@@ -580,9 +580,11 @@ final class SwitcherController: SwitcherViewDelegate {
 
     private func handleAppHiddenChanged(pid: pid_t) {
         guard phase == .visible, baseRows.contains(where: { $0.pid == pid }) else { return }
-        // No re-sort needed: windowless and hidden share a status bucket (see
-        // `statusPriority`), so the row keeps its place — only the live glyph
-        // changes. `refreshDisplay` re-renders from the current `baseRows`.
+        // No re-sort needed under either setting (see `statusPriority`): with
+        // "move hidden apps to the bottom" on, the app that fires this has
+        // already gone windowless and hidden shares that bucket; with it off,
+        // hiding isn't a bucket input at all. Only the live glyph changes, so
+        // `refreshDisplay` re-renders from the current `baseRows`.
         refreshDisplay()
     }
 

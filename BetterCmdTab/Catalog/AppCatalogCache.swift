@@ -296,10 +296,9 @@ final class AppCatalogCache {
     /// regular apps pool into one trailing "inactive" bucket: an app closing its
     /// last window can flip between "no window" and "hidden window" across AX
     /// refreshes (Electron apps hide rather than go windowless), and one bucket
-    /// stops that flip from reordering it. Turning the preference off is opting
-    /// into that jitter — a hidden app keeps its MRU slot, so an Electron app
-    /// that hides on last-window-close now drops to the windowless bucket and
-    /// back — which is the point: the user asked for hidden apps to stay put.
+    /// stops that flip from reordering it. Off, a hidden app keeps its MRU slot
+    /// instead — the whole point of the preference — so that same flip does move
+    /// the app between buckets; the jitter is the accepted cost of opting out.
     /// Placeholders stay at 0 so they aren't demoted while warming.
     nonisolated static func statusPriority(hasWindow: Bool, isPlaceholder: Bool, isHidden: Bool, isMinimized: Bool, sinkHiddenApps: Bool) -> Int {
         if !hasWindow, !isPlaceholder { return 2 }
