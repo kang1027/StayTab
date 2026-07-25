@@ -51,6 +51,30 @@ final class SwitcherPanel: NSPanel {
     /// seconds.
     private static let staleSurfaceThreshold: TimeInterval = 300
 
+    /// On-screen frame a hide parked away from; `present()` restores it so the
+    /// "frame unchanged → skip `setFrame`" fast path still holds. Nil when the
+    /// panel isn't parked.
+    private var parkedFrame: NSRect?
+
+    /// Off-screen origin for a hidden panel (same trick as the boot prewarm).
+    /// Zeroing `alphaValue` and hiding the content view isn't enough on macOS
+    /// 26: the glass backdrop is composited window-server-side, so its last
+    /// sampled frame — a cutout of the app that was behind us — can keep
+    /// compositing over the app we just activated for as long as the window
+    /// stays ordered in, which on the commit path is the whole activation
+    /// (#146). Parking the window off every display puts that residue where
+    /// nobody can see it, whichever of the two knobs the server ignores.
+    private static let parkedOrigin = NSPoint(x: -20000, y: -20000)
+
+    /// Move the (already invisible) panel off every display. Keeps the window
+    /// ordered and key, so WindowServer focus routing is unchanged — only
+    /// `orderOut` disturbs that, which is why `vanish()` can't just do it.
+    private func park() {
+        guard parkedFrame == nil else { return }
+        parkedFrame = frame
+        setFrameOrigin(Self.parkedOrigin)
+    }
+
     /// Replace the inherited `-[NSWindow appearsActive]` getter for
     /// `SwitcherPanel` instances with a constant `true`. Dynamic NSColors used
     /// by row views (`.labelColor`, `.controlAccentColor`,
@@ -167,6 +191,13 @@ final class SwitcherPanel: NSPanel {
         isPresented = true
         CATransaction.begin()
         CATransaction.setDisableActions(true)
+        // Undo the off-screen park before the frame comparison below, so an
+        // unchanged layout still skips `setFrame`. Alpha is still zero here and
+        // is restored in this same transaction — the move never shows.
+        if let parkedFrame {
+            setFrameOrigin(parkedFrame.origin)
+            self.parkedFrame = nil
+        }
         let fitting = Log.reveal.withIntervalSignpost("present.layout") { () -> NSSize in
             content.layoutSubtreeIfNeeded()
             return content.fittingSize
@@ -264,6 +295,7 @@ final class SwitcherPanel: NSPanel {
         // has no last-sampled backdrop left to flash as a ghost after we vanish.
         // `present()` un-hides it.
         contentView?.isHidden = true
+        park()
         orderOut(nil)
         targetScreen = nil
         CATransaction.commit()
@@ -284,6 +316,10 @@ final class SwitcherPanel: NSPanel {
         CATransaction.setDisableActions(true)
         alphaValue = 0
         contentView?.isHidden = true
+        // The window stays ordered until `dismiss()`, so an alpha-immune
+        // server-side glass residue would otherwise sit over the app we're
+        // activating for the whole AX focus handoff (#146).
+        park()
         CATransaction.commit()
         ignoresMouseEvents = true
         onFrameDidChange?(nil)
