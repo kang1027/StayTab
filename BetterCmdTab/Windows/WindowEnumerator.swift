@@ -127,6 +127,28 @@ enum WindowEnumerator {
     /// user windows kept in the switcher.
     static let dockWindowLevel = Int(CGWindowLevelForKey(.dockWindow))
 
+    private static let windowManagerDefaults = UserDefaults(suiteName: "com.apple.WindowManager")
+
+    /// Whether Stage Manager is on. It reports every *off-stage* window to
+    /// WindowServer at its shrunken strip-tile geometry (~83×103, ordered out)
+    /// while the Accessibility API keeps reporting the window's real frame — so
+    /// two WindowServer-derived heuristics stop holding while it is on (#116):
+    ///
+    ///   1. the sub-100px "junk surface" gate in `cgWindowBucket` would drop
+    ///      every off-stage window out of the CG hint, starving the brute-force
+    ///      AX scan (and making the hint reject anything it did find), and
+    ///   2. "ordered out, next to an ordered-in front" stops meaning "native
+    ///      background tab" — Stage Manager orders windows out *en masse*, so
+    ///      `resolveTabStacks`' near-frame rule folds real cascaded windows away.
+    ///
+    /// `GloballyEnabled` in `com.apple.WindowManager` is the system toggle; the
+    /// key is absent until Stage Manager is first enabled, which reads as false.
+    /// The suite is cached (one CFPrefs lookup per read) and picks up changes
+    /// made while we run, so toggling Stage Manager takes effect on the next scan.
+    static var isStageManagerEnabled: Bool {
+        windowManagerDefaults?.bool(forKey: "GloballyEnabled") ?? false
+    }
+
     /// Classification of a `CGWindowListCopyWindowInfo` entry for snapshot
     /// bucketing. `.normal` windows feed the id/z-order hint; `.nonNormalLayer`
     /// windows (Dock-level-and-above overlays plus the sub-normal desktop band)
@@ -139,14 +161,18 @@ enum WindowEnumerator {
         case excluded
     }
 
-    static func cgWindowBucket(layer: Int, alpha: Double, width: Double, height: Double) -> CGWindowBucket {
+    static func cgWindowBucket(layer: Int, alpha: Double, width: Double, height: Double, stageManager: Bool = false) -> CGWindowBucket {
         // Drop only non-switchable surfaces: Dock level (20) and above, plus the
         // sub-normal desktop band (< 0). Levels 1–19 — floating ("keep on top"),
         // modal panels, utility windows — are real user windows and stay. The
         // Teams notification phantom sits at level 20 (Dock), so it's still caught.
         if layer >= Self.dockWindowLevel || layer < 0 { return .nonNormalLayer }
         if alpha <= 0 { return .excluded }
-        if width < 100 || height < 100 { return .excluded }
+        // The size gate assumes anything this small is a helper surface, which is
+        // false under Stage Manager: it reports every off-stage window at its
+        // ~83×103 strip-tile size, so the gate would exclude real user windows
+        // from the CG hint and the on-screen set (#116).
+        if !stageManager, width < 100 || height < 100 { return .excluded }
         return .normal
     }
 
@@ -175,6 +201,8 @@ enum WindowEnumerator {
         var zOrder: [pid_t: [CGWindowID]] = [:]
         var nonNormalLayer: [pid_t: Set<CGWindowID>] = [:]
         var onscreen: [pid_t: Set<CGWindowID>] = [:]
+        // Read once for the whole snapshot, not per window.
+        let stageManager = isStageManagerEnabled
         for entry in cfArray {
             guard let ownerPID = entry[kCGWindowOwnerPID as String] as? pid_t else { continue }
             guard let widNum = entry[kCGWindowNumber as String] as? Int else { continue }
@@ -190,7 +218,7 @@ enum WindowEnumerator {
                 width = (bounds["Width"] as? Double) ?? 0
                 height = (bounds["Height"] as? Double) ?? 0
             }
-            switch cgWindowBucket(layer: layer, alpha: alpha, width: width, height: height) {
+            switch cgWindowBucket(layer: layer, alpha: alpha, width: width, height: height, stageManager: stageManager) {
             case .normal:
                 if ids[ownerPID, default: []].insert(wid).inserted {
                     zOrder[ownerPID, default: []].append(wid)
@@ -508,7 +536,12 @@ enum WindowEnumerator {
         // without a tab-shaped group — the common case pays nothing.
         var spaceless = [Bool](repeating: false, count: raws.count)
         var spaceOf = [UInt64?](repeating: nil, count: raws.count)
-        let spaceQueryIndices = tabSpaceQueryIndices(frames: frames, fromAXList: fromAXList, onscreen: onscreen)
+        // Under Stage Manager the near-frame rule is off (see `isStageManagerEnabled`),
+        // so skip the per-window Space IPCs that only feed it.
+        let stageManager = isStageManagerEnabled
+        let spaceQueryIndices = stageManager
+            ? []
+            : tabSpaceQueryIndices(frames: frames, fromAXList: fromAXList, onscreen: onscreen)
         if !spaceQueryIndices.isEmpty {
             let membership = PrivateAPI.spaceMembership(forWindows: spaceQueryIndices.map { raws[$0].cgWindowID })
             for i in spaceQueryIndices {
@@ -522,7 +555,8 @@ enum WindowEnumerator {
             onscreen: onscreen,
             spaceless: spaceless,
             spaceOf: spaceOf,
-            expand: expand
+            expand: expand,
+            stageManager: stageManager
         )
         for (i, raw) in raws.enumerated() where resolution.keep[i] {
             let siblings = resolution.siblingIndices[i] ?? []
@@ -633,13 +667,22 @@ enum WindowEnumerator {
     ///   their front window. Brute-only windows matching no AX-listed window
     ///   are kept (e.g. fullscreen windows the public list misses), preserving
     ///   prior behavior.
+    ///
+    /// `stageManager` disables the near-frame rule only: Stage Manager orders
+    /// every off-stage window out, so "ordered out near an ordered-in front" no
+    /// longer implies "tabbed away" and would fold the user's real windows out of
+    /// the switcher (#116 — TextEdit/browser windows cascade ~20–29pt apart, well
+    /// inside `tabFrameTolerance`). The exact-frame brute-only rule is untouched,
+    /// so ordinary native tab groups still collapse while Stage Manager is on;
+    /// only the #81 stale-frame shapes stay expanded until it is turned off.
     static func resolveTabStacks(
         frames: [CGRect?],
         fromAXList: [Bool],
         onscreen: [Bool],
         spaceless: [Bool],
         spaceOf: [UInt64?],
-        expand: Bool
+        expand: Bool,
+        stageManager: Bool = false
     ) -> TabResolution {
         let n = frames.count
         // Exact-frame front: the ordered-in AX-listed window (the visible front
@@ -662,7 +705,7 @@ enum WindowEnumerator {
             var front: Int?
             if !fromAXList[i], let exact = frontForFrame[frameKey(f)], exact != i {
                 front = exact
-            } else if !onscreen[i],
+            } else if !stageManager, !onscreen[i],
                       let near = nearFronts.first(where: { $0 != i && isNearTabFrame(f, frames[$0]!) }),
                       spaceless[i] || (spaceOf[i] != nil && spaceOf[i] == spaceOf[near]) {
                 front = near
