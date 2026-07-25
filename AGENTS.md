@@ -135,7 +135,9 @@ Data + control flow on the ⌘Tab hot path:
   (absent keys keep their current value) and calls `reloadFromDefaults()` to refresh live
   subscribers. `App/ConfigFile.swift` two-way-syncs the same flat format with
   `~/.config/bettercmdtab/config.json` (`$XDG_CONFIG_HOME` honored) when that file exists —
-  event-driven watcher + debounced write-back, dormant when absent (#117).
+  event-driven watcher + debounced write-back, dormant when absent (#117). It also writes a
+  sidecar `schema.json` (referenced by the config's `$schema` key) generated from the live
+  snapshot — types only, open-ended, so a new preference needs no schema edit.
 - **Localization** — user-facing strings use `String(localized: "…")` and live in the
   version-controlled `BetterCmdTab/Localizable.xcstrings` (native Xcode string catalog,
   macOS 13+). Enum display names (layout mode, accent, etc.) are localized too.
