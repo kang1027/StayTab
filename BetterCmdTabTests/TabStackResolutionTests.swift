@@ -28,7 +28,8 @@ struct TabStackResolutionTests {
         onscreen: [Bool]? = nil,
         spaceless: [Bool]? = nil,
         spaceOf: [UInt64?]? = nil,
-        expand: Bool
+        expand: Bool,
+        stageManager: Bool = false
     ) -> WindowEnumerator.TabResolution {
         WindowEnumerator.resolveTabStacks(
             frames: frames,
@@ -36,8 +37,69 @@ struct TabStackResolutionTests {
             onscreen: onscreen ?? fromAXList,
             spaceless: spaceless ?? [Bool](repeating: false, count: frames.count),
             spaceOf: spaceOf ?? [UInt64?](repeating: nil, count: frames.count),
-            expand: expand
+            expand: expand,
+            stageManager: stageManager
         )
+    }
+
+    // MARK: - Stage Manager (#116)
+
+    /// Measured on macOS 26 with Stage Manager on ("show windows one at a
+    /// time"): seven TextEdit windows, identical 586×488, cascaded 15pt apart,
+    /// one on stage and the rest ordered out. Every off-stage window sits inside
+    /// `tabFrameTolerance` of the staged one, so the near-frame rule folds four
+    /// real windows away and the switcher shows 3 rows instead of 7.
+    private var stageManagerCascade: (frames: [CGRect?], onscreen: [Bool]) {
+        let frames: [CGRect?] = (0..<7).map {
+            CGRect(x: 400 + CGFloat($0) * 15, y: 200 + CGFloat($0) * 15, width: 586, height: 488)
+        }
+        // Index 1 is on stage; the rest report their strip tile and are ordered out.
+        return (frames, [false, true, false, false, false, false, false])
+    }
+
+    @Test("Stage Manager: cascaded windows are not folded as tab siblings")
+    func stageManagerKeepsCascadedWindows() {
+        let (frames, onscreen) = stageManagerCascade
+        let r = resolve(
+            frames: frames,
+            fromAXList: [Bool](repeating: true, count: 7),
+            onscreen: onscreen,
+            spaceOf: [UInt64?](repeating: 1, count: 7),
+            expand: false,
+            stageManager: true
+        )
+        #expect(r.keep == [Bool](repeating: true, count: 7))
+        #expect(r.siblingIndices.isEmpty)
+    }
+
+    /// Guards the flag itself: without it the same input loses four windows,
+    /// which is exactly the bug. Documents why the gate has to exist.
+    @Test("without the Stage Manager flag the same cascade loses four windows")
+    func cascadeWouldFoldWithoutStageManagerFlag() {
+        let (frames, onscreen) = stageManagerCascade
+        let r = resolve(
+            frames: frames,
+            fromAXList: [Bool](repeating: true, count: 7),
+            onscreen: onscreen,
+            spaceOf: [UInt64?](repeating: 1, count: 7),
+            expand: false,
+            stageManager: false
+        )
+        #expect(r.keep.filter { $0 }.count == 3)
+    }
+
+    @Test("Stage Manager still collapses ordinary native tab groups")
+    func stageManagerKeepsExactFrameTabCollapse() {
+        // Exact-frame brute-only rule is untouched: front tab + 2 background
+        // tabs at the identical group frame still fold into one row.
+        let r = resolve(
+            frames: [F, F, F],
+            fromAXList: [true, false, false],
+            expand: false,
+            stageManager: true
+        )
+        #expect(r.keep == [true, false, false])
+        #expect(r.siblingIndices[0] == [1, 2])
     }
 
     @Test("expand keeps every window as its own row and flags background tabs")
