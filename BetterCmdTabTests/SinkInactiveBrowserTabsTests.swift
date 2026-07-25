@@ -6,7 +6,7 @@ import Testing
 /// Pure-logic coverage for `SwitcherController.sinkInactiveBrowserTabs` — the
 /// window-recency fallback that keeps only a browser window's active tab at the
 /// window's slot and sinks its inactive tabs (#97). `@MainActor` because the
-/// core re-buckets via the `@MainActor` `AppCatalogCache.statusPriority`.
+/// core is a static on the `@MainActor` `SwitcherController`.
 @MainActor
 @Suite("Sink inactive browser tabs")
 struct SinkInactiveBrowserTabsTests {
@@ -34,7 +34,8 @@ struct SinkInactiveBrowserTabsTests {
         let out = SwitcherController.sinkInactiveBrowserTabs(
             rows,
             activeIndex: [AXRef(element: browserWindow): 1],
-            pinnedIDs: []
+            pinnedIDs: [],
+            sinkHiddenApps: true
         )
         #expect(out.map(\.windowTitle) == ["Docs", "Editor", "Inbox", "News"])
     }
@@ -42,7 +43,7 @@ struct SinkInactiveBrowserTabsTests {
     @Test("a window without a cached active-tab index stays whole")
     func uncachedWindowStaysWhole() {
         let rows = tabRows(["Inbox", "Docs"]) + [windowRow(otherWindow, title: "Editor")]
-        let out = SwitcherController.sinkInactiveBrowserTabs(rows, activeIndex: [:], pinnedIDs: [])
+        let out = SwitcherController.sinkInactiveBrowserTabs(rows, activeIndex: [:], pinnedIDs: [], sinkHiddenApps: true)
         #expect(out.map(\.windowTitle) == rows.map(\.windowTitle))
     }
 
@@ -54,7 +55,8 @@ struct SinkInactiveBrowserTabsTests {
         let out = SwitcherController.sinkInactiveBrowserTabs(
             rows,
             activeIndex: [AXRef(element: browserWindow): 0],
-            pinnedIDs: []
+            pinnedIDs: [],
+            sinkHiddenApps: true
         )
         #expect(out.map(\.windowTitle) == ["Inbox", "Docs", "Minimized", "Windowless"])
     }
@@ -70,7 +72,8 @@ struct SinkInactiveBrowserTabsTests {
         let out = SwitcherController.sinkInactiveBrowserTabs(
             rows,
             activeIndex: [AXRef(element: browserWindow): 0],
-            pinnedIDs: ["com.example.pinned"]
+            pinnedIDs: ["com.example.pinned"],
+            sinkHiddenApps: true
         )
         #expect(out.first?.bundleIdentifier == "com.example.pinned")
         #expect(out.dropFirst().map(\.windowTitle) == ["Inbox", "Docs"])
@@ -82,7 +85,8 @@ struct SinkInactiveBrowserTabsTests {
         let out = SwitcherController.sinkInactiveBrowserTabs(
             rows,
             activeIndex: [AXRef(element: browserWindow): 0],
-            pinnedIDs: []
+            pinnedIDs: [],
+            sinkHiddenApps: true
         )
         #expect(out.map(\.windowTitle) == ["One", "Two"])
     }

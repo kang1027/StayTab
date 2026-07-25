@@ -3366,14 +3366,14 @@ final class SwitcherController: SwitcherViewDelegate {
     /// did sink, re-bucket by status and re-pin exactly like the tab-MRU branch of
     /// `applyBrowserTabMRU`: a sunk (visible) tab must land BEFORE the hidden/
     /// minimized bucket, not behind it, and pinned apps must get the front back —
-    /// the pin guarantee outranks the sink. `sinkHiddenApps` defaults `true` (the
-    /// historical behavior) for callers, like the existing tests, that don't care
-    /// about the "move hidden apps to the bottom" pref.
+    /// the pin guarantee outranks the sink. `sinkHiddenApps` is explicit (no
+    /// default) so a caller can't silently re-bucket against a different rule
+    /// than the catalog just used.
     static func sinkInactiveBrowserTabs(
         _ rows: [SwitcherRow],
         activeIndex: [AXRef: Int],
         pinnedIDs: [String],
-        sinkHiddenApps: Bool = true
+        sinkHiddenApps: Bool
     ) -> [SwitcherRow] {
         sinkInactiveBrowserTabs(rows, activeIndexFor: { activeIndex[$0] }, pinnedIDs: pinnedIDs, sinkHiddenApps: sinkHiddenApps)
     }

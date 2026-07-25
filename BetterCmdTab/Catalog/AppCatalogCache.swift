@@ -272,10 +272,13 @@ final class AppCatalogCache {
         return CatalogFilter.filteredRows(sorted, resolvedCfg)
     }
 
-    /// Internal (not private) so the `.mruWindows` re-sort can re-apply the same
-    /// bucketing after its global shuffle. `sinkHiddenApps` defaults `true` for
-    /// callers without a live preference value.
-    static func statusPriority(_ row: SwitcherRow, sinkHiddenApps: Bool = true) -> Int {
+    /// The one bucketing rule for the whole app: internal (not private) so the
+    /// `.mruWindows` re-sort can re-apply it after its global shuffle, and
+    /// `nonisolated` so the off-main cold path (`AppCatalog.snapshot`) shares it
+    /// instead of mirroring it. No default for `sinkHiddenApps` — every caller
+    /// must pass the live preference, or rows sort one way here and another way
+    /// on the next refresh.
+    nonisolated static func statusPriority(_ row: SwitcherRow, sinkHiddenApps: Bool) -> Int {
         statusPriority(
             hasWindow: row.window != nil,
             isPlaceholder: row.isPlaceholder,
@@ -289,13 +292,16 @@ final class AppCatalogCache {
     /// testable without a live `NSRunningApplication` (`isHidden` can't be faked
     /// for the test host).
     ///
-    /// Windowless and hidden regular apps pool into one trailing "inactive"
-    /// bucket: an app closing its last window can flip between "no window" and
-    /// "hidden window" across AX refreshes (Electron apps hide rather than go
-    /// windowless), and one bucket stops that flip from reordering it.
+    /// With `sinkHiddenApps` on (the default preference), windowless and hidden
+    /// regular apps pool into one trailing "inactive" bucket: an app closing its
+    /// last window can flip between "no window" and "hidden window" across AX
+    /// refreshes (Electron apps hide rather than go windowless), and one bucket
+    /// stops that flip from reordering it. Turning the preference off is opting
+    /// into that jitter — a hidden app keeps its MRU slot, so an Electron app
+    /// that hides on last-window-close now drops to the windowless bucket and
+    /// back — which is the point: the user asked for hidden apps to stay put.
     /// Placeholders stay at 0 so they aren't demoted while warming.
-    /// `sinkHiddenApps` gates only the hidden branch — windowless always sinks.
-    static func statusPriority(hasWindow: Bool, isPlaceholder: Bool, isHidden: Bool, isMinimized: Bool, sinkHiddenApps: Bool) -> Int {
+    nonisolated static func statusPriority(hasWindow: Bool, isPlaceholder: Bool, isHidden: Bool, isMinimized: Bool, sinkHiddenApps: Bool) -> Int {
         if !hasWindow, !isPlaceholder { return 2 }
         if sinkHiddenApps, isHidden { return 2 }
         if isMinimized { return 1 }

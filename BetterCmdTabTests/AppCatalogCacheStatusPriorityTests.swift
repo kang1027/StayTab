@@ -5,8 +5,9 @@ import Testing
 /// specifically the `sinkHiddenApps` gate behind "Move hidden apps to the
 /// bottom". Exercises the primitive-typed core (not the `SwitcherRow`
 /// wrapper) since `SwitcherRow.isHidden` reads a live `NSRunningApplication`,
-/// which can't be faked as hidden for the test host process.
-@MainActor
+/// which can't be faked as hidden for the test host process. The rule is
+/// `nonisolated`, so this covers both the cached and the off-main cold path
+/// (`AppCatalog.snapshot`) — they call the same function.
 @Suite("AppCatalogCache statusPriority")
 struct AppCatalogCacheStatusPriorityTests {
 

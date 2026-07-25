@@ -130,22 +130,15 @@ enum AppCatalog {
         // The old comparator called it twice per comparison (O(n log n) ObjC
         // queries); decorating up front makes it O(n). Tie-break on the
         // original offset keeps the order byte-identical to before.
+        // Shares `AppCatalogCache`'s rule (nonisolated, so this off-main cold
+        // path can call it) — cold and cached snapshots can't drift apart.
         let sorted = rows.enumerated()
-            .map { (priority: Self.statusPriority($0.element, sinkHiddenApps: resolvedCfg.sinkHiddenApps), offset: $0.offset, row: $0.element) }
+            .map { (priority: AppCatalogCache.statusPriority($0.element, sinkHiddenApps: resolvedCfg.sinkHiddenApps), offset: $0.offset, row: $0.element) }
             .sorted { lhs, rhs in
                 if lhs.priority != rhs.priority { return lhs.priority < rhs.priority }
                 return lhs.offset < rhs.offset
             }
             .map { $0.row }
         return CatalogFilter.filteredRows(sorted, resolvedCfg)
-    }
-
-    private static func statusPriority(_ row: SwitcherRow, sinkHiddenApps: Bool) -> Int {
-        // Mirror AppCatalogCache.statusPriority so cold and cached snapshots
-        // agree on ordering; see there for the bucketing rationale.
-        if row.window == nil, !row.isPlaceholder { return 2 }
-        if sinkHiddenApps, row.isHidden { return 2 }
-        if row.isMinimized { return 1 }
-        return 0
     }
 }

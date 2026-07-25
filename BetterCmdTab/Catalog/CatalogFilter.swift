@@ -25,9 +25,7 @@ enum CatalogFilter {
         /// Sink hidden apps to the end via `statusPriority` bucketing (not
         /// `filteredRows`; `showHidden` still governs whether they appear).
         /// Not per-shortcut overridable, so `overlay` passes it through.
-        /// `var` + default keeps it a defaulted memberwise-init param (a `let`
-        /// default would drop it from the init).
-        var sinkHiddenApps: Bool = true
+        let sinkHiddenApps: Bool
 
         /// No filtering and no reordering — lets callers skip work entirely.
         var isIdentity: Bool {

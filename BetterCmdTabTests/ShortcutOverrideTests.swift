@@ -220,7 +220,7 @@ struct ShortcutOverrideTests {
 
     @Test("overlaying an empty override preserves an identity config")
     func overlayKeepsIdentity() {
-        let identity = CatalogFilter.Config(hideModes: [:], pinned: [], showMinimized: true, showHidden: true, showWindowless: true, spaceScope: .allSpaces, sortOrder: .mru)
+        let identity = CatalogFilter.Config(hideModes: [:], pinned: [], showMinimized: true, showHidden: true, showWindowless: true, spaceScope: .allSpaces, sortOrder: .mru, sinkHiddenApps: true)
         #expect(identity.isIdentity)
         #expect(CatalogFilter.overlay(identity, ShortcutOverride()).isIdentity)
     }
