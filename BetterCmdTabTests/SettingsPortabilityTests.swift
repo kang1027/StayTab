@@ -371,6 +371,56 @@ struct SettingsPortabilityTests {
         #expect(defaults.string(forKey: customSoundKey) == "local.aiff")
     }
 
+    @Test("generated schema types every snapshot key and stays open-ended")
+    func schemaShape() throws {
+        let schema = Preferences.settingsSchema(
+            for: [
+                "aBool": true,
+                "anInt": 42,
+                "aDouble": 0.5,
+                "aString": "x",
+                "anArray": ["a"],
+                "anObject": ["k": "v"],
+            ],
+            version: "26.7"
+        )
+        // Open-ended by design: a file from another version must still validate.
+        #expect(schema["additionalProperties"] as? Bool == true)
+        #expect(schema["required"] == nil)
+        let properties = try #require(schema["properties"] as? [String: [String: String]])
+        #expect(properties["aBool"]?["type"] == "boolean")
+        #expect(properties["anInt"]?["type"] == "integer")
+        #expect(properties["aDouble"]?["type"] == "number")
+        #expect(properties["aString"]?["type"] == "string")
+        #expect(properties["anArray"]?["type"] == "array")
+        #expect(properties["anObject"]?["type"] == "object")
+        #expect(properties["$schema"]?["type"] == "string")
+    }
+
+    @Test("live snapshot keys all appear in the generated schema")
+    func schemaCoversSnapshot() throws {
+        let data = try Preferences.settingsSchemaData(version: "test")
+        let schema = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let properties = try #require(schema["properties"] as? [String: Any])
+        for key in Preferences.flatSettingsSnapshot().keys {
+            #expect(properties[key] != nil, "schema is missing \(key)")
+        }
+    }
+
+    @Test("the config file's $schema pointer is not imported as a setting")
+    func schemaRefIgnoredOnImport() throws {
+        let prefs = Preferences.shared
+        // A build predating the pointer stores it as a plain setting (it has no
+        // exclusion for it) and can share this defaults domain, so start clean.
+        UserDefaults.standard.removeObject(forKey: "Switcher.$schema")
+        try prefs.importSettings(from: flat(["$schema": "./schema.json"]))
+        #expect(UserDefaults.standard.object(forKey: "Switcher.$schema") == nil)
+        // …and so it can never come back out in an export.
+        let root = try #require(
+            try JSONSerialization.jsonObject(with: Preferences.exportedJSONData()) as? [String: Any])
+        #expect(root["$schema"] == nil)
+    }
+
     @Test("keys outside the Switcher namespace are ignored on import")
     func foreignKeysIgnored() throws {
         let prefs = Preferences.shared

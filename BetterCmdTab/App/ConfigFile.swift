@@ -37,7 +37,26 @@ final class ConfigFile: @unchecked Sendable {
         return base.appendingPathComponent("bettercmdtab/config.json", isDirectory: false)
     }()
 
+    /// Sidecar JSON Schema, written beside the config file and pointed at by
+    /// its `$schema` key so editors validate and autocomplete a hand-edited
+    /// file. Regenerated from the running build (see
+    /// `Preferences.settingsSchema`), so it never lags a version.
+    static let schemaURL = url.deletingLastPathComponent()
+        .appendingPathComponent("schema.json", isDirectory: false)
+
+    /// Relative on purpose (resolves against the config file's own directory)
+    /// and slash-free so `JSONSerialization` doesn't escape it into `".\/…"`.
+    private static let schemaRef = "schema.json"
+
     static var fileExists: Bool { FileManager.default.fileExists(atPath: url.path) }
+
+    /// The config snapshot plus its `$schema` pointer. `$schema` is excluded
+    /// from import, so the round trip stays a no-op setting-wise.
+    private static func configData() throws -> Data {
+        var values = Preferences.flatSettingsSnapshot()
+        values["$schema"] = schemaRef
+        return try JSONSerialization.data(withJSONObject: values, options: [.prettyPrinted, .sortedKeys])
+    }
 
     private let queue = DispatchQueue(label: "pro.bettercmdtab.config", qos: .utility)
     // Queue-confined state.
@@ -45,9 +64,12 @@ final class ConfigFile: @unchecked Sendable {
     private var watchingFile = false
     /// Raw bytes last read from or written to the file. The echo guard: our
     /// own atomic write fires the watcher, the re-read compares equal and the
-    /// reload is skipped — no suppression flags needed (`exportedJSONData()`
-    /// is byte-deterministic via `.sortedKeys`).
+    /// reload is skipped — no suppression flags needed (`configData()` is
+    /// byte-deterministic via `.sortedKeys`).
     private var lastSyncedData: Data?
+    /// Bytes last written to `schemaURL`, seeded from disk on first use so an
+    /// unchanged schema costs no write at launch.
+    private var lastSchemaData: Data?
     private var pendingReload: DispatchWorkItem?
     private var writeBack: AnyCancellable?
 
@@ -64,7 +86,12 @@ final class ConfigFile: @unchecked Sendable {
         }
         queue.async { [self] in
             armWatcher()
-            if watchingFile { scheduleReloadLocked() }
+            if watchingFile {
+                // Covers an upgrade that added keys: the schema refreshes at
+                // launch even if no setting is touched this session.
+                syncSchemaLocked()
+                scheduleReloadLocked()
+            }
         }
     }
 
@@ -75,7 +102,7 @@ final class ConfigFile: @unchecked Sendable {
     func createFileAndActivate() throws {
         try FileManager.default.createDirectory(
             at: Self.url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let data = try Preferences.exportedJSONData()
+        let data = try Self.configData()
         try data.write(to: Self.url.resolvingSymlinksInPath(), options: .atomic)
         queue.async { [self] in lastSyncedData = data }
         start()
@@ -174,15 +201,32 @@ final class ConfigFile: @unchecked Sendable {
     /// watched — never creates the file uninvited.
     private func writeBackLocked() {
         guard watchingFile,
-              let data = try? Preferences.exportedJSONData(),
+              let data = try? Self.configData(),
               data != lastSyncedData else { return }
         lastSyncedData = data
+        // A key can appear mid-session (a preference written for the first
+        // time); keep the schema in step with what we're about to write.
+        syncSchemaLocked()
         do {
             // Resolve symlinks so the atomic write (temp + rename) replaces the
             // link's target, not the link itself (dotfiles setups).
             try data.write(to: Self.url.resolvingSymlinksInPath(), options: .atomic)
         } catch {
             Log.config.warning("config write-back failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Write the sidecar schema when its bytes changed. Only ever runs while
+    /// the config file itself is synced, so nothing is created uninvited.
+    private func syncSchemaLocked() {
+        guard watchingFile, let data = try? Preferences.settingsSchemaData() else { return }
+        if lastSchemaData == nil { lastSchemaData = try? Data(contentsOf: Self.schemaURL) }
+        guard data != lastSchemaData else { return }
+        lastSchemaData = data
+        do {
+            try data.write(to: Self.schemaURL.resolvingSymlinksInPath(), options: .atomic)
+        } catch {
+            Log.config.warning("config schema write failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 }
