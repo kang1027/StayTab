@@ -66,4 +66,19 @@ struct WindowEnumeratorTests {
         // A bounds dict missing Width/Height yields 0, which the size gate excludes.
         #expect(WindowEnumerator.cgWindowBucket(layer: 0, alpha: 1.0, width: 0, height: 0) == .excluded)
     }
+
+    @Test("Stage Manager: strip-tile sized windows stay normal (#116)")
+    func stageManagerKeepsStripTiles() {
+        // Measured on macOS 26: an off-stage window is reported at ~83×103.
+        // With Stage Manager off that is a junk surface; with it on it is a real
+        // user window and must stay in the CG hint / on-screen set.
+        #expect(WindowEnumerator.cgWindowBucket(layer: 0, alpha: 1.0, width: 83, height: 103) == .excluded)
+        #expect(WindowEnumerator.cgWindowBucket(layer: 0, alpha: 1.0, width: 83, height: 103, stageManager: true) == .normal)
+    }
+
+    @Test("Stage Manager does not re-admit invisible or overlay windows")
+    func stageManagerKeepsOtherGates() {
+        #expect(WindowEnumerator.cgWindowBucket(layer: 0, alpha: 0.0, width: 83, height: 103, stageManager: true) == .excluded)
+        #expect(WindowEnumerator.cgWindowBucket(layer: 20, alpha: 1.0, width: 83, height: 103, stageManager: true) == .nonNormalLayer)
+    }
 }
