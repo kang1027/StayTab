@@ -580,9 +580,11 @@ final class SwitcherController: SwitcherViewDelegate {
 
     private func handleAppHiddenChanged(pid: pid_t) {
         guard phase == .visible, baseRows.contains(where: { $0.pid == pid }) else { return }
-        // No re-sort needed: windowless and hidden share a status bucket (see
-        // `statusPriority`), so the row keeps its place — only the live glyph
-        // changes. `refreshDisplay` re-renders from the current `baseRows`.
+        // No re-sort needed under either setting (see `statusPriority`): with
+        // "move hidden apps to the bottom" on, the app that fires this has
+        // already gone windowless and hidden shares that bucket; with it off,
+        // hiding isn't a bucket input at all. Only the live glyph changes, so
+        // `refreshDisplay` re-renders from the current `baseRows`.
         refreshDisplay()
     }
 
@@ -3260,10 +3262,11 @@ final class SwitcherController: SwitcherViewDelegate {
         // sink to the end (matching `.mru` and the rest of the app) while recency
         // order is preserved within each bucket. Then re-pin.
         let ranked = windowMRU.sortRowsGlobally(stable)
+        let sinkHiddenApps = Preferences.shared.sinkHiddenApps
         let bucketed = ranked.enumerated()
             .sorted { lhs, rhs in
-                let lp = AppCatalogCache.statusPriority(lhs.element)
-                let rp = AppCatalogCache.statusPriority(rhs.element)
+                let lp = AppCatalogCache.statusPriority(lhs.element, sinkHiddenApps: sinkHiddenApps)
+                let rp = AppCatalogCache.statusPriority(rhs.element, sinkHiddenApps: sinkHiddenApps)
                 return lp != rp ? lp < rp : lhs.offset < rhs.offset
             }
             .map(\.element)
@@ -3322,10 +3325,11 @@ final class SwitcherController: SwitcherViewDelegate {
     private func applyBrowserTabMRU(_ rows: [SwitcherRow]) -> [SwitcherRow] {
         guard browserTabMRUActive else { return sinkInactiveBrowserTabs(rows) }
         let ranked = tabMRU.sortRows(rows)
+        let sinkHiddenApps = Preferences.shared.sinkHiddenApps
         let bucketed = ranked.enumerated()
             .sorted { lhs, rhs in
-                let lp = AppCatalogCache.statusPriority(lhs.element)
-                let rp = AppCatalogCache.statusPriority(rhs.element)
+                let lp = AppCatalogCache.statusPriority(lhs.element, sinkHiddenApps: sinkHiddenApps)
+                let rp = AppCatalogCache.statusPriority(rhs.element, sinkHiddenApps: sinkHiddenApps)
                 return lp != rp ? lp < rp : lhs.offset < rhs.offset
             }
             .map(\.element)
@@ -3354,7 +3358,8 @@ final class SwitcherController: SwitcherViewDelegate {
         return Self.sinkInactiveBrowserTabs(
             rows,
             activeIndexFor: { [browserTabsCache] in browserTabsCache[$0]?.activeIndex },
-            pinnedIDs: Preferences.shared.pinnedBundleIDs
+            pinnedIDs: Preferences.shared.pinnedBundleIDs,
+            sinkHiddenApps: Preferences.shared.sinkHiddenApps
         )
     }
 
@@ -3363,19 +3368,23 @@ final class SwitcherController: SwitcherViewDelegate {
     /// did sink, re-bucket by status and re-pin exactly like the tab-MRU branch of
     /// `applyBrowserTabMRU`: a sunk (visible) tab must land BEFORE the hidden/
     /// minimized bucket, not behind it, and pinned apps must get the front back —
-    /// the pin guarantee outranks the sink.
+    /// the pin guarantee outranks the sink. `sinkHiddenApps` is explicit (no
+    /// default) so a caller can't silently re-bucket against a different rule
+    /// than the catalog just used.
     static func sinkInactiveBrowserTabs(
         _ rows: [SwitcherRow],
         activeIndex: [AXRef: Int],
-        pinnedIDs: [String]
+        pinnedIDs: [String],
+        sinkHiddenApps: Bool
     ) -> [SwitcherRow] {
-        sinkInactiveBrowserTabs(rows, activeIndexFor: { activeIndex[$0] }, pinnedIDs: pinnedIDs)
+        sinkInactiveBrowserTabs(rows, activeIndexFor: { activeIndex[$0] }, pinnedIDs: pinnedIDs, sinkHiddenApps: sinkHiddenApps)
     }
 
     private static func sinkInactiveBrowserTabs(
         _ rows: [SwitcherRow],
         activeIndexFor: (AXRef) -> Int?,
-        pinnedIDs: [String]
+        pinnedIDs: [String],
+        sinkHiddenApps: Bool
     ) -> [SwitcherRow] {
         var active: [SwitcherRow] = []
         var inactive: [SwitcherRow] = []
@@ -3392,8 +3401,8 @@ final class SwitcherController: SwitcherViewDelegate {
         guard !inactive.isEmpty else { return rows }
         let bucketed = (active + inactive).enumerated()
             .sorted { lhs, rhs in
-                let lp = AppCatalogCache.statusPriority(lhs.element)
-                let rp = AppCatalogCache.statusPriority(rhs.element)
+                let lp = AppCatalogCache.statusPriority(lhs.element, sinkHiddenApps: sinkHiddenApps)
+                let rp = AppCatalogCache.statusPriority(rhs.element, sinkHiddenApps: sinkHiddenApps)
                 return lp != rp ? lp < rp : lhs.offset < rhs.offset
             }
             .map(\.element)
@@ -5105,17 +5114,18 @@ final class SwitcherController: SwitcherViewDelegate {
     }
 
     /// Index in `rows` at which a freshly-windowless regular app should be
-    /// inserted so it matches the catalog's final ordering: after every
-    /// windowed/minimized row, and within the trailing "inactive" group
-    /// (windowless + hidden, see `statusPriority`) ordered by MRU recency.
-    /// Mirrors `AppCatalog`/`AppCatalogCache`'s sort so the row lands where the
-    /// next cache refresh will keep it — whether the app settles as windowless
-    /// or hidden, both share the bucket — so there's no second jump.
+    /// inserted to match the catalog's final order (after windowed/minimized
+    /// rows, within the trailing inactive group by MRU recency), so the next
+    /// cache refresh keeps it there with no second jump. The group must equal
+    /// `statusPriority`'s bucket 2, so gate the hidden term on `sinkHiddenApps`:
+    /// with it off a hidden-but-windowed app stays up front, and treating it as
+    /// a boundary would insert above it only for the refresh to re-sink past it.
     private func inactiveInsertionIndex(forPid pid: pid_t, in rows: [SwitcherRow]) -> Int {
         let order = mru.order
         let myRank = order.firstIndex(of: pid) ?? Int.max
+        let sinkHidden = Preferences.shared.sinkHiddenApps
         for (i, row) in rows.enumerated()
-        where ((row.window == nil && !row.isPlaceholder) || row.isHidden) {
+        where ((row.window == nil && !row.isPlaceholder) || (row.isHidden && sinkHidden)) {
             let rank = row.pid.flatMap { order.firstIndex(of: $0) } ?? Int.max
             // First inactive row less recently used than us — sit before it.
             if rank > myRank { return i }

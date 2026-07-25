@@ -14,9 +14,10 @@ struct CatalogFilterTests {
         showHidden: Bool = true,
         showWindowless: Bool = true,
         spaceScope: SpaceScope = .allSpaces,
-        sortOrder: SwitcherSortOrder = .mru
+        sortOrder: SwitcherSortOrder = .mru,
+        sinkHiddenApps: Bool = true
     ) -> CatalogFilter.Config {
-        CatalogFilter.Config(hideModes: hideModes, pinned: pinned, showMinimized: showMinimized, showHidden: showHidden, showWindowless: showWindowless, spaceScope: spaceScope, sortOrder: sortOrder)
+        CatalogFilter.Config(hideModes: hideModes, pinned: pinned, showMinimized: showMinimized, showHidden: showHidden, showWindowless: showWindowless, spaceScope: spaceScope, sortOrder: sortOrder, sinkHiddenApps: sinkHiddenApps)
     }
 
     // MARK: - isIdentity
