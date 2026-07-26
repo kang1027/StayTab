@@ -27,7 +27,6 @@ struct TabStackResolutionTests {
         fromAXList: [Bool],
         onscreen: [Bool]? = nil,
         spaceless: [Bool]? = nil,
-        spaceOf: [UInt64?]? = nil,
         expand: Bool,
         stageManager: Bool = false
     ) -> WindowEnumerator.TabResolution {
@@ -36,7 +35,6 @@ struct TabStackResolutionTests {
             fromAXList: fromAXList,
             onscreen: onscreen ?? fromAXList,
             spaceless: spaceless ?? [Bool](repeating: false, count: frames.count),
-            spaceOf: spaceOf ?? [UInt64?](repeating: nil, count: frames.count),
             expand: expand,
             stageManager: stageManager
         )
@@ -64,7 +62,7 @@ struct TabStackResolutionTests {
             frames: frames,
             fromAXList: [Bool](repeating: true, count: 7),
             onscreen: onscreen,
-            spaceOf: [UInt64?](repeating: 1, count: 7),
+            spaceless: [Bool](repeating: true, count: 7),
             expand: false,
             stageManager: true
         )
@@ -81,7 +79,7 @@ struct TabStackResolutionTests {
             frames: frames,
             fromAXList: [Bool](repeating: true, count: 7),
             onscreen: onscreen,
-            spaceOf: [UInt64?](repeating: 1, count: 7),
+            spaceless: [Bool](repeating: true, count: 7),
             expand: false,
             stageManager: false
         )
@@ -174,43 +172,15 @@ struct TabStackResolutionTests {
         #expect(r.siblingIndices[0] == [1, 2])
     }
 
-    @Test("collapse folds an ordered-out tab resolved to the front's Space")
-    func collapseFoldsSameSpaceTab() {
-        // Variant: WindowServer maps the tabbed-away window to the group's own
-        // Space instead of reporting it spaceless.
+    @Test("a window mid fullscreen-exit is never folded (issue #148)")
+    func fullscreenExitWindowKept() {
+        // Measured on macOS 26: for ~50-100ms after leaving full screen the
+        // returning window is back in the AX list but still ordered out, at its
+        // restored frame — 29pt from a cascaded sibling, inside the tolerance —
+        // and WindowServer resolves it to the current Space. Folding it dropped
+        // it from the switcher until an unrelated event re-scanned the app.
         let r = resolve(
             frames: [F, Fstale],
-            fromAXList: [true, false],
-            onscreen: [true, false],
-            spaceOf: [2, 2],
-            expand: false
-        )
-        #expect(r.keep == [true, false])
-        #expect(r.siblingIndices[0] == [1])
-    }
-
-    @Test("an ordered-out window on a DIFFERENT Space is never folded")
-    func otherSpaceWindowKept() {
-        // Two same-frame windows on two desktops (e.g. both maximized): the
-        // off-Space one is ordered out but resolves to its own Space — a real
-        // window, not a tab.
-        let r = resolve(
-            frames: [F, F],
-            fromAXList: [true, true],
-            onscreen: [true, false],
-            spaceOf: [2, 3],
-            expand: false
-        )
-        #expect(r.keep == [true, true])
-        #expect(r.siblingIndices.isEmpty)
-    }
-
-    @Test("an ordered-out AX-listed window with unresolved Space is never folded")
-    func unresolvedSpaceWindowKept() {
-        // Sticky (All Desktops) or failed query: neither spaceless nor
-        // resolved — keep it, the fold only acts on positive signals.
-        let r = resolve(
-            frames: [F, F],
             fromAXList: [true, true],
             onscreen: [true, false],
             expand: false
@@ -368,24 +338,24 @@ struct TabStackResolutionTests {
         #expect(indices.isEmpty)
     }
 
-    @Test("Space query covers stale-frame brute candidates plus their front")
+    @Test("Space query covers stale-frame brute candidates only")
     func queryCoversStaleFrameCandidates() {
         let indices = WindowEnumerator.tabSpaceQueryIndices(
             frames: [F, Fstale, Fstale, G],
             fromAXList: [true, false, false, true],
             onscreen: [true, false, false, true]
         )
-        #expect(Set(indices) == [0, 1, 2])
+        #expect(indices == [1, 2])
     }
 
-    @Test("Space query covers ordered-out AX-listed candidates plus their front")
+    @Test("Space query covers ordered-out AX-listed candidates only")
     func queryCoversAXListedCandidates() {
         let indices = WindowEnumerator.tabSpaceQueryIndices(
             frames: [F, F, F, G],
             fromAXList: [true, true, true, true],
             onscreen: [true, false, false, true]
         )
-        #expect(Set(indices) == [0, 1, 2])
+        #expect(indices == [1, 2])
     }
 
     @Test("no Space query without an ordered-in front at the frame (hidden app)")
