@@ -182,20 +182,22 @@ final class HoverActionBar: NSView {
     }
 }
 
-/// A single circular traffic-light dot. The circle is custom-drawn; the
-/// glyph rides as a centered `NSImageView` so AppKit aligns the symbol's
-/// actual cap-height optical center to the dot center (manually computing
-/// `bounds.midX - gs.width/2` lands the bbox center, not the visual center
-/// — SF Symbols ship with asymmetric ascender/descender padding that
-/// shifted every glyph half a pixel off-center). Re-rendering the symbol on
-/// each resize keeps it sharp at every switcher scale.
+/// A single circular traffic-light dot. Circle and glyph are both custom-drawn:
+/// the symbol image is centered on the circle's own center, which an
+/// `NSImageView` could not do — Auto Layout gave the hosted view a non-square
+/// frame (17.5pt tall in a 21pt dot), so `.alignCenter` centered the glyph in
+/// that box and pushed `plus` visibly up and right. SF Symbol images are
+/// ink-centered in their own bounds (measured), so centering the image rect is
+/// exact. Re-rendering the symbol on each resize keeps it sharp at every
+/// switcher scale.
 @MainActor
 final class TrafficLightDot: NSView {
     let action: RowAction
 
     private let fillColor: NSColor
     private let symbolName: String
-    private let glyphView = NSImageView()
+    private var glyph: NSImage?
+    private var glyphHeight: CGFloat = 0
     var isHot = false { didSet { if oldValue != isHot { needsDisplay = true } } }
 
     init(action: RowAction, color: NSColor, symbol: String, tooltip: String) {
@@ -204,18 +206,6 @@ final class TrafficLightDot: NSView {
         self.symbolName = symbol
         super.init(frame: NSRect(x: 0, y: 0, width: HoverActionBar.baseDotSize, height: HoverActionBar.baseDotSize))
         toolTip = tooltip
-
-        glyphView.translatesAutoresizingMaskIntoConstraints = false
-        glyphView.imageScaling = .scaleProportionallyDown
-        glyphView.imageAlignment = .alignCenter
-        addSubview(glyphView)
-        NSLayoutConstraint.activate([
-            glyphView.centerXAnchor.constraint(equalTo: centerXAnchor),
-            glyphView.centerYAnchor.constraint(equalTo: centerYAnchor),
-            glyphView.widthAnchor.constraint(equalTo: widthAnchor, multiplier: 0.62),
-            glyphView.heightAnchor.constraint(equalTo: heightAnchor, multiplier: 0.62),
-        ])
-        rebuildGlyph(for: bounds.height)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) not implemented") }
@@ -224,19 +214,17 @@ final class TrafficLightDot: NSView {
         NSSize(width: HoverActionBar.baseDotSize, height: HoverActionBar.baseDotSize)
     }
 
-    override func layout() {
-        super.layout()
-        rebuildGlyph(for: bounds.height)
-    }
-
     /// SF Symbol's point size is what determines stroke weight — set it from
     /// the live dot height so the glyph keeps its proportional weight at
     /// every panel scale, instead of staying glued to the base 8pt size.
+    /// Memoized on the height it was rendered for, so redraws (hover) are free.
     private func rebuildGlyph(for dotHeight: CGFloat) {
+        guard glyphHeight != dotHeight else { return }
+        glyphHeight = dotHeight
         let pointSize = max(6, round(dotHeight * 0.55))
         let cfg = NSImage.SymbolConfiguration(pointSize: pointSize, weight: .bold)
             .applying(.init(paletteColors: [NSColor.black.withAlphaComponent(0.65)]))
-        glyphView.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)?
+        glyph = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)?
             .withSymbolConfiguration(cfg)
     }
 
@@ -251,5 +239,35 @@ final class TrafficLightDot: NSView {
         NSColor.black.withAlphaComponent(isHot ? 0.28 : 0.18).setStroke()
         path.lineWidth = isHot ? 0.75 : 0.5
         path.stroke()
+
+        rebuildGlyph(for: d)
+        guard let glyph, glyph.size.width > 0, glyph.size.height > 0 else { return }
+        glyph.draw(in: Self.glyphRect(
+            in: circle,
+            imageSize: glyph.size,
+            backingScale: window?.backingScaleFactor ?? 2
+        ))
+    }
+
+    /// Where the symbol is drawn inside `circle`: its own aspect, fitted to 62%
+    /// of the diameter (never upscaled), centered — then snapped to the backing
+    /// pixel grid. Without the snap the glyph lands on fractional pixels and
+    /// rasterizes asymmetrically: measured 1 backing pixel high-and-left on a
+    /// 14pt dot, which is exactly what made `plus` look off-center in its dot.
+    /// Size is rounded before the origin so the rect stays symmetric about the
+    /// circle's center. Pure, so it is unit-testable.
+    nonisolated static func glyphRect(in circle: NSRect, imageSize: NSSize, backingScale: CGFloat) -> NSRect {
+        let d = min(circle.width, circle.height)
+        let box = d * 0.62
+        let k = min(box / imageSize.width, box / imageSize.height, 1)
+        let s = max(1, backingScale)
+        let w = (imageSize.width * k * s).rounded() / s
+        let h = (imageSize.height * k * s).rounded() / s
+        return NSRect(
+            x: ((circle.midX - w / 2) * s).rounded() / s,
+            y: ((circle.midY - h / 2) * s).rounded() / s,
+            width: w,
+            height: h
+        )
     }
 }

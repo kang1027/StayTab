@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Testing
 @testable import BetterCmdTab
@@ -81,6 +82,35 @@ struct SwitcherMetricsTests {
         #expect(many.appNameWidth == expected)
         // The reserved column is added back to the row width vs the no-hover collapse.
         #expect(many.rowWidth == SwitcherMetrics.baseRowWidth - SwitcherMetrics.baseAppNameWidth + expected)
+    }
+
+    @Test("traffic-light glyph is centered on its dot and lands on the pixel grid")
+    func hoverDotGlyphCentering() {
+        // `plus` renders as a non-square image (13x12 at its 21pt dot size). The
+        // old NSImageView hosting centered it in a non-square layout box, which
+        // pushed the glyph visibly up and right inside the green circle.
+        for d in [CGFloat(14), 16, 17, 21, 28] {
+            let circle = NSRect(x: 0, y: 0, width: d, height: d).insetBy(dx: 0.5, dy: 0.5)
+            let r = TrafficLightDot.glyphRect(in: circle, imageSize: NSSize(width: 13, height: 12), backingScale: 2)
+            // Centered to within half a device pixel — exact whenever the
+            // fitted size is an even number of pixels, off by that half when
+            // it isn't (the grid snap wins there: it rasterizes symmetrically,
+            // a mathematically-centered fractional rect does not).
+            #expect(abs(r.midX - circle.midX) <= 0.25)
+            #expect(abs(r.midY - circle.midY) <= 0.25)
+            #expect(r.width <= circle.width * 0.62 + 0.5)
+            // On the backing grid: every edge is a whole device pixel.
+            for v in [r.minX, r.minY, r.width, r.height] {
+                #expect(abs((v * 2).rounded() - v * 2) < 0.001)
+            }
+        }
+    }
+
+    @Test("a glyph smaller than its box is never upscaled")
+    func hoverDotGlyphNoUpscale() {
+        let circle = NSRect(x: 0, y: 0, width: 40, height: 40)
+        let r = TrafficLightDot.glyphRect(in: circle, imageSize: NSSize(width: 9, height: 8), backingScale: 2)
+        #expect(r.size == NSSize(width: 9, height: 8))
     }
 
     @Test("preview label area collapses to 0 whenever the window title is hidden")
