@@ -521,8 +521,8 @@ enum WindowEnumerator {
         // #81) — a background tab left at its stale pre-merge frame
         // (CotEditor), or AX-listed on macOS builds that list every tab window
         // (Sonoma) — are caught by the near-frame rule: ordered out near an
-        // ordered-in front's frame and spaceless / on the front's own Space.
-        // Ordered-in windows and windows on another Space are never folded.
+        // ordered-in front's frame and reported spaceless. Ordered-in windows
+        // and windows that resolve to a Space are never folded (#148).
         // Collapse keeps the front tab and attaches the rest as `tabWindows`
         // for the `\` peek; expand emits one row per tab. No reliance on
         // `AXTabs` (which these apps don't expose).
@@ -531,11 +531,9 @@ enum WindowEnumerator {
         let fromAXList = raws.map(\.fromAXList)
         let onscreen = raws.map { onscreenWids.contains($0.cgWindowID) }
         // Space membership is one WindowServer IPC per window, so resolve it
-        // only for the windows the near-frame tab rule can act on (plus their
-        // on-screen fronts, for the same-Space comparison). Empty for apps
-        // without a tab-shaped group — the common case pays nothing.
+        // only for the windows the near-frame tab rule can act on. Empty for
+        // apps without a tab-shaped group — the common case pays nothing.
         var spaceless = [Bool](repeating: false, count: raws.count)
-        var spaceOf = [UInt64?](repeating: nil, count: raws.count)
         // Under Stage Manager the near-frame rule is off (see `isStageManagerEnabled`),
         // so skip the per-window Space IPCs that only feed it.
         let stageManager = isStageManagerEnabled
@@ -546,7 +544,6 @@ enum WindowEnumerator {
             let membership = PrivateAPI.spaceMembership(forWindows: spaceQueryIndices.map { raws[$0].cgWindowID })
             for i in spaceQueryIndices {
                 spaceless[i] = membership.spaceless.contains(raws[i].cgWindowID)
-                spaceOf[i] = membership.resolved[raws[i].cgWindowID]
             }
         }
         let resolution = resolveTabStacks(
@@ -554,7 +551,6 @@ enum WindowEnumerator {
             fromAXList: fromAXList,
             onscreen: onscreen,
             spaceless: spaceless,
-            spaceOf: spaceOf,
             expand: expand,
             stageManager: stageManager
         )
@@ -616,8 +612,7 @@ enum WindowEnumerator {
     /// windows sitting near an ordered-in AX-listed window's frame that the
     /// exact-frame brute rule alone can't classify (AX-listed ones — the
     /// Sonoma shape — and brute-only ones whose stale frame drifted off the
-    /// group's, the CotEditor shape), plus the ordered-in fronts themselves
-    /// (for the same-Space comparison). Empty — the common case — means the
+    /// group's, the CotEditor shape). Empty — the common case — means the
     /// caller skips the per-window `CGSCopySpacesForWindows` IPCs entirely.
     /// Pure, so the gate is unit-testable.
     static func tabSpaceQueryIndices(frames: [CGRect?], fromAXList: [Bool], onscreen: [Bool]) -> [Int] {
@@ -631,15 +626,13 @@ enum WindowEnumerator {
             if let f = frames[i] { axFrames.insert(frameKey(f)) }
         }
         var indices: [Int] = []
-        var neededFronts = Set<Int>()
         for i in 0..<n where !onscreen[i] {
             guard let f = frames[i] else { continue }
             if !fromAXList[i] && axFrames.contains(frameKey(f)) { continue }
-            guard let front = fronts.first(where: { isNearTabFrame(f, frames[$0]!) }) else { continue }
+            guard fronts.contains(where: { isNearTabFrame(f, frames[$0]!) }) else { continue }
             indices.append(i)
-            neededFronts.insert(front)
         }
-        return indices.isEmpty ? [] : indices + neededFronts.sorted()
+        return indices
     }
 
     /// Decide which windows to surface and which are native background tabs.
@@ -653,13 +646,15 @@ enum WindowEnumerator {
     ///   windows are both AX-listed, so issue #10 stays safe. Or:
     /// - it is ordered out (`onscreen[i] == false`) *near* an ordered-in
     ///   AX-listed front's frame (same size, origin within
-    ///   `tabFrameTolerance`), and WindowServer reports it spaceless or on the
-    ///   front's own Space. This catches the shapes the exact rule misses
-    ///   (issue #81): apps that leave a background tab's frame at its stale
-    ///   pre-merge cascade offset (CotEditor), and macOS builds that AX-list
-    ///   every tab window (Sonoma). Ordered-in windows (real overlapping
-    ///   windows, issue #10) and windows resolved to a *different* Space (a
-    ///   same-frame window on another desktop) are never folded.
+    ///   `tabFrameTolerance`) and WindowServer reports it *spaceless*. This
+    ///   catches the shapes the exact rule misses (issue #81): apps that leave
+    ///   a background tab's frame at its stale pre-merge cascade offset
+    ///   (CotEditor), and macOS builds that AX-list every tab window (Sonoma).
+    ///   Ordered-in windows (real overlapping windows, issue #10) and windows
+    ///   that resolve to *any* Space are never folded — a real window mid
+    ///   fullscreen-exit is briefly ordered out at a cascade-near frame while
+    ///   still resolving to the current Space, and folding it dropped it from
+    ///   the switcher until an unrelated event re-scanned the app (issue #148).
     ///
     /// - expand: every window is kept as its own row (one entry per tab);
     ///   background tabs are flagged `tabSibling` instead of folded.
@@ -680,7 +675,6 @@ enum WindowEnumerator {
         fromAXList: [Bool],
         onscreen: [Bool],
         spaceless: [Bool],
-        spaceOf: [UInt64?],
         expand: Bool,
         stageManager: Bool = false
     ) -> TabResolution {
@@ -705,9 +699,8 @@ enum WindowEnumerator {
             var front: Int?
             if !fromAXList[i], let exact = frontForFrame[frameKey(f)], exact != i {
                 front = exact
-            } else if !stageManager, !onscreen[i],
-                      let near = nearFronts.first(where: { $0 != i && isNearTabFrame(f, frames[$0]!) }),
-                      spaceless[i] || (spaceOf[i] != nil && spaceOf[i] == spaceOf[near]) {
+            } else if !stageManager, !onscreen[i], spaceless[i],
+                      let near = nearFronts.first(where: { $0 != i && isNearTabFrame(f, frames[$0]!) }) {
                 front = near
             }
             if let front {

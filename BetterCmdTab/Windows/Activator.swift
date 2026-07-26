@@ -881,7 +881,13 @@ enum Activator {
 
     /// Zoom (green-button maximize) the row's window by pressing its AX zoom
     /// button. Apps without a zoom button (some dialogs/utilities) are no-ops.
+    ///
+    /// A full-screen window still exposes an `AXZoomButton` whose `AXPress`
+    /// reports success and does nothing, so the hover dot looked dead on exactly
+    /// the window the user wants to restore. Route that case through the
+    /// `AXFullScreen` write instead, which does leave full screen.
     static func zoomWindow(_ row: SwitcherRow) {
+        if row.isFullscreen { return toggleFullscreen(row) }
         guard let window = row.window, let app = row.app else { return }
         let apply: @Sendable () -> Void = {
             var buttonValue: AnyObject?
