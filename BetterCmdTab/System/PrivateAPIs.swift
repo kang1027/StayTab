@@ -151,21 +151,50 @@ enum PrivateAPI {
 
     /// The Spaces currently on screen: each display's "Current Space" from
     /// `CGSCopyManagedDisplaySpaces` (#57 — the "visible Spaces" switcher
-    /// filter). One id per connected display; a single-monitor setup yields the
-    /// same id as `activeSpace()`. Empty when the private API is unavailable —
-    /// callers must treat that as "unknown" and degrade, same as a nil
-    /// `activeSpace()`. One CGS round-trip, no per-window IPC.
+    /// filter), *plus the Spaces grouped with it* (see `spaceGroup`). A
+    /// single-monitor setup with no full-screen app yields the same id as
+    /// `activeSpace()`. Empty when the private API is unavailable — callers must
+    /// treat that as "unknown" and degrade, same as a nil `activeSpace()`. One
+    /// CGS round-trip, no per-window IPC.
     static func visibleSpaces() -> Set<UInt64> {
         guard let mainConnection = mainConnectionFn,
               let copyDisplays = copyManagedDisplaySpacesFn,
               let cfDisplays = copyDisplays(mainConnection())?.takeRetainedValue() else { return [] }
         var spaces = Set<UInt64>()
         for display in (cfDisplays as NSArray).compactMap({ $0 as? [String: Any] }) {
-            if let current = display["Current Space"] as? [String: Any], let id = spaceId(current) {
-                spaces.insert(id)
+            guard let current = display["Current Space"] as? [String: Any], let id = spaceId(current) else { continue }
+            let ordered = ((display["Spaces"] as? [[String: Any]]) ?? []).compactMap { dict -> (id: UInt64, isDesktop: Bool)? in
+                guard let spaceId = spaceId(dict) else { return nil }
+                return (spaceId, ((dict["type"] as? NSNumber)?.intValue ?? 0) == 0)
             }
+            spaces.formUnion(spaceGroup(containing: id, orderedSpaces: ordered))
         }
         return spaces
+    }
+
+    /// The Spaces that share a display "place" with `current`: a desktop Space
+    /// and the full-screen/tiled Spaces created from it, which WindowServer
+    /// lists right after it in the display's ordered `Spaces` array.
+    ///
+    /// Going full screen must not empty the switcher: the desktop underneath is
+    /// no longer WindowServer-visible, so a literal per-display "Current Space"
+    /// hid every other window while a full-screen app was focused — and hid the
+    /// full-screen window itself while its desktop was focused. Grouping the two
+    /// makes "Visible Spaces" mean "this desktop, however it's being shown".
+    ///
+    /// Pure, so the grouping is unit-testable. Falls back to `[current]` when the
+    /// display's Space list is missing or doesn't contain it.
+    static func spaceGroup(containing current: UInt64, orderedSpaces: [(id: UInt64, isDesktop: Bool)]) -> Set<UInt64> {
+        var group: [UInt64] = []
+        for space in orderedSpaces {
+            if space.isDesktop {
+                if group.contains(current) { break }
+                group = [space.id]
+            } else {
+                group.append(space.id)
+            }
+        }
+        return group.contains(current) ? Set(group) : [current]
     }
 
     /// The CoreGraphics display id of the monitor whose menu bar is currently
