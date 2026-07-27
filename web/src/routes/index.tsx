@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { AnimatePresence, LayoutGroup, MotionConfig, motion, useReducedMotion } from "motion/react";
 import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import snapshot from "../releases.json";
 
 export const Route = createFileRoute("/")({
   component: Home,
@@ -149,7 +150,10 @@ const featureGroups: Array<{ label: string; rows: Array<[string, string]> }> = [
         "keep the switcher out of screen recordings and shared screens. Needs macOS 14.6+",
       ],
       ["Export & import", "back up and move your whole setup as a plain JSON file"],
-      ["Config file", "optionally keep settings in ~/.config/bettercmdtab/config.json — file edits apply live, app changes write back"],
+      [
+        "Config file",
+        "optionally keep settings in ~/.config/bettercmdtab/config.json — file edits apply live, app changes write back",
+      ],
       ["Configurable", "custom hotkey, size, scale, layout, grid columns, and reveal delay"],
     ],
   },
@@ -237,22 +241,30 @@ function storeDownloads(count: number) {
   }
 }
 
+// Releases come newest-first. A beta is only worth offering when the very
+// newest release is a prerelease (i.e. ahead of stable); once stable catches
+// up, releases[0] is stable and the toggle disappears.
+function channels(releases: GhRelease[], ready: boolean): Releases {
+  return {
+    stable: dmgOf(releases.find((r) => !r.prerelease) ?? releases[0]),
+    beta: releases[0]?.prerelease ? dmgOf(releases[0]) : null,
+    totalDownloads: releases.reduce(
+      (sum, r) => sum + r.assets.reduce((s, a) => s + a.download_count, 0),
+      0,
+    ),
+    ready,
+  };
+}
+
 function useReleases(): Releases {
-  const [rel, setRel] = useState<Releases>(() => ({
-    // Keep the last known channels visible when GitHub's anonymous API limit is exhausted.
-    stable: {
-      version: "v26.6.1",
-      dmgUrl:
-        "https://github.com/rokartur/BetterCmdTab/releases/download/v26.6.1/BetterCmdTab-26.6.1-20260703123053.dmg",
-    },
-    beta: {
-      version: "26.7-beta.2",
-      dmgUrl:
-        "https://github.com/rokartur/BetterCmdTab/releases/download/26.7-beta.2/BetterCmdTab-26.7-beta.2-20260718190227.dmg",
-    },
-    totalDownloads: storedDownloads(),
-    ready: false,
-  }));
+  // `snapshot` is baked at build time (scripts/fetch-releases.ts) so the page —
+  // including the prerendered HTML — is correct as of the last deploy even when
+  // GitHub's anonymous API limit is exhausted, which it routinely is.
+  const [rel, setRel] = useState<Releases>(() => {
+    const baked = channels(snapshot, false);
+    // A visitor's cached count can be fresher than the last deploy's.
+    return { ...baked, totalDownloads: storedDownloads() ?? baked.totalDownloads };
+  });
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -269,20 +281,9 @@ function useReleases(): Releases {
           setRel((p) => ({ ...p, ready: true }));
           return;
         }
-        // Releases come newest-first. A beta is only worth offering when the
-        // very newest release is a prerelease (i.e. ahead of stable); once
-        // stable catches up, releases[0] is stable and the toggle disappears.
-        const total = releases.reduce(
-          (sum, r) => sum + r.assets.reduce((s, a) => s + a.download_count, 0),
-          0,
-        );
-        storeDownloads(total);
-        setRel({
-          stable: dmgOf(releases.find((r) => !r.prerelease) ?? releases[0]),
-          beta: releases[0].prerelease ? dmgOf(releases[0]) : null,
-          totalDownloads: total,
-          ready: true,
-        });
+        const fresh = channels(releases, true);
+        storeDownloads(fresh.totalDownloads ?? 0);
+        setRel(fresh);
       })
       .catch(() => {
         if (!ctrl.signal.aborted) setRel((p) => ({ ...p, ready: true }));

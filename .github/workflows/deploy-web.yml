@@ -6,6 +6,9 @@ on:
     paths:
       - "web/**"
       - ".github/workflows/deploy-web.yml"
+  # Redeploy on every release so the baked download links/versions stay current.
+  release:
+    types: [published]
   workflow_dispatch:
 
 # Allow the GITHUB_TOKEN to deploy to Pages and verify the deployment origin.
@@ -34,6 +37,11 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Refresh release snapshot
+        run: bun run scripts/fetch-releases.ts
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Build
         run: bun run build
