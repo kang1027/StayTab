@@ -59,8 +59,10 @@ and the `BetterCmdTabNotarization` notarytool keychain profile (see the script h
 The changelog *is* the GitHub Release body (no `CHANGELOG.md`). Pass it to
 `build_release.sh --auto-release --notes notes.md`, or write it after the fact with
 `gh release create <tag> -R rokartur/BetterCmdTab --title "BetterCmdTab <version>" --notes-file notes.md`.
-New tags are bare for stable releases (`26.4.3`) and prereleases (`26.0-beta.1`, published
-with `--prerelease`); historical stable tags retain their `v` prefix. `MAJOR` tracks the macOS year.
+Stable tags keep the `v` prefix (`v26.6.1`); prerelease tags are bare (`26.7-beta.3`, published
+with `--prerelease`). Both Homebrew casks template their download URL on that shape
+(`bettercmdtab` → `v#{version}`, `bettercmdtab@beta` → `#{version}`), so flipping a prefix
+breaks `brew bump` on the next release. `MAJOR` tracks the macOS year.
 
 Match the established BetterCmdTab body shape — this is an end-user app, so bullets are
 **user-facing and outcome-first**, not internal symbol names:

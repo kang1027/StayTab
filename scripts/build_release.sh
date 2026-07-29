@@ -519,6 +519,14 @@ build_cmd=(
 	OTHER_CODE_SIGN_FLAGS="--timestamp"
 )
 
+# Beta archives ship the -beta.N suffix in CFBundleShortVersionString. Without
+# it the app reports a bare "26.7" and semver puts every "26.7-beta.N" *below*
+# the installed version, so a beta never offers the next beta (#158).
+# Overridden at archive time — no pbxproj edit to revert afterwards.
+if [[ $is_beta -eq 1 ]]; then
+	build_cmd+=(MARKETING_VERSION="$_artifact_version")
+fi
+
 if [[ $clean_build -eq 1 ]]; then
 	echo "🧹 Cleaning build folder..."
 	xcodebuild clean -project "$PROJECT_PATH" -scheme "$SCHEME" -configuration Release -quiet
