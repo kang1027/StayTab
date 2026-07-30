@@ -1965,7 +1965,12 @@ final class SwitcherController: SwitcherViewDelegate {
         guard phase == .idle else {
             if case .scoped(let activeId) = activeTarget, activeId == id,
                phase == .visible, !tabDrillActive {
-                advanceLinearVisible(by: 1, wrap: true)
+                // Through `handle`, not `advanceLinearVisible` directly (identical
+                // step at `.visible`): the chokepoint stamps `lastVisibleActivity`,
+                // so a user stepping *only* by repeat chord press isn't read as an
+                // abandoned panel and force-closed after 4s under Secure Event
+                // Input (issue #16's ceiling).
+                handle(.nextApp)
             }
             return
         }
