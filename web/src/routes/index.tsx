@@ -653,12 +653,12 @@ function CheckGlyph() {
 // Copyable Homebrew one-liner. clipboard access lives inside the click
 // handler, so this stays SSR-safe during the prerender (no top-level
 // navigator/window reference).
-function BrewCmd() {
+function BrewCmd({ beta }: { beta: boolean }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<number | undefined>(undefined);
 
   const copy = () => {
-    navigator.clipboard?.writeText(BREW).then(() => {
+    navigator.clipboard?.writeText(beta ? `${BREW}@beta` : BREW).then(() => {
       setCopied(true);
       if (timer.current !== undefined) window.clearTimeout(timer.current);
       timer.current = window.setTimeout(() => setCopied(false), 1600);
@@ -684,6 +684,21 @@ function BrewCmd() {
     >
       <code className="block overflow-x-auto whitespace-nowrap px-3.5 py-[7px] font-mono leading-normal text-dim before:text-muted before:content-['$_']">
         {BREW}
+        {/* Only the suffix moves, so the command reads as one stable string:
+            it slides its own width open instead of the whole box jumping. */}
+        <AnimatePresence initial={false}>
+          {beta && (
+            <motion.span
+              className="inline-block overflow-hidden align-bottom text-accent"
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: "auto", opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.28, ease: EASE }}
+            >
+              @beta
+            </motion.span>
+          )}
+        </AnimatePresence>
       </code>
       <motion.button
         type="button"
@@ -768,7 +783,7 @@ export function Home() {
         <motion.section className={SECTION} {...inView}>
           <motion.div className="flex max-w-full flex-wrap items-center gap-2.5" variants={reveal}>
             <DownloadCta href={dmgUrl} beta={!!beta} channel={channel} onChange={setChannel} />
-            <BrewCmd />
+            <BrewCmd beta={channel === "beta"} />
           </motion.div>
           {/* Meta as quiet chips, echoing the capsules above. Mirrors the
               BetterAudio price animation: LayoutGroup + eased layout on every
