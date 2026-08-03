@@ -1,0 +1,13 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "index",
+    "---Configuration---",
+    "configuration",
+    "config-reference",
+    "app-rules",
+    "overrides",
+    "---Project---",
+    "contributing"
+  ]
+}
