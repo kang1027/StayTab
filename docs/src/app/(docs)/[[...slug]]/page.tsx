@@ -1,4 +1,4 @@
-import { getPageImageUrl, getPageMarkdownUrl, source } from '@/lib/source';
+import { getPageImageUrl, getPageMarkdownUrl, getPageUrl, source } from '@/lib/source';
 import {
   DocsBody,
   DocsDescription,
@@ -66,10 +66,18 @@ export async function generateMetadata(props: PageProps<'/[[...slug]]'>): Promis
   const page = source.getPage(params.slug);
   if (!page) notFound();
 
+  // Each page is reachable as both /docs/x/ and /docs/x (which GitHub Pages
+  // 301s to the first), so it has to name its own canonical or the two split
+  // ranking signals. og:url has no canonical fallback in Next and must be set
+  // too.
+  const url = getPageUrl(page);
+
   return {
     title: page.data.title,
     description: page.data.description,
+    alternates: { canonical: url },
     openGraph: {
+      url,
       images: getPageImageUrl(page).url,
     },
   };

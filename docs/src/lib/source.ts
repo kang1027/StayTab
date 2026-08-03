@@ -1,6 +1,6 @@
 import { loader } from 'fumadocs-core/source';
 import { lucideIconsPlugin } from 'fumadocs-core/source/lucide-icons';
-import { docsBasePath, docsContentRoute, docsImageRoute, docsRoute } from './shared';
+import { docsBasePath, docsContentRoute, docsImageRoute, docsRoute, siteUrl } from './shared';
 import { defineDocs } from 'fumadocs-mdx/macro';
 import { metaSchema, pageSchema } from 'fumadocs-core/source/schema';
 
@@ -36,6 +36,23 @@ function publicUrl(route: string, locale: string | undefined, segments: string[]
   return (
     docsBasePath + '/' + [locale, ...route.split('/'), ...segments].filter(Boolean).join('/')
   );
+}
+
+/**
+ * Canonical public URL of a page, absolute.
+ *
+ * `source` is mounted at `docsRoute` ('/'), so `page.url` carries no `/docs`
+ * prefix, and Next does not apply `basePath` to metadata URLs either — so a
+ * relative canonical would resolve against the origin root and point at the
+ * marketing site. Fully absolute leaves nothing to infer.
+ *
+ * Slash-terminated to match `trailingSlash: true`, which is the form that has
+ * an index.html on disk; GitHub Pages answers the bare form with its own 301.
+ * Next would normalise the canonical anyway, but a canonical URL is not
+ * something to leave to an implicit rewrite.
+ */
+export function getPageUrl(page: (typeof source)['$inferPage']) {
+  return siteUrl + docsBasePath + (page.url.endsWith('/') ? page.url : `${page.url}/`);
 }
 
 export function getPageImageUrl(page: (typeof source)['$inferPage']) {

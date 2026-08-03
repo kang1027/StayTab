@@ -1,13 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Hand-maintained, and guarded from both sides by .github/workflows/ci-site.yml:
+  every URL listed here must return 200, and every docs page must be listed.
+  (Keep loc tags out of this comment — CI greps the file for them.)
+
+  No <lastmod>/<changefreq>/<priority>: Google ignores the latter two outright,
+  and the deploy checks out at depth 1, so nothing in the build knows when a
+  page actually changed. A build-date lastmod would just be a stamp that moves
+  on every redeploy, which is exactly the kind Google learns to distrust.
+
+  Every URL ends in a slash, matching `trailingSlash: true` and the canonical
+  tags: that is the form with an index.html behind it, and GitHub Pages 301s
+  the bare form to it. A sitemap that lists redirects wastes crawl budget.
+-->
 <urlset
   xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
 >
   <url>
     <loc>https://bettercmdtab.app/</loc>
-    <lastmod>2026-05-31</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>1.0</priority>
     <image:image>
       <image:loc>https://bettercmdtab.app/og.png</image:loc>
       <image:title>BetterCmdTab — a window switcher and app launcher for macOS</image:title>
@@ -24,5 +35,25 @@
       <image:loc>https://bettercmdtab.app/screenshots/grid.jpg</image:loc>
       <image:title>BetterCmdTab grid of app icons layout</image:title>
     </image:image>
+  </url>
+
+  <!-- Documentation (docs/, built with basePath=/docs into the same origin). -->
+  <url>
+    <loc>https://bettercmdtab.app/docs/</loc>
+  </url>
+  <url>
+    <loc>https://bettercmdtab.app/docs/configuration/</loc>
+  </url>
+  <url>
+    <loc>https://bettercmdtab.app/docs/config-reference/</loc>
+  </url>
+  <url>
+    <loc>https://bettercmdtab.app/docs/app-rules/</loc>
+  </url>
+  <url>
+    <loc>https://bettercmdtab.app/docs/overrides/</loc>
+  </url>
+  <url>
+    <loc>https://bettercmdtab.app/docs/contributing/</loc>
   </url>
 </urlset>

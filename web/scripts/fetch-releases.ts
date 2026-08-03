@@ -1,8 +1,8 @@
 /**
- * Refreshes src/releases.json — the release snapshot the page renders before
+ * Refreshes releases.json — the release snapshot the page renders before
  * (and instead of, when GitHub's anonymous rate limit is exhausted) the
- * client-side fetch lands. Committed so local builds work offline; CI runs
- * this before `bun run build` with a token, see deploy-web.yml.
+ * client-side fetch lands. Committed so builds work offline; run it before
+ * `bun run build` to refresh (GITHUB_TOKEN optional, raises the rate limit).
  *
  *   bun run scripts/fetch-releases.ts
  */
@@ -46,6 +46,6 @@ const trimmed = releases.map((r) => ({
   })),
 }));
 
-const out = join(import.meta.dir, "..", "src", "releases.json");
+const out = join(import.meta.dirname, "..", "releases.json");
 writeFileSync(out, `${JSON.stringify(trimmed, null, 2)}\n`);
 console.log(`fetch-releases: wrote ${trimmed.length} releases (latest ${trimmed[0].tag_name})`);

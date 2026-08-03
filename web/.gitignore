@@ -8,10 +8,11 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
-dist-ssr
+.next
+out
+next-env.d.ts
+*.tsbuildinfo
 *.local
-.tanstack
 
 # Editor directories and files
 .vscode/*

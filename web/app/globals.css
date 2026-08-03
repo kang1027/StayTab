@@ -9,6 +9,10 @@
   --color-line: #222222;
   --color-accent: #3b82f6;
   --color-black: #000000;
+  /* `--color-*: initial` above drops Tailwind's default palette, so `bg-white/…`
+     silently compiles to nothing without this. Used for the faint raised
+     surfaces: the channel segment and the Copy button. */
+  --color-white: #ffffff;
 
   --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Menlo", "Monaco", monospace;
 
@@ -74,4 +78,3 @@
     border-radius: 4px;
   }
 }
-

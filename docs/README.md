@@ -19,6 +19,12 @@ covered in [CONTRIBUTING.md](CONTRIBUTING.md). Read that before editing.
 ## How it ships
 
 `output: 'export'` with `basePath: '/docs'`, so the build is a directory of static
-files whose URLs already carry the `/docs` prefix. The **root** `Dockerfile`
-builds this together with `../web`, copies this export into `web/out/docs`, and
-serves both from one nginx image — no docs server, no reverse proxy.
+files whose URLs already carry the `/docs` prefix.
+`.github/workflows/deploy-pages.yml` builds this together with `../web`, copies
+this export into `web/out/docs`, and publishes the merged tree to GitHub Pages —
+no docs server, no reverse proxy, no container.
+
+Pages serves files and nothing else: no rewrites, no redirects, no custom
+headers. That is why both apps set `trailingSlash: true` — every page ships as
+`<slug>/index.html`, so the URL with the slash is the one that exists and the
+bare form is Pages' own 301 to it.

@@ -3,8 +3,11 @@ export const appName = 'BetterCmdTab';
 /** Origin the docs are served from — they live under /docs on the main site. */
 export const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://bettercmdtab.app';
 
-/** Marketing site, linked from the docs nav. Absolute so it escapes /docs. */
-export const homeUrl = 'https://bettercmdtab.app';
+/**
+ * Marketing site, linked from the docs nav. Absolute so it escapes /docs, and
+ * slash-terminated because GitHub Pages 301s the bare form.
+ */
+export const homeUrl = 'https://bettercmdtab.app/';
 
 /**
  * Public prefix the docs are mounted under, mirroring `basePath` in

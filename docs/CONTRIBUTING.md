@@ -181,14 +181,16 @@ files with no server at runtime.
 
 ## How it ships
 
-The root `Dockerfile` (at the repo root, not in this directory) builds `web/` and
-`docs/`, copies this export into `web/out/docs`, and serves the result from one
-nginx image. There is no separate docs service and no reverse proxy in front.
+`.github/workflows/deploy-pages.yml` builds `web/` and `docs/`, copies this
+export into `web/out/docs`, and publishes the merged tree to GitHub Pages. There
+is no separate docs service, no reverse proxy and no container.
 
-That means a docs change reaches production through the same image as a marketing
-change — and that `bun run build` failing here fails the whole site's deploy.
-`.github/workflows/ci-site.yml` runs the same builds plus a smoke test of the
-served routes on every PR.
+That means a docs change reaches production through the same artifact as a
+marketing change — and that `bun run build` failing here fails the whole site's
+deploy. `.github/workflows/ci-site.yml` runs the same builds on every PR, plus
+the checks that used to be server rules: every sitemap URL resolves to a real
+`index.html`, no internal link points at a URL Pages would redirect, and
+`robots.txt` still blocks the RSC payload twins.
 
 ## Style
 
