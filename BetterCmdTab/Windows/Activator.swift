@@ -1117,6 +1117,76 @@ enum Activator {
         return CGRect(origin: pos, size: size)
     }
 
+    /// AX bounds of *some* window of `pid`, for apps that expose no focused
+    /// window (`kAXFocusedWindow` missing: Finder showing only the desktop, or
+    /// an app with thin AX support). Backs `.activeApp` panel placement, whose
+    /// only question is *which display the app is on*, so any of its windows
+    /// answers it: `kAXWindows` order is arbitrary (see `WindowEnumerator`), and
+    /// the main window is tried first precisely because it isn't. Scanning stops
+    /// after a few entries: each candidate costs three AX round-trips, and an app
+    /// whose first windows are all minimized or zero-sized won't be placed better
+    /// by reading the rest. Call OFF the main thread, like `focusedWindow(pid:)`.
+    /// Nil when the app has no usable window, or when the scan runs out of budget
+    /// (see `axScanBudget`).
+    static func frontWindowBounds(pid: pid_t) -> CGRect? {
+        guard pid > 0, pid != getpid() else { return nil }
+        let deadline = DispatchTime.now().advanced(by: axScanBudget)
+        let axApp = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(axApp, axScanTimeout)
+        var value: CFTypeRef?
+        if AXUIElementCopyAttributeValue(axApp, kAXMainWindowAttribute as CFString, &value) == .success,
+           let main = value, CFGetTypeID(main) == AXUIElementGetTypeID(),
+           let bounds = scanBounds(of: main as! AXUIElement), !bounds.isEmpty {
+            return bounds
+        }
+        value = nil
+        guard DispatchTime.now() < deadline,
+              AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &value) == .success,
+              let windows = value as? [AXUIElement] else { return nil }
+        for window in windows.prefix(3) {
+            guard DispatchTime.now() < deadline else { return nil }
+            if let bounds = scanBounds(of: window), !bounds.isEmpty { return bounds }
+        }
+        return nil
+    }
+
+    /// Per-request timeout for the `frontWindowBounds` scan, and the wall-clock
+    /// budget for that scan as a whole (checked between round-trips).
+    ///
+    /// Both exist because a *wedged* app is precisely what reaches the scan
+    /// (`focusedWindow(pid:)` timed out for it too), so each of its up-to-ten
+    /// round-trips can burn a full timeout. And its answer only ever arrives late
+    /// enough to move an **already visible** panel (`adoptLateTargetScreen`),
+    /// where slow is worse than absent: the switcher would appear on the fallback
+    /// display and then teleport mid-cycle. Holding the whole scan under half a
+    /// second keeps it to what the `.activeWindow` path already cost.
+    ///
+    /// The timeout is per `AXUIElement`, not per process. The value set on the
+    /// application element is NOT inherited by the window elements it hands back,
+    /// so `scanBounds(of:)` re-pins it on each window. Without that a single
+    /// position read falls back to the multi-second system default.
+    private static let axScanTimeout: Float = 0.1
+    private static let axScanBudget: DispatchTimeInterval = .milliseconds(400)
+
+    /// `axBounds(of:)` for the scan: the scan's messaging timeout pinned on the
+    /// element, and minimized windows rejected outright.
+    ///
+    /// A minimized window keeps reporting its pre-minimize AX position, and "every
+    /// window minimized" is one of the main reasons an app has no focused window
+    /// in the first place, so it is a leading way to reach this scan at all.
+    /// Taking those bounds would open the switcher on a display where the active
+    /// app shows nothing. The extra round-trip is paid only on this fallback path,
+    /// and only until a usable window is found.
+    private static func scanBounds(of window: AXUIElement) -> CGRect? {
+        AXUIElementSetMessagingTimeout(window, axScanTimeout)
+        var minimized: CFTypeRef?
+        if AXUIElementCopyAttributeValue(window, kAXMinimizedAttribute as CFString, &minimized) == .success,
+           (minimized as? Bool) == true {
+            return nil
+        }
+        return axBounds(of: window)
+    }
+
     /// Arrange an explicit window on its current screen. Used by the switcher
     /// for the window it captured at open time (see `openFocusedWindow`).
     /// Always on main: `applyArrangement` reads `NSScreen.screens` (documented

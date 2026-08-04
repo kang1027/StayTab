@@ -45,6 +45,37 @@ enum ScreenSelection {
         screenFrames.firstIndex { $0.origin == .zero }
     }
 
+    /// What a display mode needs the switcher's off-main capture to resolve
+    /// before the panel can be placed. Pure mapping, kept out of the controller
+    /// so the "which signal does this mode follow" decision is testable on its
+    /// own. `.activeApp` must never resolve to `.activeMonitor`, or it would
+    /// consult the menu bar and collapse onto the main display whenever displays
+    /// share one Space.
+    enum CaptureNeed {
+        /// The monitor showing the active Space (bright menu bar).
+        case activeMonitor
+        /// The monitor the frontmost app's window sits on.
+        case activeApp
+        /// Nothing to capture: the panel resolves cursor/main-display live.
+        case none
+
+        init(_ mode: SwitcherDisplayMode) {
+            switch mode {
+            case .activeWindow: self = .activeMonitor
+            case .activeApp:    self = .activeApp
+            case .mouseCursor, .mainDisplay: self = .none
+            }
+        }
+    }
+
+    /// Where the switcher panel should open, as resolved off the main thread.
+    /// Plain values only: `NSScreen.screens` is main-thread-only, so a capture
+    /// can't name a screen, so the caller places it back on the main actor.
+    enum CaptureTarget {
+        case displayID(CGDirectDisplayID)
+        case axBounds(CGRect)
+    }
+
     /// Flip a rect from Accessibility coordinates (top-left origin of the primary
     /// display, y-down) into Cocoa coordinates (bottom-left origin, y-up).
     /// `primaryMaxY` is the primary ("Main display") height — pass the origin-zero

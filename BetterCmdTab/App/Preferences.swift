@@ -72,8 +72,15 @@ enum TitleTruncationMode: String, CaseIterable {
 enum SwitcherDisplayMode: String, CaseIterable {
     /// Screen under the mouse pointer. Default — matches pre-#22 behavior.
     case mouseCursor
-    /// Screen of the window focused when ⌘Tab fired.
+    /// Monitor showing the active Space: the display whose menu bar is bright,
+    /// with the focused window's screen as fallback. Only distinguishes displays
+    /// when "Displays have separate Spaces" is on: with one Space spanning every
+    /// display there is a single menu bar, so this resolves to the main display.
     case activeWindow
+    /// Monitor showing the frontmost app's window, read from that window's own
+    /// geometry. Never consults the menu bar, so it is correct under either
+    /// "Displays have separate Spaces" setting.
+    case activeApp
     /// "Main display" from System Settings → Displays (the origin-zero screen).
     case mainDisplay
 
@@ -81,7 +88,24 @@ enum SwitcherDisplayMode: String, CaseIterable {
         switch self {
         case .mouseCursor:  return String(localized: "Monitor with the cursor")
         case .activeWindow: return String(localized: "Monitor with the active space")
+        case .activeApp:    return String(localized: "Monitor with the active app")
         case .mainDisplay:  return String(localized: "Main display")
+        }
+    }
+
+    /// One-line "when to pick this" shown as the popup item's tooltip. The three
+    /// monitor-following modes differ only in *what* they follow, which the
+    /// titles alone don't convey.
+    var placementHint: String {
+        switch self {
+        case .mouseCursor:
+            return String(localized: "Follows the mouse pointer.")
+        case .activeWindow:
+            return String(localized: "Follows the display whose menu bar is active. Needs separate Spaces per display; when displays share one Space there is a single menu bar, so the switcher opens on the main display.")
+        case .activeApp:
+            return String(localized: "Follows the window you are working in, whether displays have separate Spaces or share one.")
+        case .mainDisplay:
+            return String(localized: "Always the display set as main in System Settings → Displays.")
         }
     }
 }

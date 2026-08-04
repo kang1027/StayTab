@@ -648,6 +648,40 @@
         }
       }
     },
+    "Always the display set as main in System Settings → Displays." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Immer der Bildschirm, der in den Systemeinstellungen → Displays als Hauptbildschirm festgelegt ist."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siempre la pantalla configurada como principal en Ajustes del Sistema → Pantallas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toujours l’écran défini comme principal dans Réglages Système → Moniteurs."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zawsze ekran ustawiony jako główny w Ustawieniach systemowych → Monitory."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "始终是在“系统设置”→“显示器”中设为主显示器的那台。"
+          }
+        }
+      }
+    },
     "App rules" : {
       "localizations" : {
         "de" : {
@@ -3570,6 +3604,108 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "反馈"
+          }
+        }
+      }
+    },
+    "Follows the display whose menu bar is active. Needs separate Spaces per display; when displays share one Space there is a single menu bar, so the switcher opens on the main display." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Folgt dem Bildschirm mit der aktiven Menüleiste. Erfordert separate Spaces pro Bildschirm; teilen sich die Bildschirme einen Space, gibt es nur eine Menüleiste und der Umschalter öffnet sich auf dem Hauptbildschirm."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sigue a la pantalla cuya barra de menús está activa. Requiere espacios independientes por pantalla; si las pantallas comparten un espacio solo hay una barra de menús, por lo que el conmutador se abre en la pantalla principal."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suit l’écran dont la barre des menus est active. Nécessite des espaces distincts par écran ; si les écrans partagent un espace, il n’y a qu’une barre des menus et le sélecteur s’ouvre sur l’écran principal."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Podąża za ekranem z aktywnym paskiem menu. Wymaga oddzielnych przestrzeni dla każdego ekranu; gdy ekrany współdzielą jedną przestrzeń, pasek menu jest tylko jeden, więc przełącznik otwiera się na ekranie głównym."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跟随菜单栏处于活动状态的显示器。需要为每台显示器启用独立的空间；若多台显示器共用一个空间，则只有一个菜单栏，切换器会显示在主显示器上。"
+          }
+        }
+      }
+    },
+    "Follows the mouse pointer." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Folgt dem Mauszeiger."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sigue al puntero del ratón."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suit le pointeur de la souris."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Podąża za wskaźnikiem myszy."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跟随鼠标指针。"
+          }
+        }
+      }
+    },
+    "Follows the window you are working in, whether displays have separate Spaces or share one." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Folgt dem Fenster, in dem du arbeitest, unabhängig davon, ob die Bildschirme separate Spaces haben oder sich einen teilen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sigue a la ventana en la que estás trabajando, tanto si las pantallas tienen espacios independientes como si comparten uno."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suit la fenêtre dans laquelle vous travaillez, que les écrans aient des espaces distincts ou en partagent un."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Podąża za oknem, w którym pracujesz, niezależnie od tego, czy ekrany mają oddzielne przestrzenie, czy współdzielą jedną."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跟随你正在使用的窗口，无论显示器使用独立空间还是共用一个空间。"
           }
         }
       }
@@ -6497,6 +6633,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最小化窗口"
+          }
+        }
+      }
+    },
+    "Monitor with the active app" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bildschirm mit der aktiven App"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pantalla con la app activa"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écran avec l’app active"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ekran z aktywną aplikacją"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前活动应用所在显示器"
           }
         }
       }

@@ -120,12 +120,20 @@ struct PreferencesEnumTests {
     func switcherDisplayModeRoundTrip() {
         for mode in SwitcherDisplayMode.allCases {
             #expect(SwitcherDisplayMode(rawValue: mode.rawValue) == mode)
+            // Both strings reach the settings popup (title + tooltip).
+            #expect(!mode.displayName.isEmpty)
+            #expect(!mode.placementHint.isEmpty)
         }
         #expect(SwitcherDisplayMode(rawValue: "garbage") == nil)
         // Stable raw values (persisted to UserDefaults / exported settings).
         #expect(SwitcherDisplayMode.mouseCursor.rawValue == "mouseCursor")
         #expect(SwitcherDisplayMode.activeWindow.rawValue == "activeWindow")
+        #expect(SwitcherDisplayMode.activeApp.rawValue == "activeApp")
         #expect(SwitcherDisplayMode.mainDisplay.rawValue == "mainDisplay")
+        // A new case must come with its own title/hint, not inherit one. This
+        // count is the reminder to add both above.
+        #expect(SwitcherDisplayMode.allCases.count == 4)
+        #expect(Set(SwitcherDisplayMode.allCases.map(\.displayName)).count == 4)
     }
 
     @Test("PreviewTitleAlignment raw values round-trip and unknown falls back")
