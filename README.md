@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="web/public/screenshots/hero.png"  alt="BetterCmdTab promotion image" />
+<img src="https://github.com/user-attachments/assets/ee39f23a-0b35-46e7-966b-7887ba0f16aa"  alt="BetterCmdTab promotion image" />
 
 <br>
 <br>
