@@ -195,9 +195,9 @@ final class BrowserTabFocusObserver {
         let window = focusedVal as! AXUIElement
         let wid = PrivateAPI.cgWindowId(of: window)
         // The 0.05 pinned above is on the app element and is NOT inherited by the
-        // window it handed back, so this read goes through `scanTitle` to get its
-        // own cap — otherwise it falls back to the multi-second system default,
-        // which is the one stall this function's own doc promises to bound.
-        return (wid, Activator.scanTitle(of: window))
+        // window it handed back, so this read carries its own — otherwise it falls
+        // back to the multi-second system default, which is the one stall this
+        // function's own doc promises to bound.
+        return (wid, Activator.scanTitle(of: window, timeout: 0.05))
     }
 }

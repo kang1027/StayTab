@@ -1103,124 +1103,147 @@ enum Activator {
     /// nil if the attributes are missing/typed wrong. Call OFF the main thread —
     /// `AXUIElementCopyAttributeValue` can block up to the messaging timeout on a
     /// busy app. The caller converts to Cocoa coordinates and picks a screen.
-    static func axBounds(of window: AXUIElement) -> CGRect? {
+    ///
+    /// `timeout` is pinned on `window` for the read and released after it (0 =
+    /// back to the global default). Both halves belong here rather than at the
+    /// call site: the timeout is per element *instance*, so the value set on an
+    /// application element is NOT inherited by the windows it hands back and an
+    /// unpinned read falls back to the multi-second system default — and these
+    /// elements outlive the read, so a cap left behind would silently apply to
+    /// every later AX call on that window.
+    static func axBounds(of window: AXUIElement, timeout: Float) -> CGRect? {
+        AXUIElementSetMessagingTimeout(window, timeout)
+        defer { AXUIElementSetMessagingTimeout(window, 0) }
         var posRef: AnyObject?
         var sizeRef: AnyObject?
         guard AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &posRef) == .success,
               AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &sizeRef) == .success,
-              CFGetTypeID(posRef as CFTypeRef) == AXValueGetTypeID(),
-              CFGetTypeID(sizeRef as CFTypeRef) == AXValueGetTypeID() else { return nil }
-        var pos = CGPoint.zero
-        var size = CGSize.zero
-        AXValueGetValue(posRef as! AXValue, .cgPoint, &pos)
-        AXValueGetValue(sizeRef as! AXValue, .cgSize, &size)
-        return CGRect(origin: pos, size: size)
+              let pos = posRef, let size = sizeRef else { return nil }
+        return WindowEnumerator.frameFromAttributes(pos, size)
     }
 
-    /// AX bounds of *some* window of `pid`, for apps that expose no focused
-    /// window (`kAXFocusedWindow` missing: Finder showing only the desktop, or
-    /// an app with thin AX support). Backs `.activeWindow` panel placement, whose
-    /// only question is *which display the app is on*, so any of its windows
-    /// answers it: `kAXWindows` order is arbitrary (see `WindowEnumerator`), and
-    /// the main window is tried first precisely because it isn't. Scanning stops
-    /// after a few entries: each candidate costs three AX round-trips, and an app
-    /// whose first windows are all minimized or zero-sized won't be placed better
-    /// by reading the rest. Call OFF the main thread, like `focusedWindow(pid:)`.
-    /// Nil when the app has no usable window, or when the scan runs out of budget
-    /// (see `axScanBudget`).
+    /// Bounds of the frontmost on-screen window of `pid`, for apps that expose no
+    /// focused window (`kAXFocusedWindow` missing: Finder showing only the desktop,
+    /// or an app with thin AX support). Backs `.activeWindow` panel placement,
+    /// whose only question is *which display the app is on*.
+    ///
+    /// Asked of the **WindowServer**, not of the app: one
+    /// `CGWindowListCopyWindowInfo` call — the same list enumeration already reads
+    /// (`WindowEnumerator.snapshotCGWindowMap`) — instead of up to 14 AX
+    /// round-trips to a process that, by the time we get here, has already timed
+    /// out once on `focusedWindow(pid:)`. A wedged app cannot stall it, so the
+    /// wall-clock budget the AX scan needed goes away with it, and the list is
+    /// front-to-back, which makes "front" a real ordering rather than
+    /// `kAXWindows`' arbitrary one.
+    ///
+    /// `.optionOnScreenOnly` is the filter placement wants: it drops minimized and
+    /// other-Space windows by construction — a window the user cannot see says
+    /// nothing about which display they are working on. `cgWindowBucket` still
+    /// runs on what remains, so this agrees with what the switcher considers a
+    /// real window rather than placing the panel by a Dock-level overlay or an
+    /// invisible helper surface. Its size gate is left in Stage Manager-unaware
+    /// mode deliberately: the ~83×103 strip tiles it drops (#116) sit on the same
+    /// display as the stage they belong to, so dropping them cannot change which
+    /// display this returns — and the frontmost app's own window, being on stage,
+    /// is reported at full size and ahead of them.
+    /// Bounds come back in the same top-left global space as AX, so callers convert
+    /// them identically. Nil when the app has no on-screen window.
     static func frontWindowBounds(pid: pid_t) -> CGRect? {
-        guard pid > 0, pid != getpid() else { return nil }
-        let deadline = DispatchTime.now().advanced(by: axScanBudget)
-        let axApp = AXUIElementCreateApplication(pid)
-        AXUIElementSetMessagingTimeout(axApp, axScanTimeout)
-        var value: CFTypeRef?
-        if AXUIElementCopyAttributeValue(axApp, kAXMainWindowAttribute as CFString, &value) == .success,
-           let main = value, CFGetTypeID(main) == AXUIElementGetTypeID(),
-           let bounds = scanBounds(of: main as! AXUIElement) {
-            return bounds
-        }
-        value = nil
-        guard DispatchTime.now() < deadline,
-              AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &value) == .success,
-              let windows = value as? [AXUIElement] else { return nil }
-        for window in windows.prefix(3) {
-            guard DispatchTime.now() < deadline else { return nil }
-            if let bounds = scanBounds(of: window) { return bounds }
+        // `[NSDictionary]`, not `[[String: Any]]`: the entries stay toll-free
+        // bridged, so only the four keys read below are bridged (same reason
+        // `snapshotCGWindowMap` does it).
+        guard pid > 0, pid != getpid(),
+              let entries = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
+                                                       kCGNullWindowID) as? [NSDictionary] else { return nil }
+        for entry in entries {
+            guard (entry[kCGWindowOwnerPID as String] as? pid_t) == pid,
+                  let boundsDict = entry[kCGWindowBounds as String] as? NSDictionary,
+                  let rect = CGRect(dictionaryRepresentation: boundsDict), !rect.isEmpty,
+                  WindowEnumerator.cgWindowBucket(
+                      layer: (entry[kCGWindowLayer as String] as? Int) ?? 0,
+                      alpha: (entry[kCGWindowAlpha as String] as? Double) ?? 1,
+                      width: rect.width, height: rect.height) == .normal else { continue }
+            return rect
         }
         return nil
     }
 
-    /// Per-request timeout for `scanBounds(of:)`, and the wall-clock budget for a
-    /// whole `frontWindowBounds` scan (checked before each candidate).
+    /// Per-request timeout for `scanPlacement(of:)` — the one AX read the
+    /// placement capture makes on the frontmost app's own window.
     ///
-    /// Both bound how long a *wedged* app can occupy the background thread, which
-    /// is precisely the app that reaches the scan (`focusedWindow(pid:)` timed out
-    /// for it too). The scan is up to 14 round-trips — `kAXMainWindow` plus three
-    /// for it, then `kAXWindows` plus three for each of three candidates — so
-    /// without a shared deadline one unresponsive app could burn 14 timeouts in a
-    /// row. With these values the scan stays under ~0.35s (budget, plus the last
-    /// candidate that started just inside it).
-    ///
-    /// Deliberately NOT a guarantee that the answer arrives in time to be used:
-    /// `adoptLateTargetScreen` owns that call and enforces its own window, because
-    /// "too late to move the panel" is a UX judgement, not a thread-time one. A
-    /// wedged app can still miss it — correctly, since leaving the panel put beats
-    /// teleporting it mid-cycle. That drop is logged.
+    /// It bounds how long a *wedged* app can occupy the background thread, which
+    /// is precisely the app that reaches placement (`focusedWindow(pid:)` timed
+    /// out for it too). What matters is the whole chain, not this read alone:
+    /// worst case a capture costs `focusedWindow`'s 0.25s, plus this 0.05s, plus
+    /// `frontWindowBounds` — which asks the WindowServer and so cannot be stalled
+    /// by the app — for ~0.3s total, inside `adoptLateTargetScreen`'s 0.6s window.
+    /// Keep that sum under the window when tuning either end: past it a wedged app
+    /// is *guaranteed* to lose the mode rather than merely risking it.
     ///
     /// The timeout is per `AXUIElement`, not per process. The value set on the
     /// application element is NOT inherited by the window elements it hands back,
-    /// so `scanBounds(of:)` and `scanTitle(of:)` re-pin it on each window. Without
-    /// that a single read falls back to the multi-second system default.
+    /// so the window reads re-pin it. Without that a single read falls back to the
+    /// multi-second system default.
     private static let axScanTimeout: Float = 0.05
-    private static let axScanBudget: DispatchTimeInterval = .milliseconds(200)
 
-    /// `axBounds(of:)` hardened for placement reads: the messaging timeout pinned
-    /// on the window element itself, and windows that cannot place a panel —
-    /// minimized, or zero-sized — rejected outright.
+    private static let placementAttributes = [
+        kAXTitleAttribute, kAXMinimizedAttribute, kAXPositionAttribute, kAXSizeAttribute,
+    ] as CFArray
+
+    /// The window's title and its bounds for placement, in ONE AX round-trip.
     ///
-    /// A minimized window keeps reporting its pre-minimize AX position, so taking
-    /// its bounds opens the switcher on a display where the app shows nothing —
-    /// true both for a focused window the user just ⌘M'd and for the `kAXWindows`
-    /// scan, where "every window minimized" is a leading reason the app has no
-    /// focused window at all. An empty rect is rejected for the mirror-image
-    /// reason: an app mid-launch (or one restoring a window) can report a
-    /// zero-sized focused window, `screen(forAXBounds:)` resolves a zero-area rect
-    /// to no screen at all, and adopting it would short-circuit a fallback that
-    /// would have placed the panel correctly. Both rejections live here rather
-    /// than at the call sites because every caller wants the same answer — and the
-    /// one call site that forgot the emptiness check placed the panel by cursor
-    /// instead, silently.
+    /// The reveal worker wants both, and the window scan already reads this exact
+    /// set through `AXUIElementCopyMultipleAttributeValues` for the same reason:
+    /// the work is bound by cross-process AX IPC latency, not CPU, so collapsing
+    /// reads into one round-trip is the largest latency win available here
+    /// (`WindowEnumerator`, measured ~70% faster end-to-end). Four sequential
+    /// reads become one, and the worst case a wedged app can impose drops from
+    /// four messaging timeouts to one. With options 0 a missing attribute comes
+    /// back as an error placeholder, which the casts treat as absent — same
+    /// fallback as separate reads.
     ///
-    /// Call OFF the main thread. The extra round-trip buys the timeout pin too,
-    /// without which the position read uses the multi-second system default.
+    /// `bounds` is nil for windows that cannot place a panel — minimized, or
+    /// zero-sized. A minimized window keeps reporting its pre-minimize AX
+    /// position, so taking its bounds opens the switcher on a display where the
+    /// app shows nothing. An empty rect is rejected for the mirror-image reason:
+    /// an app mid-launch (or one restoring a window) can report a zero-sized
+    /// focused window, `screen(forAXBounds:)` resolves a zero-area rect to no
+    /// screen at all, and adopting it would short-circuit a fallback that would
+    /// have placed the panel correctly. Both rejections live here rather than at
+    /// the call sites because every caller wants the same answer — and the one
+    /// call site that forgot the emptiness check placed the panel by cursor
+    /// instead, silently. The title is returned either way: it is the window's
+    /// identity, not its placement.
     ///
-    /// The pin is per element *instance* and is released on the way out (0 = use
-    /// the global timeout), because one of the elements passed here is the
-    /// switcher's retained `openFocusedWindow`: leaving a 50 ms cap on it would
-    /// silently apply to every later AX write a window-management chord makes to
-    /// that same window.
-    static func scanBounds(of window: AXUIElement) -> CGRect? {
+    /// Call OFF the main thread. The pin is per element *instance* and is released
+    /// on the way out (0 = use the global timeout), because one of the elements
+    /// passed here is the switcher's retained `openFocusedWindow`: leaving a 50 ms
+    /// cap on it would silently apply to every later AX write a window-management
+    /// chord makes to that same window.
+    static func scanPlacement(of window: AXUIElement) -> (title: String, bounds: CGRect?) {
         AXUIElementSetMessagingTimeout(window, axScanTimeout)
         defer { AXUIElementSetMessagingTimeout(window, 0) }
-        var minimized: CFTypeRef?
-        if AXUIElementCopyAttributeValue(window, kAXMinimizedAttribute as CFString, &minimized) == .success,
-           (minimized as? Bool) == true {
-            return nil
-        }
-        guard let bounds = axBounds(of: window), !bounds.isEmpty else { return nil }
-        return bounds
+        var valuesRef: CFArray?
+        guard AXUIElementCopyMultipleAttributeValues(window, placementAttributes,
+                                                     AXCopyMultipleAttributeOptions(rawValue: 0),
+                                                     &valuesRef) == .success,
+              let values = valuesRef as? [AnyObject], values.count == 4 else { return ("", nil) }
+        let title = (values[0] as? String) ?? ""
+        guard (values[1] as? Bool) != true,
+              let bounds = WindowEnumerator.frameFromAttributes(values[2], values[3]),
+              !bounds.isEmpty else { return (title, nil) }
+        return (title, bounds)
     }
 
-    /// AX title of `window`, pinned and released exactly like `scanBounds(of:)`
-    /// and for the same reason: the timeout set on the application element is not
-    /// inherited, so an unpinned title read falls back to the multi-second system
-    /// default. That matters most where this is called — on the reveal worker,
-    /// ahead of the placement capture, where a wedged app would otherwise park a
-    /// `.userInteractive` thread for seconds and push the capture past
-    /// `adoptLateTargetScreen`'s window. Call OFF the main thread; "" when the app
-    /// has no title to give.
-    static func scanTitle(of window: AXUIElement) -> String {
-        AXUIElementSetMessagingTimeout(window, axScanTimeout)
+    /// AX title of `window`, pinned for `timeout` and released, exactly like
+    /// `scanPlacement(of:)` and for the same reason: the timeout set on the
+    /// application element is not inherited, so an unpinned title read falls back
+    /// to the multi-second system default. The budget is the caller's because the
+    /// only caller left is a background MRU refresh, whose tolerance for a slow
+    /// app is nothing like the reveal path's. Call OFF the main thread; "" when
+    /// the app has no title to give.
+    static func scanTitle(of window: AXUIElement, timeout: Float) -> String {
+        AXUIElementSetMessagingTimeout(window, timeout)
         defer { AXUIElementSetMessagingTimeout(window, 0) }
         var value: AnyObject?
         guard AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &value) == .success

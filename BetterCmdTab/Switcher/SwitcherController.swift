@@ -2793,11 +2793,12 @@ final class SwitcherController: SwitcherViewDelegate {
     /// reading rows on the fallback display, and yanking the panel to another
     /// monitor mid-cycle loses their place.
     ///
-    /// A healthy app answers in single-digit milliseconds. A wedged one can exceed
-    /// this — `Activator.axScanBudget` bounds thread occupancy, not arrival time —
-    /// and then loses its say, which is the intended trade rather than a miss to
-    /// tune away. Those drops are logged so "the mode didn't apply" is diagnosable
-    /// instead of silent.
+    /// A healthy app answers in single-digit milliseconds, and a wedged one still
+    /// lands: the whole capture is bounded to ~0.3s (see `Activator.axScanTimeout`,
+    /// which documents the sum), comfortably inside this window. What can still
+    /// miss is a capture that *started* late — a gesture open racing a slow app
+    /// switch — so the drop stays rather than being tuned away, and is logged so
+    /// "the mode didn't apply" is diagnosable instead of silent.
     private static let lateScreenAdoptionWindow: TimeInterval = 0.6
 
     /// Adopt a capture that landed after the panel was already presented. No-op
@@ -2846,19 +2847,20 @@ final class SwitcherController: SwitcherViewDelegate {
                                     separateSpaces: NSScreen.screensHaveSeparateSpaces)
     }
 
-    /// Off-main half of display placement: one AX/CGS pass yielding the target
-    /// the main actor turns into a screen. `window` is the frontmost app's
-    /// focused window when the caller already resolved it (reused, never re-read)
-    /// and `pid` its owner — which lets `.activeApp` fall back to another window of
-    /// the same app, and is nil when the frontmost app was us. Returns nil when
-    /// nothing resolves, leaving the panel's cursor → main-display chain to place
-    /// the switcher.
+    /// Off-main half of display placement: one CGS/CGWindowList pass yielding the
+    /// target the main actor turns into a screen. `bounds` is the frontmost app's
+    /// focused-window geometry when the caller already has it — the reveal worker
+    /// reads it in the same round-trip as the window title (`scanPlacement`), so
+    /// it costs nothing extra — and `pid` its owner, which lets `.activeApp` fall
+    /// back to another window of the same app; nil when the frontmost app was us.
+    /// Returns nil when nothing resolves, leaving the panel's cursor → main-display
+    /// chain to place the switcher.
     ///
     /// Every signal `.activeWindow` can use lives here, so `preferredScreen` never
     /// has to reach for one: `nonisolated` and meant to be called off the main
-    /// thread, because every branch can block on AX messaging or CGS.
+    /// thread, because both remaining branches block on cross-process IPC.
     nonisolated private static func captureTarget(_ need: ScreenSelection.CaptureNeed,
-                                                  window: AXUIElement?,
+                                                  bounds: CGRect?,
                                                   pid: pid_t?) -> ScreenSelection.CaptureTarget? {
         switch need {
         case .live:
@@ -2866,17 +2868,17 @@ final class SwitcherController: SwitcherViewDelegate {
         case .activeMonitor:
             // Displays have separate Spaces, so the bright-menu-bar display is
             // authoritative: it does NOT follow the mouse and is right even with no
-            // focused window (a bare desktop). Only pay for the AX bounds read when
-            // that is unavailable.
+            // focused window (a bare desktop). The window the caller measured is
+            // the fallback for the rare case that lookup fails.
             if let id = PrivateAPI.activeMenuBarDisplayID() { return .displayID(id) }
-            return window.flatMap(Activator.scanBounds(of:)).map(ScreenSelection.CaptureTarget.axBounds)
+            return bounds.map(ScreenSelection.CaptureTarget.axBounds)
         case .activeApp:
             // Displays share one Space, so the app's own window geometry is asked
             // FIRST and the menu bar only as a last resort. Order is the whole
             // fix: there is a single menu bar here, on the main display, so asking
             // it first would succeed with the same answer every time and pin every
             // open to the main display — a wrong answer that never falls through.
-            if let bounds = window.flatMap(Activator.scanBounds(of:)) { return .axBounds(bounds) }
+            if let bounds { return .axBounds(bounds) }
             if let bounds = pid.flatMap(Activator.frontWindowBounds(pid:)) { return .axBounds(bounds) }
             // No window anywhere to measure: the desktop is frontmost (Finder with
             // no windows) or a menu-bar-only app is. Nothing can lose to the menu
@@ -2916,8 +2918,11 @@ final class SwitcherController: SwitcherViewDelegate {
         let gen = focusedWindowCaptureGen
         DispatchQueue.global(qos: .userInteractive).async {
             let window = Activator.focusedWindow(pid: pid)
-            let title = window.map(Activator.scanTitle(of:)) ?? ""
-            let target = Self.captureTarget(need, window: window, pid: pid)
+            // One round-trip for both: the title is needed either way, and the
+            // bounds ride along for free (see `Activator.scanPlacement`).
+            let placement = window.map(Activator.scanPlacement(of:))
+            let title = placement?.title ?? ""
+            let target = Self.captureTarget(need, bounds: placement?.bounds, pid: pid)
             let wid = window.map { PrivateAPI.cgWindowId(of: $0) } ?? 0
             DispatchQueue.main.async { [weak self] in
                 guard let self, gen == self.focusedWindowCaptureGen else { return }
@@ -3000,7 +3005,9 @@ final class SwitcherController: SwitcherViewDelegate {
             focusedWindowCaptureGen &+= 1
             let gen = focusedWindowCaptureGen
             DispatchQueue.global(qos: .userInteractive).async {
-                let target = Self.captureTarget(revealNeed, window: capturedWindow, pid: userPid)
+                let target = Self.captureTarget(revealNeed,
+                                                bounds: Activator.scanPlacement(of: capturedWindow).bounds,
+                                                pid: userPid)
                 DispatchQueue.main.async { [weak self] in
                     guard let self, gen == self.focusedWindowCaptureGen, self.phase == .visible else { return }
                     self.adoptLateTargetScreen(target)
@@ -3012,8 +3019,9 @@ final class SwitcherController: SwitcherViewDelegate {
             let gen = focusedWindowCaptureGen
             DispatchQueue.global(qos: .userInteractive).async {
                 let window = Activator.focusedWindow(pid: pid)
-                let title = window.map(Activator.scanTitle(of:)) ?? ""
-                let target = Self.captureTarget(revealNeed, window: window, pid: pid)
+                let placement = window.map(Activator.scanPlacement(of:))
+                let title = placement?.title ?? ""
+                let target = Self.captureTarget(revealNeed, bounds: placement?.bounds, pid: pid)
                 let wid = window.map { PrivateAPI.cgWindowId(of: $0) } ?? 0
                 DispatchQueue.main.async { [weak self] in
                     guard let self, gen == self.focusedWindowCaptureGen else { return }
@@ -3880,12 +3888,14 @@ final class SwitcherController: SwitcherViewDelegate {
                         fetched[t.key] = hit
                     } else if titleCounts[k] == 1, let hit = byTitle[k] {
                         fetched[t.key] = hit
-                    } else if let frame = Self.scanAXFrame(of: t.window),
+                    } else if let frame = Activator.axBounds(of: t.window, timeout: 0.1),
                               let bi = Self.uniqueBoundsMatch(frame: frame, in: scriptBounds) {
                         // Titles are duplicated (two windows on the same page /
                         // Start Page) or stale (the catalog only tracks titles
                         // while the panel is visible) — fall back to the window's
                         // geometry, which needs no freshness and is near-unique.
+                        // Same space as AppleScript `bounds`; the short messaging
+                        // timeout keeps a busy browser from stalling this worker.
                         let w = perWindow[bi]
                         fetched[t.key] = (w.tabs, w.activeIndex)
                     } else if perWindow.count == 1 && entry.wins.count == 1 {
@@ -5323,13 +5333,6 @@ final class SwitcherController: SwitcherViewDelegate {
         closedTombstones = closedTombstones.enumerated()
             .compactMap { matchedSigIndices.contains($0.offset) ? $0.element : nil }
         return result
-    }
-
-    /// `Activator.axBounds` with a short messaging timeout so a busy browser
-    /// can't stall the off-main scan worker. Same space as AppleScript `bounds`.
-    nonisolated private static func scanAXFrame(of window: AXUIElement) -> CGRect? {
-        AXUIElementSetMessagingTimeout(window, 0.1)
-        return Activator.axBounds(of: window)
     }
 
     /// Resolve an AX window to one of the AppleScript-scanned windows by screen

@@ -721,7 +721,7 @@ enum WindowEnumerator {
     /// autosize; the visual outline is identical. Returns nil when either
     /// attribute is missing or fails to decode — defaults to "keep the window"
     /// rather than collapsing on incomplete data.
-    private static func frameFromAttributes(_ posValue: AnyObject, _ sizeValue: AnyObject) -> CGRect? {
+    static func frameFromAttributes(_ posValue: AnyObject, _ sizeValue: AnyObject) -> CGRect? {
         guard CFGetTypeID(posValue) == AXValueGetTypeID(),
               CFGetTypeID(sizeValue) == AXValueGetTypeID() else { return nil }
         var origin = CGPoint.zero
