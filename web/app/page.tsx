@@ -22,35 +22,11 @@ const BREW = "brew install --cask bettercmdtab";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
-// Below the fold only. An element at opacity:0 is not a paint, so the first
-// screen must never use this one — see `rise`.
-const reveal = {
-  hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE } },
-};
-
-// Same entrance, above the fold: no opacity, so the prerendered HTML is already
-// painted and FCP/LCP land on the static file instead of waiting for ~800 KB of
-// JS to hydrate. Transform-only movement is excluded from layout-shift scoring,
-// so this costs nothing in CLS either. Everything down to and including
-// <Showcase /> — the hero, the CTA row and the preloaded LCP screenshot — is
-// first-screen and uses this; Features and below use `reveal`.
-const rise = {
-  hidden: { y: 16 },
-  show: { y: 0, transition: { duration: 0.5, ease: EASE } },
-};
-
-const stagger = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.05, delayChildren: 0.04 } },
-};
-
-const inView = {
-  variants: stagger,
-  initial: "hidden",
-  whileInView: "show",
-  viewport: { once: true, margin: "-60px" },
-} as const;
+// Nothing on this page has an entrance animation, by design: the whole document
+// is prerendered, so every element ships already in its final position and the
+// static HTML is what you see. Motion is only used for what a click or a hover
+// asks for. Don't reintroduce a load/scroll reveal — it can't start until ~800 KB
+// of JS hydrates, which means content sits visibly parked and then hops.
 
 // Shared utility strings — the recurring "components" of the page.
 const SECTION = "flex flex-col gap-4";
@@ -400,11 +376,8 @@ function Showcase() {
   const shot = layouts[shown];
 
   return (
-    <motion.section className="flex flex-col gap-3" {...inView}>
-      <motion.div
-        className="flex items-center justify-between gap-4 max-[560px]:flex-col max-[560px]:items-start max-[560px]:gap-1.5"
-        variants={rise}
-      >
+    <section className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-4 max-[560px]:flex-col max-[560px]:items-start max-[560px]:gap-1.5">
         <Tabs
           label="Switcher layouts"
           tabs={layouts}
@@ -425,17 +398,11 @@ function Showcase() {
             {shot.caption}
           </motion.p>
         </AnimatePresence>
-      </motion.div>
+      </div>
 
-      {/* `rise`, not `reveal`: this holds the LCP image, and layout.tsx
-          preloads it at fetchpriority=high — an opacity:0 wrapper would throw
-          that away and defer the paint to hydration. */}
-      <motion.div
-        id="layout-panel"
-        role="tabpanel"
-        aria-labelledby={`layout-tab-${shot.id}`}
-        variants={rise}
-      >
+      {/* Holds the LCP image, which layout.tsx preloads at fetchpriority=high —
+          nothing here may hide or defer it. */}
+      <div id="layout-panel" role="tabpanel" aria-labelledby={`layout-tab-${shot.id}`}>
         <button
           type="button"
           onClick={() => setZoomed(true)}
@@ -478,7 +445,7 @@ function Showcase() {
             ) : null,
           )}
         </button>
-      </motion.div>
+      </div>
 
       {mounted &&
         createPortal(
@@ -509,7 +476,7 @@ function Showcase() {
           </AnimatePresence>,
           document.body,
         )}
-    </motion.section>
+    </section>
   );
 }
 
@@ -568,79 +535,73 @@ function Features() {
   }, [active]);
 
   return (
-    <motion.section className={SECTION} {...inView}>
-      <motion.div className="flex flex-wrap items-center gap-3" variants={reveal}>
+    <section className={SECTION}>
+      <div className="flex flex-wrap items-center gap-3">
         <h2 className="m-0 shrink-0 text-[13px] font-normal tracking-[0.04em] text-muted">
           Features
         </h2>
         <span className="h-px flex-1 bg-line max-[560px]:hidden" aria-hidden />
         <span className="shrink-0 text-[13px] tabular-nums text-dim">{FEATURE_COUNT}</span>
-      </motion.div>
+      </div>
 
-      <motion.div variants={reveal}>
-        <Tabs
-          label="Feature groups"
-          tabs={featureTabs}
-          active={active}
-          onChange={select}
-          idPrefix="feature"
-          panelId="feature-panel"
-        />
+      <Tabs
+        label="Feature groups"
+        tabs={featureTabs}
+        active={active}
+        onChange={select}
+        idPrefix="feature"
+        panelId="feature-panel"
+      />
+      <motion.div
+        className="relative overflow-hidden"
+        initial={false}
+        animate={{ height: height ?? "auto" }}
+        transition={{ duration: reduce ? 0 : 0.36, ease: EASE }}
+      >
+        {featureGroups.map((group, i) => (
+          <motion.div
+            key={group.label}
+            ref={(el) => {
+              panels.current[i] = el;
+            }}
+            // The one on its way out leaves the flow, so the incoming
+            // panel alone sets the height the box is gliding to.
+            className={i === leaving ? "absolute inset-x-0 top-0" : undefined}
+            // Only the visible panel is referenced by its tab, so only it
+            // carries the id Tabs points at.
+            id={i === active ? "feature-panel" : undefined}
+            role="tabpanel"
+            aria-labelledby={`feature-tab-${group.label}`}
+            // Nothing inside a panel is focusable, so the panel itself has
+            // to be, or the rows are unreachable from the tab strip.
+            tabIndex={i === active ? 0 : undefined}
+            aria-hidden={i === leaving || undefined}
+            // Hidden, not unmounted: the rows stay in the static HTML,
+            // and each panel keeps the parked state it animates back from
+            // the next time it is picked.
+            hidden={i !== active && i !== leaving}
+            initial={false}
+            // Panels park on the side they sit on in the strip, so a group
+            // picked to the right comes in from the right and the one it
+            // replaces leaves to the left. No direction to track: the
+            // index against the new selection already says which way.
+            animate={i === active ? { opacity: 1, x: 0 } : { opacity: 0, x: i < active ? -16 : 16 }}
+            transition={
+              i === active
+                ? { duration: 0.3, delay: 0.05, ease: EASE }
+                : // Parked panels are display:none, so their reset is free
+                  // and only the two panels in the swap spend frames.
+                  { duration: i === leaving ? 0.22 : 0, ease: EASE }
+            }
+            onAnimationComplete={() => {
+              if (i === leaving) setLeaving(null);
+            }}
+          >
+            <Rows rows={group.rows} />
+          </motion.div>
+        ))}
       </motion.div>
-      <motion.div variants={reveal}>
-        <motion.div
-          className="relative overflow-hidden"
-          initial={false}
-          animate={{ height: height ?? "auto" }}
-          transition={{ duration: reduce ? 0 : 0.36, ease: EASE }}
-        >
-          {featureGroups.map((group, i) => (
-            <motion.div
-              key={group.label}
-              ref={(el) => {
-                panels.current[i] = el;
-              }}
-              // The one on its way out leaves the flow, so the incoming
-              // panel alone sets the height the box is gliding to.
-              className={i === leaving ? "absolute inset-x-0 top-0" : undefined}
-              // Only the visible panel is referenced by its tab, so only it
-              // carries the id Tabs points at.
-              id={i === active ? "feature-panel" : undefined}
-              role="tabpanel"
-              aria-labelledby={`feature-tab-${group.label}`}
-              // Nothing inside a panel is focusable, so the panel itself has
-              // to be, or the rows are unreachable from the tab strip.
-              tabIndex={i === active ? 0 : undefined}
-              aria-hidden={i === leaving || undefined}
-              // Hidden, not unmounted: the rows stay in the static HTML,
-              // and each panel keeps the parked state it animates back from
-              // the next time it is picked.
-              hidden={i !== active && i !== leaving}
-              initial={false}
-              // Panels park on the side they sit on in the strip, so a group
-              // picked to the right comes in from the right and the one it
-              // replaces leaves to the left. No direction to track: the
-              // index against the new selection already says which way.
-              animate={
-                i === active ? { opacity: 1, x: 0 } : { opacity: 0, x: i < active ? -16 : 16 }
-              }
-              transition={
-                i === active
-                  ? { duration: 0.3, delay: 0.05, ease: EASE }
-                  : // Parked panels are display:none, so their reset is free
-                    // and only the two panels in the swap spend frames.
-                    { duration: i === leaving ? 0.22 : 0, ease: EASE }
-              }
-              onAnimationComplete={() => {
-                if (i === leaving) setLeaving(null);
-              }}
-            >
-              <Rows rows={group.rows} />
-            </motion.div>
-          ))}
-        </motion.div>
-      </motion.div>
-    </motion.section>
+    </section>
   );
 }
 
@@ -650,7 +611,7 @@ function Features() {
 function FaqItem({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <motion.div className="border-b border-line" variants={reveal}>
+    <div className="border-b border-line">
       <button
         type="button"
         className="flex w-full cursor-pointer items-baseline gap-2.5 border-0 bg-transparent py-2 text-left text-text transition-colors duration-150 hover:text-accent"
@@ -677,7 +638,7 @@ function FaqItem({ q, a }: { q: string; a: string }) {
       >
         <p className="mb-3 ml-5 text-muted">{a}</p>
       </motion.div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -802,12 +763,7 @@ function DownloadCta({
         <span className="[font-variant-ligatures:none]">{label}</span>
       </motion.a>
       {beta && (
-        <motion.div
-          className="flex flex-none items-center gap-0.5 border-l border-line bg-white/[0.03] px-1.5 text-[13px] leading-normal"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.25, ease: EASE }}
-        >
+        <div className="flex flex-none items-center gap-0.5 border-l border-line bg-white/[0.03] px-1.5 text-[13px] leading-normal">
           {(["stable", "beta"] as const).map((c) => {
             const on = channel === c;
             return (
@@ -835,7 +791,7 @@ function DownloadCta({
               </button>
             );
           })}
-        </motion.div>
+        </div>
       )}
     </div>
   );
@@ -1084,7 +1040,7 @@ function ConfigPreview() {
   }, [active]);
 
   return (
-    <motion.div className="flex flex-col gap-2.5" variants={reveal}>
+    <div className="flex flex-col gap-2.5">
       <Tabs
         label="Configuration examples"
         tabs={configPresets}
@@ -1187,22 +1143,20 @@ function ConfigPreview() {
           </motion.p>
         </AnimatePresence>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
 function Docs() {
   return (
-    <motion.section className={SECTION} {...inView}>
-      <motion.h2 className={H2} variants={reveal}>
-        Docs
-      </motion.h2>
+    <section className={SECTION}>
+      <h2 className={H2}>Docs</h2>
 
       {/* The pitch sits beside the artifact it is describing instead of above
           it. Stacked, this section was the tallest on the page while half the
           width next to the code panel stayed empty. */}
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] items-start gap-x-10 gap-y-7 max-[860px]:grid-cols-1">
-        <motion.div className="flex flex-col gap-4" variants={reveal}>
+        <div className="flex flex-col gap-4">
           <p className="m-0 text-muted">
             Every setting also lives in a plain JSON file you can diff, version and drop into your
             dotfiles. Edits apply live, changes made in the app are written back, and a generated
@@ -1235,11 +1189,11 @@ function Docs() {
             Read the docs
             <span aria-hidden>→</span>
           </a>
-        </motion.div>
+        </div>
 
         <ConfigPreview />
       </div>
-    </motion.section>
+    </section>
   );
 }
 
@@ -1264,14 +1218,9 @@ export default function Home() {
         {/* Left-aligned like everything below it: a centred hero over a
             left-aligned page is two axes fighting, and centred logo-over-
             headline is the most default shape a landing page has. */}
-        <motion.header
-          className="flex flex-col gap-5"
-          variants={stagger}
-          initial="hidden"
-          animate="show"
-        >
+        <header className="flex flex-col gap-5">
           {/* Brand mark, not a heading — the h1 is the promise. */}
-          <motion.div className="flex items-center gap-2.5" variants={rise}>
+          <div className="flex items-center gap-2.5">
             <motion.img
               className="block h-7 w-7 rounded-[7px]"
               // 56px source for a 28px box — 2x for retina and nothing more.
@@ -1287,34 +1236,31 @@ export default function Home() {
               transition={{ type: "spring", stiffness: 500, damping: 16 }}
             />
             <span className="text-[13px] tracking-[0.02em] text-muted">BetterCmdTab</span>
-          </motion.div>
+          </div>
 
           {/* No width cap: 27 mono characters at 34px is ~565px, so the line
              holds together on one line and the step down lands exactly where
              it stops fitting. Phones still wrap — one line there would mean a
              19px headline, which is barely louder than the paragraph. */}
-          <motion.h1
-            className="m-0 text-[34px] leading-[1.18] font-semibold tracking-[-0.02em] max-[640px]:text-[24px]"
-            variants={rise}
-          >
+          <h1 className="m-0 text-[34px] leading-[1.18] font-semibold tracking-[-0.02em] max-[640px]:text-[24px]">
             The <span className="text-accent">Cmd+Tab</span> macOS deserves.
             <span
               className="ml-1.5 inline-block h-[0.9em] w-[9px] animate-caret rounded-[1px] bg-accent align-[-0.06em] motion-reduce:animate-none"
               aria-hidden
             />
-          </motion.h1>
+          </h1>
 
-          <motion.p className="m-0 max-w-[56ch] text-muted" variants={rise}>
+          <p className="m-0 max-w-[56ch] text-muted">
             A fast, native window switcher and app launcher. Free forever, zero telemetry, no
             subscription.
-          </motion.p>
-        </motion.header>
+          </p>
+        </header>
 
-        <motion.section className="flex flex-col gap-4" {...inView}>
-          <motion.div className="flex max-w-full flex-wrap items-center gap-2.5" variants={rise}>
+        <section className="flex flex-col gap-4">
+          <div className="flex max-w-full flex-wrap items-center gap-2.5">
             <DownloadCta href={dmgUrl} beta={!!beta} channel={channel} onChange={setChannel} />
             <BrewCmd beta={channel === "beta"} />
-          </motion.div>
+          </div>
           {/* Meta as quiet chips, echoing the capsules above. Mirrors the
               BetterAudio price animation: LayoutGroup + eased layout on every
               chip so width changes glide, per-char roll inside the version. */}
@@ -1322,7 +1268,6 @@ export default function Home() {
             <motion.div
               layout
               className="flex flex-wrap items-center gap-2 text-[13px] leading-normal text-dim"
-              variants={rise}
               transition={{ duration: 0.32, ease: EASE }}
             >
               {version && (
@@ -1383,7 +1328,7 @@ export default function Home() {
               </motion.span>
             </motion.div>
           </LayoutGroup>
-        </motion.section>
+        </section>
 
         <Showcase />
 
@@ -1391,40 +1336,30 @@ export default function Home() {
 
         <Docs />
 
-        <motion.section className={SECTION} {...inView}>
-          <motion.h2 className={H2} variants={reveal}>
-            FAQ
-          </motion.h2>
-          <motion.div className="flex flex-col gap-2" variants={stagger}>
+        <section className={SECTION}>
+          <h2 className={H2}>FAQ</h2>
+          <div className="flex flex-col gap-2">
             {faqs.map(([q, a]) => (
               <FaqItem key={q} q={q} a={a} />
             ))}
-          </motion.div>
-        </motion.section>
+          </div>
+        </section>
 
-        <motion.section className={SECTION} {...inView}>
-          <motion.h2 className={H2} variants={reveal}>
-            Connect
-          </motion.h2>
-          <motion.p className="m-0 flex items-center gap-3" variants={reveal}>
+        <section className={SECTION}>
+          <h2 className={H2}>Connect</h2>
+          <p className="m-0 flex items-center gap-3">
             <ExternalLink href={REPO}>GitHub</ExternalLink>
             <span className="text-line">·</span>
             <ExternalLink href={`${REPO}/releases`}>Releases</ExternalLink>
             <span className="text-line">·</span>
             <ExternalLink href={`${REPO}/blob/main/LICENSE`}>License</ExternalLink>
-          </motion.p>
-        </motion.section>
+          </p>
+        </section>
 
-        <motion.footer
-          className="text-[13px] text-muted"
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
-        >
+        <footer className="text-[13px] text-muted">
           Built by <ExternalLink href="https://github.com/rokartur">@rokartur</ExternalLink> · GPL
           v3
-        </motion.footer>
+        </footer>
       </main>
     </MotionConfig>
   );
