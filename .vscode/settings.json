@@ -1,3 +1,4 @@
 {
-    "sweetpad.build.xcodeWorkspacePath": "BetterCmdTab.xcodeproj/project.xcworkspace"
+    "sweetpad.build.xcodeWorkspacePath": "BetterCmdTab.xcodeproj/project.xcworkspace",
+    "sweetpad.build.scheme": "BetterCmdTab Debug"
 }
