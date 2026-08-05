@@ -48,22 +48,31 @@ enum ScreenSelection {
     /// What a display mode needs the switcher's off-main capture to resolve
     /// before the panel can be placed. Pure mapping, kept out of the controller
     /// so the "which signal does this mode follow" decision is testable on its
-    /// own. `.activeApp` must never resolve to `.activeMonitor`, or it would
-    /// consult the menu bar and collapse onto the main display whenever displays
-    /// share one Space.
+    /// own.
+    ///
+    /// `separateSpaces` is `NSScreen.screensHaveSeparateSpaces`, and it is the
+    /// whole reason `.activeWindow` isn't a fixed answer. The menu-bar display
+    /// (`SLSCopyActiveMenuBarDisplayIdentifier`) is a Spaces concept: it only
+    /// tells displays apart when that setting is ON. With one Space spanning
+    /// every display there is a single menu bar, on the main display, so the
+    /// call always succeeds with the same answer and "the monitor I'm working on"
+    /// silently collapses into "main display". Reading the frontmost app's own
+    /// window geometry is what holds in that configuration — and asking for the
+    /// menu bar *first* is what would break it, because a successful wrong answer
+    /// never falls through.
     enum CaptureNeed {
         /// The monitor showing the active Space (bright menu bar).
         case activeMonitor
         /// The monitor the frontmost app's window sits on.
         case activeApp
-        /// Nothing to capture: the panel resolves cursor/main-display live.
-        case none
+        /// Nothing to capture: the panel resolves cursor/main-display live on the
+        /// main actor, so the open path must not pay for an off-main capture.
+        case live
 
-        init(_ mode: SwitcherDisplayMode) {
+        init(_ mode: SwitcherDisplayMode, separateSpaces: Bool) {
             switch mode {
-            case .activeWindow: self = .activeMonitor
-            case .activeApp:    self = .activeApp
-            case .mouseCursor, .mainDisplay: self = .none
+            case .activeWindow: self = separateSpaces ? .activeMonitor : .activeApp
+            case .mouseCursor, .mainDisplay: self = .live
             }
         }
     }

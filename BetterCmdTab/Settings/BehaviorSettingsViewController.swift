@@ -91,12 +91,6 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
         displayMonitorPopup.setContentHuggingPriority(.required, for: .horizontal)
         displayMonitorPopup.removeAllItems()
         displayMonitorPopup.addItems(withTitles: displayModes.map(\.displayName))
-        // Per-item hints: the titles say which monitor, not how it is found,
-        // and "active space" vs "active app" only differ when displays share a
-        // Space, which is exactly when the distinction matters.
-        for (item, mode) in zip(displayMonitorPopup.itemArray, displayModes) {
-            item.toolTip = mode.placementHint
-        }
         displayMonitorPopup.target = self
         displayMonitorPopup.action = #selector(displayModeChanged)
         addRow(to: display, title: String(localized: "Show switcher on"),

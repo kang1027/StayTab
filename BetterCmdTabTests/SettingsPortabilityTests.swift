@@ -210,11 +210,11 @@ struct SettingsPortabilityTests {
             ]))
         }
         // Set a non-default value, export, flip live, then import the export back.
-        prefs.switcherDisplayMode = .activeApp
+        prefs.switcherDisplayMode = .activeWindow
         let data = try Preferences.exportedJSONData()
         prefs.switcherDisplayMode = .mainDisplay
         try prefs.importSettings(from: data)
-        #expect(prefs.switcherDisplayMode == .activeApp)
+        #expect(prefs.switcherDisplayMode == .activeWindow)
     }
 
     @Test("round-trip: shortcutOverrides survive export/import")

@@ -1119,7 +1119,7 @@ enum Activator {
 
     /// AX bounds of *some* window of `pid`, for apps that expose no focused
     /// window (`kAXFocusedWindow` missing: Finder showing only the desktop, or
-    /// an app with thin AX support). Backs `.activeApp` panel placement, whose
+    /// an app with thin AX support). Backs `.activeWindow` panel placement, whose
     /// only question is *which display the app is on*, so any of its windows
     /// answers it: `kAXWindows` order is arbitrary (see `WindowEnumerator`), and
     /// the main window is tried first precisely because it isn't. Scanning stops
@@ -1150,35 +1150,49 @@ enum Activator {
         return nil
     }
 
-    /// Per-request timeout for the `frontWindowBounds` scan, and the wall-clock
-    /// budget for that scan as a whole (checked between round-trips).
+    /// Per-request timeout for `scanBounds(of:)`, and the wall-clock budget for a
+    /// whole `frontWindowBounds` scan (checked before each candidate).
     ///
-    /// Both exist because a *wedged* app is precisely what reaches the scan
-    /// (`focusedWindow(pid:)` timed out for it too), so each of its up-to-ten
-    /// round-trips can burn a full timeout. And its answer only ever arrives late
-    /// enough to move an **already visible** panel (`adoptLateTargetScreen`),
-    /// where slow is worse than absent: the switcher would appear on the fallback
-    /// display and then teleport mid-cycle. Holding the whole scan under half a
-    /// second keeps it to what the `.activeWindow` path already cost.
+    /// Both bound how long a *wedged* app can occupy the background thread, which
+    /// is precisely the app that reaches the scan (`focusedWindow(pid:)` timed out
+    /// for it too). The scan is up to 14 round-trips — `kAXMainWindow` plus three
+    /// for it, then `kAXWindows` plus three for each of three candidates — so
+    /// without a shared deadline one unresponsive app could burn 14 timeouts in a
+    /// row. With these values the scan stays under ~0.35s (budget, plus the last
+    /// candidate that started just inside it).
+    ///
+    /// Deliberately NOT a guarantee that the answer arrives in time to be used:
+    /// `adoptLateTargetScreen` owns that call and enforces its own window, because
+    /// "too late to move the panel" is a UX judgement, not a thread-time one. A
+    /// wedged app can still miss it — correctly, since leaving the panel put beats
+    /// teleporting it mid-cycle. That drop is logged.
     ///
     /// The timeout is per `AXUIElement`, not per process. The value set on the
     /// application element is NOT inherited by the window elements it hands back,
     /// so `scanBounds(of:)` re-pins it on each window. Without that a single
     /// position read falls back to the multi-second system default.
-    private static let axScanTimeout: Float = 0.1
-    private static let axScanBudget: DispatchTimeInterval = .milliseconds(400)
+    private static let axScanTimeout: Float = 0.05
+    private static let axScanBudget: DispatchTimeInterval = .milliseconds(200)
 
-    /// `axBounds(of:)` for the scan: the scan's messaging timeout pinned on the
-    /// element, and minimized windows rejected outright.
+    /// `axBounds(of:)` hardened for placement reads: the messaging timeout pinned
+    /// on the window element itself, and minimized windows rejected outright.
     ///
-    /// A minimized window keeps reporting its pre-minimize AX position, and "every
-    /// window minimized" is one of the main reasons an app has no focused window
-    /// in the first place, so it is a leading way to reach this scan at all.
-    /// Taking those bounds would open the switcher on a display where the active
-    /// app shows nothing. The extra round-trip is paid only on this fallback path,
-    /// and only until a usable window is found.
-    private static func scanBounds(of window: AXUIElement) -> CGRect? {
+    /// A minimized window keeps reporting its pre-minimize AX position, so taking
+    /// its bounds opens the switcher on a display where the app shows nothing —
+    /// true both for a focused window the user just ⌘M'd and for the `kAXWindows`
+    /// scan, where "every window minimized" is a leading reason the app has no
+    /// focused window at all. Both callers go through here for that reason.
+    /// Call OFF the main thread. The extra round-trip buys the timeout pin too,
+    /// without which the position read uses the multi-second system default.
+    ///
+    /// The pin is per element *instance* and is released on the way out (0 = use
+    /// the global timeout), because one of the elements passed here is the
+    /// switcher's retained `openFocusedWindow`: leaving a 50 ms cap on it would
+    /// silently apply to every later AX write a window-management chord makes to
+    /// that same window.
+    static func scanBounds(of window: AXUIElement) -> CGRect? {
         AXUIElementSetMessagingTimeout(window, axScanTimeout)
+        defer { AXUIElementSetMessagingTimeout(window, 0) }
         var minimized: CFTypeRef?
         if AXUIElementCopyAttributeValue(window, kAXMinimizedAttribute as CFString, &minimized) == .success,
            (minimized as? Bool) == true {

@@ -346,12 +346,13 @@ final class SwitcherPanel: NSPanel {
     }
 
     /// Resolve the screen for `mode`. `mouseCursor`/`mainDisplay` are cheap live
-    /// reads; `activeWindow` (the active monitor — the bright-menu-bar / focused
-    /// display) and `activeApp` (the display the frontmost app's window sits on)
-    /// are supplied by the controller as `capturedScreen`, resolved off-main
-    /// before our key panel stole frontmost. Both fall back to cursor → main
-    /// when unavailable (private API missing, no window to measure, or the
-    /// capture not yet landed).
+    /// reads; `activeWindow` (the monitor being worked on — the bright-menu-bar
+    /// display, or the frontmost app's window when displays share one Space) is
+    /// supplied by the controller as `capturedScreen`, resolved off-main before
+    /// our key panel stole frontmost. It falls back to cursor → main when
+    /// unavailable (private API missing, no window to measure, or the capture not
+    /// yet landed) — every signal it needs is off-main-only, so this stays free of
+    /// AX/CGS work on the reveal path.
     static func preferredScreen(mode: SwitcherDisplayMode? = nil,
                                 capturedScreen: NSScreen? = nil) -> NSScreen {
         switch mode ?? Preferences.shared.switcherDisplayMode {
@@ -361,24 +362,7 @@ final class SwitcherPanel: NSPanel {
             return mainDisplayScreen()
         case .activeWindow:
             return capturedScreen ?? mouseScreen() ?? mainDisplayScreen()
-        case .activeApp:
-            // `.activeApp`'s capture is nil only when the frontmost app exposed no
-            // window to measure at all: the desktop is frontmost (Finder with no
-            // windows), or a menu-bar-only app is. Dropping straight to the cursor
-            // there would break the mode's promise to follow the app you're working
-            // in, so the focused (bright-menu-bar) display gets the next word. This
-            // is NOT the collapse `CaptureNeed` guards against: that one comes from
-            // *capturing* the menu bar in preference to a real window, and here
-            // there is no window anywhere for it to lose to.
-            return capturedScreen ?? menuBarScreen() ?? mouseScreen() ?? mainDisplayScreen()
         }
-    }
-
-    /// Screen showing the active (bright) menu bar, i.e. the display holding the
-    /// active Space. Nil when the private API is unavailable or its display went
-    /// away. Main-actor only (`NSScreen.screens`).
-    static func menuBarScreen() -> NSScreen? {
-        PrivateAPI.activeMenuBarDisplayID().flatMap(screen(forDisplayID:))
     }
 
     /// The `NSScreen` whose `CGDirectDisplayID` matches `displayID`, or nil when no
