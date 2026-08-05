@@ -9,6 +9,29 @@ struct BrowserTabInfo: Equatable, Sendable {
     let url: String
 }
 
+extension BrowserTabs {
+    /// Whether `windowTitle` (a browser window's AX title) denotes `tabTitle`
+    /// (one tab's AppleScript title). The two are the same string in Safari, but
+    /// Chromium appends the browser name — and, with more than one profile, the
+    /// profile name — to the window title ("Inbox - Google Chrome - Artur"), so
+    /// equality alone never matches for those users (#157). Both sides are
+    /// trimmed, and a separator is required after the tab title so one tab can't
+    /// match another whose title merely starts the same.
+    ///
+    /// The single definition of this rule, shared by the active-tab resolver
+    /// (`SwitcherController.activeBrowserTabIndex`) and the tab-recency sort
+    /// (`BrowserTabMRUTracker.sortRows`). Pure.
+    static func windowTitle(_ windowTitle: String, matchesTab tabTitle: String) -> Bool {
+        let window = windowTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let tab = tabTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !window.isEmpty, !tab.isEmpty else { return false }
+        return window == tab
+            || window.hasPrefix(tab + " — ")
+            || window.hasPrefix(tab + " – ")
+            || window.hasPrefix(tab + " - ")
+    }
+}
+
 // Private SPI from libsystem: detaches the spawned child's TCC
 // "responsibility" so it acts as its own client (osascript) instead of
 // inheriting from us (BetterCmdTab). This is the documented escape hatch

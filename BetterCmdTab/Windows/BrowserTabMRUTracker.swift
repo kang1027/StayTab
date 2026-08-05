@@ -15,6 +15,10 @@ import CoreGraphics
 ///   have (read straight off the window's AX title — no Apple Events). Title
 ///   churn on navigation just renames the entry the user is already on, which is
 ///   harmless: it still points at "the tab they're looking at".
+///   The AX title an entry records is not always the tab title a displayed row
+///   carries: Chromium suffixes the window title with the browser (and profile)
+///   name, so `sortRows` matches those through
+///   `BrowserTabs.windowTitle(_:matchesTab:)` (#157).
 ///
 /// Fed by `BrowserTabFocusObserver` (in-browser tab switches) and the switcher's
 /// focus/commit paths. Pure ordering — no AX/Apple Events here, so it's unit
@@ -59,7 +63,10 @@ final class BrowserTabMRUTracker {
     /// sources — the AX window title (observer / focus) and the osascript tab list
     /// (displayed rows) — which the cache already matches on a *trimmed* basis. Trim
     /// here too so a stray whitespace difference between the two can't split one tab
-    /// into two recency entries (the current tab would then miss row 0).
+    /// into two recency entries (the current tab would then miss row 0). A window
+    /// title that carries more than the tab title (Chromium's browser/profile
+    /// suffix) can't be canonicalized here — the tab list it has to match isn't
+    /// known at bump time — so `sortRows` reconciles that pair instead.
     static func tabKey(wid: CGWindowID, title: String) -> Key {
         .tab(wid, title.trimmingCharacters(in: .whitespacesAndNewlines))
     }
@@ -84,12 +91,32 @@ final class BrowserTabMRUTracker {
         var rank: [Key: Int] = [:]
         rank.reserveCapacity(order.count)
         for (i, k) in order.enumerated() { rank[k] = i }
+        // Built on the first exact miss only, so a reveal where every tab hits its
+        // key — Safari, single-profile Chromium — pays nothing extra.
+        var tabRanks: [CGWindowID: [(rank: Int, title: String)]]?
         let indexed = rows.enumerated().map { offset, row -> (rank: Int, offset: Int, row: SwitcherRow) in
-            let r = Self.key(for: row).flatMap { rank[$0] } ?? Int.max
-            return (r, offset, row)
+            guard let key = Self.key(for: row) else { return (Int.max, offset, row) }
+            if let exact = rank[key] { return (exact, offset, row) }
+            guard case .tab(let wid, let tabTitle) = key else { return (Int.max, offset, row) }
+            let byWindow = tabRanks ?? Self.tabRanksByWindow(order)
+            tabRanks = byWindow
+            let matched = byWindow[wid]?.first { BrowserTabs.windowTitle($0.title, matchesTab: tabTitle) }
+            return (matched?.rank ?? Int.max, offset, row)
         }
         return indexed.sorted { lhs, rhs in
             lhs.rank != rhs.rank ? lhs.rank < rhs.rank : lhs.offset < rhs.offset
         }.map(\.row)
+    }
+
+    /// Tab entries grouped by their parent window id, newest first — the index
+    /// `sortRows` falls back to when a row's tab title isn't the whole AX window
+    /// title the bump recorded. Scanning only the row's own window keeps the
+    /// fallback to a handful of comparisons instead of the whole 300-entry order.
+    private static func tabRanksByWindow(_ order: [Key]) -> [CGWindowID: [(rank: Int, title: String)]] {
+        var out: [CGWindowID: [(rank: Int, title: String)]] = [:]
+        for (rank, key) in order.enumerated() {
+            if case .tab(let wid, let title) = key { out[wid, default: []].append((rank, title)) }
+        }
+        return out
     }
 }

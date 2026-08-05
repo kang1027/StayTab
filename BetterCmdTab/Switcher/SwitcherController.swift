@@ -5421,16 +5421,8 @@ final class SwitcherController: SwitcherViewDelegate {
     /// title. Duplicate titles are intentionally ambiguous: skipping one frame
     /// is better than caching the current page under another tab's URL.
     nonisolated static func activeBrowserTabIndex(tabs: [BrowserTabInfo], windowTitle: String) -> Int? {
-        let title = windowTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !title.isEmpty else { return nil }
         var match: Int?
-        for index in tabs.indices {
-            let tabTitle = tabs[index].title.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !tabTitle.isEmpty,
-                  title == tabTitle
-                || title.hasPrefix(tabTitle + " — ")
-                || title.hasPrefix(tabTitle + " – ")
-                || title.hasPrefix(tabTitle + " - ") else { continue }
+        for index in tabs.indices where BrowserTabs.windowTitle(windowTitle, matchesTab: tabs[index].title) {
             guard match == nil else { return nil }
             match = index
         }

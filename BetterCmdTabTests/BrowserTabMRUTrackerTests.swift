@@ -98,4 +98,29 @@ struct BrowserTabMRUTrackerTests {
         // Clean osascript row titles — the trimmed bump still matches "Inbox".
         #expect(t.sortRows(tabRows(wid: 3, titles: ["Inbox", "Docs"])).first?.windowTitle == "Inbox")
     }
+
+    @Test func sortRowsMatchesBumpsCarryingTheBrowserWindowSuffix() {
+        // Chromium with more than one profile suffixes the window title, so the AX
+        // title a bump records is longer than the osascript tab title the row
+        // carries. Without reconciling the two, every tab misses its rank and the
+        // panel can only ever show the current tab first (#157).
+        let t = BrowserTabMRUTracker()
+        t.bump(BrowserTabMRUTracker.tabKey(wid: 4, title: "News - Google Chrome - Artur"))
+        t.bump(BrowserTabMRUTracker.tabKey(wid: 4, title: "Docs"))            // Safari-shaped bump
+        let sorted = t.sortRows(tabRows(wid: 4, titles: ["Inbox", "News", "Docs"]))
+        // Docs (exact hit, newest), News (suffix match), Inbox (never focused).
+        #expect(sorted.map(\.windowTitle) == ["Docs", "News", "Inbox"])
+    }
+
+    @Test func suffixMatchNeedsASeparatorAndTheSameWindow() {
+        let t = BrowserTabMRUTracker()
+        t.bump(BrowserTabMRUTracker.tabKey(wid: 4, title: "Inbox - Google Chrome - Artur"))
+        // "Inb"/"Inbox Zero" only *start* like the recorded title — no separator
+        // follows, so neither may inherit Inbox's recency.
+        #expect(t.sortRows(tabRows(wid: 4, titles: ["Inb", "Inbox Zero"])).map(\.windowTitle)
+                == ["Inb", "Inbox Zero"])
+        // Same title in another window is another tab — recency must not leak.
+        #expect(t.sortRows(tabRows(wid: 7, titles: ["Docs", "Inbox"])).map(\.windowTitle)
+                == ["Docs", "Inbox"])
+    }
 }
