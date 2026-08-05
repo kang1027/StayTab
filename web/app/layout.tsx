@@ -233,16 +233,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <link rel="dns-prefetch" href="https://api.github.com" />
         <link rel="dns-prefetch" href="https://objects.githubusercontent.com" />
 
-        {/* Settle the prerendered content when JS is disabled (motion ships its
-            initial variant inline; this only applies with no JS). Both hidden
-            forms have to be listed: below the fold that is opacity:0, above it
-            `rise` leaves a transform-only offset with no opacity at all. */}
-        <noscript>
-          <style>
-            {`[style*="opacity:0"],[style*="translateY"]{opacity:1!important;transform:none!important}`}
-          </style>
-        </noscript>
-
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
