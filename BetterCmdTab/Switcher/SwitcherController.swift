@@ -151,12 +151,11 @@ final class SwitcherController: SwitcherViewDelegate {
     /// AX title captured with `openFocusedWindow`; for browsers this identifies
     /// the active tab without another AppleScript scan.
     private var openFocusedWindowTitle = ""
-    /// Target screen for `.activeWindow` ("active Space") display mode (#22),
-    /// resolved off-main: the active monitor (the bright-menu-bar / focused
-    /// display, which does not follow the mouse), or — when that can't be
-    /// resolved — the screen of the window focused when the switcher opened. nil
-    /// for other modes or until the async read lands. Cleared on teardown with
-    /// `openFocusedWindow`.
+    /// Target screen for `.activeWindow` — the mode that follows the user rather
+    /// than the mouse (#22) — resolved off-main from whichever signal
+    /// `ScreenSelection.CaptureNeed` picked for the current Spaces configuration.
+    /// nil for the other modes, or until the async read lands. Cleared on teardown
+    /// with `openFocusedWindow`.
     private var openTargetScreen: NSScreen?
     /// The app that was frontmost when the switcher opened. On open we activate
     /// BetterCmdTab so the WindowServer renders the Liquid Glass backdrop as
@@ -215,6 +214,11 @@ final class SwitcherController: SwitcherViewDelegate {
     /// input flagsState is reliable, so this stamp drives nothing — a held ⌘ keeps
     /// the panel up for as long as the user wants, with no idle ceiling.
     private var lastVisibleActivity: Date?
+    /// When the current panel became visible. Unlike `lastVisibleActivity` this is
+    /// never bumped afterwards, so it measures the true age of the open, which is
+    /// what `adoptLateTargetScreen` needs to decide whether a screen capture is
+    /// still early enough to act on.
+    private var visibleSince: Date?
     /// When Secure Event Input last cleared (ON→OFF) while a panel was open. The
     /// no-interaction force-close is normally SEI-only, but a ⌘-release dropped
     /// during an SEI-deaf window can leave `CGEventSource.flagsState` latched
@@ -449,9 +453,16 @@ final class SwitcherController: SwitcherViewDelegate {
     /// path on the synchronous AX read. Consumed and cleared by `reveal()`.
     private var prefetchedFocusedWindow: AXUIElement?
     private var prefetchedFocusedWindowTitle = ""
-    /// `.activeWindow` target screen resolved during the primed prefetch, copied
-    /// into `openTargetScreen` by `reveal()` (mirrors `prefetchedFocusedWindow`).
-    private var prefetchedTargetScreen: NSScreen?
+    /// Target screen resolved during the primed prefetch for `.activeWindow`,
+    /// copied into `openTargetScreen` by `reveal()` (mirrors
+    /// `prefetchedFocusedWindow`).
+    ///
+    /// Carries the `CaptureNeed` it was resolved for, because that can change
+    /// between the prefetch and the reveal that consumes it — the user switches
+    /// display mode, or (rarely) the separate-Spaces setting flips. The two needs
+    /// follow different signals (menu bar vs. app window geometry), so a screen
+    /// captured for the other one is not a usable answer and `reveal()` drops it.
+    private var prefetchedTarget: (need: ScreenSelection.CaptureNeed, screen: NSScreen)?
     /// Token bumped per primed chord so a stale off-main focused-window capture
     /// from an earlier chord can't land on a newer one.
     private var focusedWindowCaptureGen: UInt64 = 0
@@ -1736,7 +1747,8 @@ final class SwitcherController: SwitcherViewDelegate {
         prefetchedFocusedWindow = nil
         prefetchedFocusedWindowTitle = ""
         openTargetScreen = nil
-        prefetchedTargetScreen = nil
+        prefetchedTarget = nil
+        visibleSince = nil
         previousFrontmostApp = nil
 
         cancellables.removeAll()
@@ -1904,9 +1916,15 @@ final class SwitcherController: SwitcherViewDelegate {
             // (commit/cancel → `.idle`) always tears it down, and a fresh `.visible`
             // arms it.
             syncVisibleReleaseBackstop()
-            // Seed the steering stamp on the open edge so the no-interaction
-            // force-close ceiling is measured from when the panel appeared.
-            if newValue == .visible { lastVisibleActivity = Date() }
+            // Seed both open-edge stamps so the no-interaction force-close ceiling
+            // and the late-capture adoption window are measured from when the
+            // panel appeared. They diverge afterwards: steering bumps only the
+            // former, and the latter must keep reporting the true age.
+            if newValue == .visible {
+                let now = Date()
+                lastVisibleActivity = now
+                visibleSince = now
+            }
             // Returning to idle ends any scoped-shortcut open so the next plain
             // ⌘Tab is unfiltered. Single chokepoint — every exit path (commit,
             // cancel, dismiss) flows through here.
@@ -2737,18 +2755,18 @@ final class SwitcherController: SwitcherViewDelegate {
     }
 
     /// The one screen this open session uses for positioning AND metrics, so the
-    /// two never disagree. Mouse/main resolve live; active-window uses the
+    /// two never disagree. Mouse/main resolve live; `.activeWindow` uses the
     /// off-main capture (`openTargetScreen`) with the panel's fallback chain.
     private func resolveSessionScreen() -> NSScreen {
-        // Map the captured active-window screen to a still-connected screen by
-        // frame (NSScreen instances are recreated on reconfig; a disconnected
-        // display has no frame match → nil → graceful cursor/main fallback).
-        let active = openTargetScreen.flatMap { captured in
+        // Map the captured screen to a still-connected one by frame (NSScreen
+        // instances are recreated on reconfig; a disconnected display has no
+        // frame match → nil → graceful cursor/main fallback).
+        let captured = openTargetScreen.flatMap { captured in
             NSScreen.screens.first { $0.frame == captured.frame }
         }
         return SwitcherPanel.preferredScreen(
             mode: Preferences.shared.switcherDisplayMode,
-            activeWindowScreen: active
+            capturedScreen: captured
         )
     }
 
@@ -2760,14 +2778,47 @@ final class SwitcherController: SwitcherViewDelegate {
         refreshDisplay()
     }
 
-    /// After a late `.activeWindow` screen capture lands, move the already-shown
-    /// panel to it — but only if the screen actually changed, to avoid needless
-    /// relayout/flicker when the fallback already matched the active window.
+    /// After a late screen capture lands, move the already-shown panel to it,
+    /// but only if the screen actually changed, to avoid needless relayout/
+    /// flicker when the fallback already matched the captured display.
     private func reapplySessionScreenIfChanged() {
         guard phase == .visible else { return }
         let resolved = resolveSessionScreen()
         guard resolved.frame != panel.targetScreen?.frame else { return }
         applySessionScreen(resolved)
+    }
+
+    /// How long after the panel appears a late screen capture may still move it.
+    /// Past this the correction is worse than the miss: the user is already
+    /// reading rows on the fallback display, and yanking the panel to another
+    /// monitor mid-cycle loses their place.
+    ///
+    /// A healthy app answers in single-digit milliseconds, and a wedged one still
+    /// lands: the whole capture is bounded to ~0.3s (see `Activator.axScanTimeout`,
+    /// which documents the sum), comfortably inside this window. What can still
+    /// miss is a capture that *started* late — a gesture open racing a slow app
+    /// switch — so the drop stays rather than being tuned away, and is logged so
+    /// "the mode didn't apply" is diagnosable instead of silent.
+    private static let lateScreenAdoptionWindow: TimeInterval = 0.6
+
+    /// Adopt a capture that landed after the panel was already presented. No-op
+    /// when it resolves to no live screen (leaving the fallback in place) or when
+    /// the panel has been up too long to move without disorienting the user.
+    private func adoptLateTargetScreen(_ target: ScreenSelection.CaptureTarget?) {
+        guard let shown = visibleSince else { return }
+        let age = Date().timeIntervalSince(shown)
+        guard age < Self.lateScreenAdoptionWindow else {
+            if target != nil {
+                // .info, not .debug: os_log discards debug by default, so a drop
+                // logged at that level is exactly as silent as no log at all — and
+                // this fires at most once per open, only on the failure path.
+                Log.switcher.info("display placement: capture landed \(age, format: .fixed(precision: 3))s after present, past the \(Self.lateScreenAdoptionWindow, format: .fixed(precision: 2))s window — leaving the panel put")
+            }
+            return
+        }
+        guard let target, let resolved = screen(for: target) else { return }
+        openTargetScreen = resolved
+        reapplySessionScreenIfChanged()
     }
 
     /// Convert AX (top-left) window bounds to Cocoa and pick the max-overlap
@@ -2787,13 +2838,62 @@ final class SwitcherController: SwitcherViewDelegate {
         return screens[i]
     }
 
-    /// The `NSScreen` whose `CGDirectDisplayID` matches `displayID`, or nil when
-    /// no live screen does (e.g. the display was unplugged between the off-main
-    /// capture and this main-actor lookup). Main-actor only (`NSScreen.screens`).
-    /// Backs `.activeWindow` (active-monitor) placement.
-    private func screen(forDisplayID displayID: CGDirectDisplayID) -> NSScreen? {
-        NSScreen.screens.first {
-            ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value == displayID
+    /// Which signal the live display mode wants captured. Both inputs are
+    /// main-actor-only reads, so this is resolved here and handed to the off-main
+    /// `captureTarget`; `screensHaveSeparateSpaces` is a cached system flag, not a
+    /// WindowServer round-trip.
+    private var captureNeed: ScreenSelection.CaptureNeed {
+        ScreenSelection.CaptureNeed(Preferences.shared.switcherDisplayMode,
+                                    separateSpaces: NSScreen.screensHaveSeparateSpaces)
+    }
+
+    /// Off-main half of display placement: one CGS/CGWindowList pass yielding the
+    /// target the main actor turns into a screen. `bounds` is the frontmost app's
+    /// focused-window geometry when the caller already has it — the reveal worker
+    /// reads it in the same round-trip as the window title (`scanPlacement`), so
+    /// it costs nothing extra — and `pid` its owner, which lets `.activeApp` fall
+    /// back to another window of the same app; nil when the frontmost app was us.
+    /// Returns nil when nothing resolves, leaving the panel's cursor → main-display
+    /// chain to place the switcher.
+    ///
+    /// Every signal `.activeWindow` can use lives here, so `preferredScreen` never
+    /// has to reach for one: `nonisolated` and meant to be called off the main
+    /// thread, because both remaining branches block on cross-process IPC.
+    nonisolated private static func captureTarget(_ need: ScreenSelection.CaptureNeed,
+                                                  bounds: CGRect?,
+                                                  pid: pid_t?) -> ScreenSelection.CaptureTarget? {
+        switch need {
+        case .live:
+            return nil
+        case .activeMonitor:
+            // Displays have separate Spaces, so the bright-menu-bar display is
+            // authoritative: it does NOT follow the mouse and is right even with no
+            // focused window (a bare desktop). The window the caller measured is
+            // the fallback for the rare case that lookup fails.
+            if let id = PrivateAPI.activeMenuBarDisplayID() { return .displayID(id) }
+            return bounds.map(ScreenSelection.CaptureTarget.axBounds)
+        case .activeApp:
+            // Displays share one Space, so the app's own window geometry is asked
+            // FIRST and the menu bar only as a last resort. Order is the whole
+            // fix: there is a single menu bar here, on the main display, so asking
+            // it first would succeed with the same answer every time and pin every
+            // open to the main display — a wrong answer that never falls through.
+            if let bounds { return .axBounds(bounds) }
+            if let bounds = pid.flatMap(Activator.frontWindowBounds(pid:)) { return .axBounds(bounds) }
+            // No window anywhere to measure: the desktop is frontmost (Finder with
+            // no windows) or a menu-bar-only app is. Nothing can lose to the menu
+            // bar here, so it gets the last word rather than dropping to the cursor
+            // — still off-main, unlike asking for it during placement.
+            return PrivateAPI.activeMenuBarDisplayID().map(ScreenSelection.CaptureTarget.displayID)
+        }
+    }
+
+    /// Main-actor half: place a capture on a live screen. Nil when the display
+    /// went away or no screen overlaps the bounds.
+    private func screen(for target: ScreenSelection.CaptureTarget) -> NSScreen? {
+        switch target {
+        case .displayID(let id): return SwitcherPanel.screen(forDisplayID: id)
+        case .axBounds(let bounds): return screen(forAXBounds: bounds)
         }
     }
 
@@ -2808,27 +2908,21 @@ final class SwitcherController: SwitcherViewDelegate {
     private func prefetchOpenFocusedWindow() {
         prefetchedFocusedWindow = nil
         prefetchedFocusedWindowTitle = ""
-        prefetchedTargetScreen = nil
+        prefetchedTarget = nil
         let selfPid = getpid()
         guard let front = NSWorkspace.shared.frontmostApplication,
               front.processIdentifier != selfPid else { return }
         let pid = front.processIdentifier
-        let wantScreen = Preferences.shared.switcherDisplayMode == .activeWindow
+        let need = captureNeed
         focusedWindowCaptureGen &+= 1
         let gen = focusedWindowCaptureGen
         DispatchQueue.global(qos: .userInteractive).async {
             let window = Activator.focusedWindow(pid: pid)
-            var titleValue: AnyObject?
-            let title = window.flatMap {
-                AXUIElementCopyAttributeValue($0, kAXTitleAttribute as CFString, &titleValue) == .success
-                    ? titleValue as? String : nil
-            } ?? ""
-            // Prefer the active monitor (the one with the bright menu bar — the
-            // focused display, which does NOT follow the mouse; correct even with
-            // no focused window, e.g. a bare desktop). Only pay for the
-            // focused-window AX bounds read when that is unavailable.
-            let activeDisplayID = wantScreen ? PrivateAPI.activeMenuBarDisplayID() : nil
-            let axBounds = (wantScreen && activeDisplayID == nil && window != nil) ? Activator.axBounds(of: window!) : nil
+            // One round-trip for both: the title is needed either way, and the
+            // bounds ride along for free (see `Activator.scanPlacement`).
+            let placement = window.map(Activator.scanPlacement(of:))
+            let title = placement?.title ?? ""
+            let target = Self.captureTarget(need, bounds: placement?.bounds, pid: pid)
             let wid = window.map { PrivateAPI.cgWindowId(of: $0) } ?? 0
             DispatchQueue.main.async { [weak self] in
                 guard let self, gen == self.focusedWindowCaptureGen else { return }
@@ -2849,11 +2943,7 @@ final class SwitcherController: SwitcherViewDelegate {
                 guard self.phase == .primed else { return }
                 self.prefetchedFocusedWindow = window
                 self.prefetchedFocusedWindowTitle = title
-                if let activeDisplayID, let s = self.screen(forDisplayID: activeDisplayID) {
-                    self.prefetchedTargetScreen = s
-                } else if let axBounds {
-                    self.prefetchedTargetScreen = self.screen(forAXBounds: axBounds)
-                }
+                self.prefetchedTarget = target.flatMap { self.screen(for: $0) }.map { (need, $0) }
             }
         }
     }
@@ -2897,51 +2987,52 @@ final class SwitcherController: SwitcherViewDelegate {
         openFocusedWindowTitle = prefetchedFocusedWindowTitle
         prefetchedFocusedWindow = nil
         prefetchedFocusedWindowTitle = ""
-        openTargetScreen = prefetchedTargetScreen
-        prefetchedTargetScreen = nil
+        // The user's app, us excluded — `previousFrontmostApp` above already
+        // applied that filter. Our own panel/settings windows say nothing about
+        // which display the user was working on.
+        let userPid = previousFrontmostApp?.processIdentifier
+        // Adopt the prefetched screen only if the live mode still wants the signal
+        // it was captured from: the display mode (or, rarely, the separate-Spaces
+        // setting behind it) can change during the primed delay, and a screen
+        // resolved from the other signal is not a usable answer for this one. Both
+        // cases leave `openTargetScreen` nil and re-capture below so the live mode
+        // wins.
+        let revealNeed = captureNeed
+        openTargetScreen = prefetchedTarget.flatMap { $0.need == revealNeed ? $0.screen : nil }
+        prefetchedTarget = nil
         _ = syncFocusedBrowserTabIndex()
-        // Mode may have flipped to .activeWindow after the primed prefetch (which
-        // captured the window but not the screen). Resolve the screen now —
-        // active monitor (bright menu bar) first, the captured window as
-        // fallback — so active-window mode still applies.
-        if Preferences.shared.switcherDisplayMode == .activeWindow,
-           openTargetScreen == nil, let capturedWindow = openFocusedWindow {
+        if revealNeed != .live, openTargetScreen == nil, let capturedWindow = openFocusedWindow {
             focusedWindowCaptureGen &+= 1
             let gen = focusedWindowCaptureGen
             DispatchQueue.global(qos: .userInteractive).async {
-                let activeDisplayID = PrivateAPI.activeMenuBarDisplayID()
-                let axBounds = activeDisplayID == nil ? Activator.axBounds(of: capturedWindow) : nil
+                let target = Self.captureTarget(revealNeed,
+                                                bounds: Activator.scanPlacement(of: capturedWindow).bounds,
+                                                pid: userPid)
                 DispatchQueue.main.async { [weak self] in
                     guard let self, gen == self.focusedWindowCaptureGen, self.phase == .visible else { return }
-                    if let activeDisplayID, let resolved = self.screen(forDisplayID: activeDisplayID) {
-                        self.openTargetScreen = resolved
-                        self.reapplySessionScreenIfChanged()
-                    } else if let axBounds, let resolved = self.screen(forAXBounds: axBounds) {
-                        self.openTargetScreen = resolved
-                        self.reapplySessionScreenIfChanged()
-                    }
+                    self.adoptLateTargetScreen(target)
                 }
             }
         }
-        if openFocusedWindow == nil, let pid = front?.processIdentifier, pid != getpid() {
-            let wantScreen = Preferences.shared.switcherDisplayMode == .activeWindow
+        if openFocusedWindow == nil, let pid = userPid {
             focusedWindowCaptureGen &+= 1
             let gen = focusedWindowCaptureGen
             DispatchQueue.global(qos: .userInteractive).async {
                 let window = Activator.focusedWindow(pid: pid)
-                var titleValue: AnyObject?
-                let title = window.flatMap {
-                    AXUIElementCopyAttributeValue($0, kAXTitleAttribute as CFString, &titleValue) == .success
-                        ? titleValue as? String : nil
-                } ?? ""
-                let activeDisplayID = wantScreen ? PrivateAPI.activeMenuBarDisplayID() : nil
-                let axBounds = (wantScreen && activeDisplayID == nil && window != nil) ? Activator.axBounds(of: window!) : nil
+                let placement = window.map(Activator.scanPlacement(of:))
+                let title = placement?.title ?? ""
+                let target = Self.captureTarget(revealNeed, bounds: placement?.bounds, pid: pid)
                 let wid = window.map { PrivateAPI.cgWindowId(of: $0) } ?? 0
                 DispatchQueue.main.async { [weak self] in
                     guard let self, gen == self.focusedWindowCaptureGen else { return }
                     // Same MRU self-heal as the primed prefetch (#85) — this
                     // branch serves gesture/scoped opens, which skip it.
                     if wid != 0, self.phase != .idle { self.windowMRU.bump(pid: pid, wid: wid) }
+                    // Ahead of the window-capture guard on purpose: which display
+                    // the app occupies is still the right answer even if something
+                    // else claimed `openFocusedWindow` first, and this applies its
+                    // own visible/age guards.
+                    self.adoptLateTargetScreen(target)
                     guard self.phase == .visible, self.openFocusedWindow == nil else { return }
                     self.openFocusedWindow = window
                     self.openFocusedWindowTitle = title
@@ -2949,13 +3040,6 @@ final class SwitcherController: SwitcherViewDelegate {
                         self.reExpandBrowserTabs(force: true)
                     }
                     self.prewarmActiveBrowserTabPreview()
-                    if let activeDisplayID, let resolved = self.screen(forDisplayID: activeDisplayID) {
-                        self.openTargetScreen = resolved
-                        self.reapplySessionScreenIfChanged()
-                    } else if let axBounds, let resolved = self.screen(forAXBounds: axBounds) {
-                        self.openTargetScreen = resolved
-                        self.reapplySessionScreenIfChanged()
-                    }
                 }
             }
         }
@@ -3804,12 +3888,14 @@ final class SwitcherController: SwitcherViewDelegate {
                         fetched[t.key] = hit
                     } else if titleCounts[k] == 1, let hit = byTitle[k] {
                         fetched[t.key] = hit
-                    } else if let frame = Self.scanAXFrame(of: t.window),
+                    } else if let frame = Activator.axBounds(of: t.window, timeout: 0.1),
                               let bi = Self.uniqueBoundsMatch(frame: frame, in: scriptBounds) {
                         // Titles are duplicated (two windows on the same page /
                         // Start Page) or stale (the catalog only tracks titles
                         // while the panel is visible) — fall back to the window's
                         // geometry, which needs no freshness and is near-unique.
+                        // Same space as AppleScript `bounds`; the short messaging
+                        // timeout keeps a busy browser from stalling this worker.
                         let w = perWindow[bi]
                         fetched[t.key] = (w.tabs, w.activeIndex)
                     } else if perWindow.count == 1 && entry.wins.count == 1 {
@@ -4207,7 +4293,8 @@ final class SwitcherController: SwitcherViewDelegate {
         // prefetch (those call reveal() directly).
         prefetchedFocusedWindow = nil
         prefetchedFocusedWindowTitle = ""
-        prefetchedTargetScreen = nil
+        prefetchedTarget = nil
+        visibleSince = nil
         // We picked a target — `pendingActivation` activates it, so there's
         // nothing to restore. Without a pick (committing out of the empty
         // state, or a primed commit that resolved no app) undo present()'s
@@ -4257,7 +4344,8 @@ final class SwitcherController: SwitcherViewDelegate {
         prefetchedFocusedWindow = nil
         prefetchedFocusedWindowTitle = ""
         openTargetScreen = nil
-        prefetchedTargetScreen = nil
+        prefetchedTarget = nil
+        visibleSince = nil
         view.releaseIdleResources()
         // Dismissing without picking: undo the self-activation `present()` did for
         // the glass backdrop and put the user back in the app they came from.
@@ -5245,13 +5333,6 @@ final class SwitcherController: SwitcherViewDelegate {
         closedTombstones = closedTombstones.enumerated()
             .compactMap { matchedSigIndices.contains($0.offset) ? $0.element : nil }
         return result
-    }
-
-    /// `Activator.axBounds` with a short messaging timeout so a busy browser
-    /// can't stall the off-main scan worker. Same space as AppleScript `bounds`.
-    nonisolated private static func scanAXFrame(of window: AXUIElement) -> CGRect? {
-        AXUIElementSetMessagingTimeout(window, 0.1)
-        return Activator.axBounds(of: window)
     }
 
     /// Resolve an AX window to one of the AppleScript-scanned windows by screen

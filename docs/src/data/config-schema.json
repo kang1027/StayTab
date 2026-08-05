@@ -142,7 +142,7 @@
       ],
       "enumDescriptions" : [
         "Monitor with the cursor",
-        "Monitor with the active space",
+        "Monitor with the active app",
         "Main display"
       ],
       "type" : "string"

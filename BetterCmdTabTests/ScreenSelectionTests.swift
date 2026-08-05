@@ -163,4 +163,20 @@ struct ScreenSelectionTests {
         let cocoa = ScreenSelection.cocoaRect(forAXBounds: CGRect(x: 1200, y: 0, width: 400, height: 500), primaryMaxY: 1000)
         #expect(ScreenSelection.indexOfMaxOverlap(rect: cocoa, screenFrames: [screenA, screenB]) == 1)
     }
+
+    // Which signal each display mode follows. The `separateSpaces: false` case is
+    // the regression guard: the menu-bar signal only distinguishes displays when
+    // "Displays have separate Spaces" is on, so answering `.activeMonitor` there
+    // pins the switcher to the main display for everyone sharing one Space.
+    @Test("active-window mode drops the menu-bar signal when displays share a Space")
+    func captureNeedPerDisplayMode() {
+        #expect(ScreenSelection.CaptureNeed(.activeWindow, separateSpaces: true) == .activeMonitor)
+        #expect(ScreenSelection.CaptureNeed(.activeWindow, separateSpaces: false) == .activeApp)
+        // Cursor and main display resolve live on the main actor, so the open
+        // path must not pay for an off-main capture in either configuration.
+        for separate in [true, false] {
+            #expect(ScreenSelection.CaptureNeed(.mouseCursor, separateSpaces: separate) == .live)
+            #expect(ScreenSelection.CaptureNeed(.mainDisplay, separateSpaces: separate) == .live)
+        }
+    }
 }

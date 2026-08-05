@@ -303,7 +303,7 @@ enum SettingsCatalog {
 
         // Behavior · Display
         item(SearchID.displayMonitor, .switcher, SettingsAnchor.display, String(localized: "Behavior"), String(localized: "Display"),
-             String(localized: "Show switcher on"), ["display", "monitor", "screen", "multi monitor", "cursor", "main display", "active space"]),
+             String(localized: "Show switcher on"), ["display", "monitor", "screen", "multi monitor", "cursor", "main display", "active app", "active space"]),
         item(SearchID.quickSwitchDelay, .switcher, SettingsAnchor.display, String(localized: "Behavior"), String(localized: "Display"),
              String(localized: "Quick-switch delay"), ["delay", "reveal", "hold", "quick switch"]),
         item(SearchID.titleRefreshInterval, .switcher, SettingsAnchor.display, String(localized: "Behavior"), String(localized: "Display"),

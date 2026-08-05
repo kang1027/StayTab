@@ -346,19 +346,31 @@ final class SwitcherPanel: NSPanel {
     }
 
     /// Resolve the screen for `mode`. `mouseCursor`/`mainDisplay` are cheap live
-    /// reads; `activeWindow` (the active monitor — the bright-menu-bar / focused
-    /// display) is supplied by the controller (`activeWindowScreen`), captured
-    /// before our key panel stole frontmost — it falls back to cursor → main when
-    /// unavailable (private API missing, or the capture not yet landed).
+    /// reads; `activeWindow` (the monitor being worked on — the bright-menu-bar
+    /// display, or the frontmost app's window when displays share one Space) is
+    /// supplied by the controller as `capturedScreen`, resolved off-main before
+    /// our key panel stole frontmost. It falls back to cursor → main when
+    /// unavailable (private API missing, no window to measure, or the capture not
+    /// yet landed) — every signal it needs is off-main-only, so this stays free of
+    /// AX/CGS work on the reveal path.
     static func preferredScreen(mode: SwitcherDisplayMode? = nil,
-                                activeWindowScreen: NSScreen? = nil) -> NSScreen {
+                                capturedScreen: NSScreen? = nil) -> NSScreen {
         switch mode ?? Preferences.shared.switcherDisplayMode {
         case .mouseCursor:
             return mouseScreen() ?? mainDisplayScreen()
         case .mainDisplay:
             return mainDisplayScreen()
         case .activeWindow:
-            return activeWindowScreen ?? mouseScreen() ?? mainDisplayScreen()
+            return capturedScreen ?? mouseScreen() ?? mainDisplayScreen()
+        }
+    }
+
+    /// The `NSScreen` whose `CGDirectDisplayID` matches `displayID`, or nil when no
+    /// live screen does (e.g. the display was unplugged between an off-main capture
+    /// and this main-actor lookup). Main-actor only (`NSScreen.screens`).
+    static func screen(forDisplayID displayID: CGDirectDisplayID) -> NSScreen? {
+        NSScreen.screens.first {
+            ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value == displayID
         }
     }
 

@@ -45,6 +45,46 @@ enum ScreenSelection {
         screenFrames.firstIndex { $0.origin == .zero }
     }
 
+    /// What a display mode needs the switcher's off-main capture to resolve
+    /// before the panel can be placed. Pure mapping, kept out of the controller
+    /// so the "which signal does this mode follow" decision is testable on its
+    /// own.
+    ///
+    /// `separateSpaces` is `NSScreen.screensHaveSeparateSpaces`, and it is the
+    /// whole reason `.activeWindow` isn't a fixed answer. The menu-bar display
+    /// (`SLSCopyActiveMenuBarDisplayIdentifier`) is a Spaces concept: it only
+    /// tells displays apart when that setting is ON. With one Space spanning
+    /// every display there is a single menu bar, on the main display, so the
+    /// call always succeeds with the same answer and "the monitor I'm working on"
+    /// silently collapses into "main display". Reading the frontmost app's own
+    /// window geometry is what holds in that configuration — and asking for the
+    /// menu bar *first* is what would break it, because a successful wrong answer
+    /// never falls through.
+    enum CaptureNeed {
+        /// The monitor showing the active Space (bright menu bar).
+        case activeMonitor
+        /// The monitor the frontmost app's window sits on.
+        case activeApp
+        /// Nothing to capture: the panel resolves cursor/main-display live on the
+        /// main actor, so the open path must not pay for an off-main capture.
+        case live
+
+        init(_ mode: SwitcherDisplayMode, separateSpaces: Bool) {
+            switch mode {
+            case .activeWindow: self = separateSpaces ? .activeMonitor : .activeApp
+            case .mouseCursor, .mainDisplay: self = .live
+            }
+        }
+    }
+
+    /// Where the switcher panel should open, as resolved off the main thread.
+    /// Plain values only: `NSScreen.screens` is main-thread-only, so a capture
+    /// can't name a screen, so the caller places it back on the main actor.
+    enum CaptureTarget {
+        case displayID(CGDirectDisplayID)
+        case axBounds(CGRect)
+    }
+
     /// Flip a rect from Accessibility coordinates (top-left origin of the primary
     /// display, y-down) into Cocoa coordinates (bottom-left origin, y-up).
     /// `primaryMaxY` is the primary ("Main display") height — pass the origin-zero

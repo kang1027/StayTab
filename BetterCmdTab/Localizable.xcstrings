@@ -6501,36 +6501,36 @@
         }
       }
     },
-    "Monitor with the active space" : {
+    "Monitor with the active app" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bildschirm mit dem aktiven Space"
+            "value" : "Bildschirm mit der aktiven App"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pantalla con el espacio activo"
+            "value" : "Pantalla con la app activa"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Écran avec l'espace actif"
+            "value" : "Écran avec l’app active"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ekran z aktywną przestrzenią"
+            "value" : "Ekran z aktywną aplikacją"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "当前活动空间所在显示器"
+            "value" : "当前活动应用所在显示器"
           }
         }
       }

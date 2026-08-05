@@ -120,12 +120,19 @@ struct PreferencesEnumTests {
     func switcherDisplayModeRoundTrip() {
         for mode in SwitcherDisplayMode.allCases {
             #expect(SwitcherDisplayMode(rawValue: mode.rawValue) == mode)
+            #expect(!mode.displayName.isEmpty)
         }
         #expect(SwitcherDisplayMode(rawValue: "garbage") == nil)
         // Stable raw values (persisted to UserDefaults / exported settings).
+        // `activeWindow` predates the label "Monitor with the active app" and is
+        // deliberately NOT renamed — renaming it would reset every stored pref.
         #expect(SwitcherDisplayMode.mouseCursor.rawValue == "mouseCursor")
         #expect(SwitcherDisplayMode.activeWindow.rawValue == "activeWindow")
         #expect(SwitcherDisplayMode.mainDisplay.rawValue == "mainDisplay")
+        // A new case must come with its own title, not inherit one. This count is
+        // the reminder to add it above.
+        #expect(SwitcherDisplayMode.allCases.count == 3)
+        #expect(Set(SwitcherDisplayMode.allCases.map(\.displayName)).count == 3)
     }
 
     @Test("PreviewTitleAlignment raw values round-trip and unknown falls back")

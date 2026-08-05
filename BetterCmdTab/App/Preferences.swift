@@ -72,7 +72,15 @@ enum TitleTruncationMode: String, CaseIterable {
 enum SwitcherDisplayMode: String, CaseIterable {
     /// Screen under the mouse pointer. Default — matches pre-#22 behavior.
     case mouseCursor
-    /// Screen of the window focused when ⌘Tab fired.
+    /// Monitor the user is working on. Which signal answers that depends on the
+    /// "Displays have separate Spaces" setting, so `ScreenSelection.CaptureNeed`
+    /// picks one per open: with it ON the bright-menu-bar display is authoritative
+    /// (and right even on a bare desktop); with it OFF there is a single menu bar
+    /// for the whole arrangement, living on the main display, so only the frontmost
+    /// app's own window geometry distinguishes displays at all.
+    ///
+    /// Raw value stays `activeWindow` from #22 — stored preferences and
+    /// `config.json` files keep working.
     case activeWindow
     /// "Main display" from System Settings → Displays (the origin-zero screen).
     case mainDisplay
@@ -80,7 +88,7 @@ enum SwitcherDisplayMode: String, CaseIterable {
     var displayName: String {
         switch self {
         case .mouseCursor:  return String(localized: "Monitor with the cursor")
-        case .activeWindow: return String(localized: "Monitor with the active space")
+        case .activeWindow: return String(localized: "Monitor with the active app")
         case .mainDisplay:  return String(localized: "Main display")
         }
     }

@@ -182,21 +182,32 @@ final class BrowserTabFocusObserver {
         }
     }
 
+    /// Budget for both AX reads in `focusedWindowInfo`, bounded because they run
+    /// on every browser focus and title change, but not at a hair trigger:
+    /// nothing waits on the result, and a read that times out does not degrade —
+    /// it drops the MRU bump entirely, since `handleChange` has no tab key to
+    /// build without a title. At 0.05 a browser busy loading a heavy page could
+    /// lose bumps on the focused-window read alone. 0.25 matches
+    /// `Activator.focusedWindow` and still bounds the stall this function's own
+    /// doc promises to bound; the read runs on `.utility`, coalesced per pid, so
+    /// nothing on the reveal path waits on it.
+    private nonisolated static let axTimeout: Float = 0.25
+
     /// The pid's focused window's CGWindowID and AX title (its active tab's title
     /// for a browser). `nonisolated` so it runs off the main thread — the AX reads
     /// can stall for the messaging timeout on an unresponsive app.
     nonisolated static func focusedWindowInfo(pid: pid_t) -> (wid: CGWindowID, title: String)? {
         let axApp = AXUIElementCreateApplication(pid)
-        AXUIElementSetMessagingTimeout(axApp, 0.05)
+        AXUIElementSetMessagingTimeout(axApp, Self.axTimeout)
         var focused: AnyObject?
         guard AXUIElementCopyAttributeValue(axApp, kAXFocusedWindowAttribute as CFString, &focused) == .success,
               let focusedVal = focused,
               CFGetTypeID(focusedVal) == AXUIElementGetTypeID() else { return nil }
         let window = focusedVal as! AXUIElement
         let wid = PrivateAPI.cgWindowId(of: window)
-        var titleVal: AnyObject?
-        let title = (AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &titleVal) == .success
-            ? titleVal as? String : nil) ?? ""
-        return (wid, title)
+        // The timeout pinned above is on the app element and is NOT inherited by
+        // the window it handed back, so this read carries its own — otherwise it
+        // falls back to the multi-second system default.
+        return (wid, Activator.scanTitle(of: window, timeout: Self.axTimeout))
     }
 }
