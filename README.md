@@ -93,7 +93,11 @@
 
 ### Homebrew
 ```bash
-brew install --cask bettercmdtab
+# stable channel
+brew install --ask bettercmdtab
+
+# beta channel
+brew install --cask bettercmdtab@beta
 ```
 
 ### Download
