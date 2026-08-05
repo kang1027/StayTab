@@ -1136,7 +1136,7 @@ enum Activator {
         var value: CFTypeRef?
         if AXUIElementCopyAttributeValue(axApp, kAXMainWindowAttribute as CFString, &value) == .success,
            let main = value, CFGetTypeID(main) == AXUIElementGetTypeID(),
-           let bounds = scanBounds(of: main as! AXUIElement), !bounds.isEmpty {
+           let bounds = scanBounds(of: main as! AXUIElement) {
             return bounds
         }
         value = nil
@@ -1145,7 +1145,7 @@ enum Activator {
               let windows = value as? [AXUIElement] else { return nil }
         for window in windows.prefix(3) {
             guard DispatchTime.now() < deadline else { return nil }
-            if let bounds = scanBounds(of: window), !bounds.isEmpty { return bounds }
+            if let bounds = scanBounds(of: window) { return bounds }
         }
         return nil
     }
@@ -1169,19 +1169,28 @@ enum Activator {
     ///
     /// The timeout is per `AXUIElement`, not per process. The value set on the
     /// application element is NOT inherited by the window elements it hands back,
-    /// so `scanBounds(of:)` re-pins it on each window. Without that a single
-    /// position read falls back to the multi-second system default.
+    /// so `scanBounds(of:)` and `scanTitle(of:)` re-pin it on each window. Without
+    /// that a single read falls back to the multi-second system default.
     private static let axScanTimeout: Float = 0.05
     private static let axScanBudget: DispatchTimeInterval = .milliseconds(200)
 
     /// `axBounds(of:)` hardened for placement reads: the messaging timeout pinned
-    /// on the window element itself, and minimized windows rejected outright.
+    /// on the window element itself, and windows that cannot place a panel —
+    /// minimized, or zero-sized — rejected outright.
     ///
     /// A minimized window keeps reporting its pre-minimize AX position, so taking
     /// its bounds opens the switcher on a display where the app shows nothing —
     /// true both for a focused window the user just ⌘M'd and for the `kAXWindows`
     /// scan, where "every window minimized" is a leading reason the app has no
-    /// focused window at all. Both callers go through here for that reason.
+    /// focused window at all. An empty rect is rejected for the mirror-image
+    /// reason: an app mid-launch (or one restoring a window) can report a
+    /// zero-sized focused window, `screen(forAXBounds:)` resolves a zero-area rect
+    /// to no screen at all, and adopting it would short-circuit a fallback that
+    /// would have placed the panel correctly. Both rejections live here rather
+    /// than at the call sites because every caller wants the same answer — and the
+    /// one call site that forgot the emptiness check placed the panel by cursor
+    /// instead, silently.
+    ///
     /// Call OFF the main thread. The extra round-trip buys the timeout pin too,
     /// without which the position read uses the multi-second system default.
     ///
@@ -1198,7 +1207,25 @@ enum Activator {
            (minimized as? Bool) == true {
             return nil
         }
-        return axBounds(of: window)
+        guard let bounds = axBounds(of: window), !bounds.isEmpty else { return nil }
+        return bounds
+    }
+
+    /// AX title of `window`, pinned and released exactly like `scanBounds(of:)`
+    /// and for the same reason: the timeout set on the application element is not
+    /// inherited, so an unpinned title read falls back to the multi-second system
+    /// default. That matters most where this is called — on the reveal worker,
+    /// ahead of the placement capture, where a wedged app would otherwise park a
+    /// `.userInteractive` thread for seconds and push the capture past
+    /// `adoptLateTargetScreen`'s window. Call OFF the main thread; "" when the app
+    /// has no title to give.
+    static func scanTitle(of window: AXUIElement) -> String {
+        AXUIElementSetMessagingTimeout(window, axScanTimeout)
+        defer { AXUIElementSetMessagingTimeout(window, 0) }
+        var value: AnyObject?
+        guard AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &value) == .success
+        else { return "" }
+        return value as? String ?? ""
     }
 
     /// Arrange an explicit window on its current screen. Used by the switcher

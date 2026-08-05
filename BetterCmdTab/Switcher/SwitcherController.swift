@@ -2808,7 +2808,10 @@ final class SwitcherController: SwitcherViewDelegate {
         let age = Date().timeIntervalSince(shown)
         guard age < Self.lateScreenAdoptionWindow else {
             if target != nil {
-                Log.switcher.debug("display placement: capture landed \(age, format: .fixed(precision: 3))s after present, past the \(Self.lateScreenAdoptionWindow, format: .fixed(precision: 2))s window — leaving the panel put")
+                // .info, not .debug: os_log discards debug by default, so a drop
+                // logged at that level is exactly as silent as no log at all — and
+                // this fires at most once per open, only on the failure path.
+                Log.switcher.info("display placement: capture landed \(age, format: .fixed(precision: 3))s after present, past the \(Self.lateScreenAdoptionWindow, format: .fixed(precision: 2))s window — leaving the panel put")
             }
             return
         }
@@ -2873,15 +2876,7 @@ final class SwitcherController: SwitcherViewDelegate {
             // fix: there is a single menu bar here, on the main display, so asking
             // it first would succeed with the same answer every time and pin every
             // open to the main display — a wrong answer that never falls through.
-            //
-            // Empty bounds are rejected, not adopted: an app mid-launch (or one
-            // restoring a window) can report a zero-sized focused window, and
-            // `screen(forAXBounds:)` resolves a zero-area rect to no screen at all.
-            // Adopting it would short-circuit the scan below even though another
-            // window of the same app would have placed the panel correctly.
-            if let bounds = window.flatMap(Activator.scanBounds(of:)), !bounds.isEmpty {
-                return .axBounds(bounds)
-            }
+            if let bounds = window.flatMap(Activator.scanBounds(of:)) { return .axBounds(bounds) }
             if let bounds = pid.flatMap(Activator.frontWindowBounds(pid:)) { return .axBounds(bounds) }
             // No window anywhere to measure: the desktop is frontmost (Finder with
             // no windows) or a menu-bar-only app is. Nothing can lose to the menu
@@ -2921,11 +2916,7 @@ final class SwitcherController: SwitcherViewDelegate {
         let gen = focusedWindowCaptureGen
         DispatchQueue.global(qos: .userInteractive).async {
             let window = Activator.focusedWindow(pid: pid)
-            var titleValue: AnyObject?
-            let title = window.flatMap {
-                AXUIElementCopyAttributeValue($0, kAXTitleAttribute as CFString, &titleValue) == .success
-                    ? titleValue as? String : nil
-            } ?? ""
+            let title = window.map(Activator.scanTitle(of:)) ?? ""
             let target = Self.captureTarget(need, window: window, pid: pid)
             let wid = window.map { PrivateAPI.cgWindowId(of: $0) } ?? 0
             DispatchQueue.main.async { [weak self] in
@@ -3021,11 +3012,7 @@ final class SwitcherController: SwitcherViewDelegate {
             let gen = focusedWindowCaptureGen
             DispatchQueue.global(qos: .userInteractive).async {
                 let window = Activator.focusedWindow(pid: pid)
-                var titleValue: AnyObject?
-                let title = window.flatMap {
-                    AXUIElementCopyAttributeValue($0, kAXTitleAttribute as CFString, &titleValue) == .success
-                        ? titleValue as? String : nil
-                } ?? ""
+                let title = window.map(Activator.scanTitle(of:)) ?? ""
                 let target = Self.captureTarget(revealNeed, window: window, pid: pid)
                 let wid = window.map { PrivateAPI.cgWindowId(of: $0) } ?? 0
                 DispatchQueue.main.async { [weak self] in
@@ -3033,6 +3020,11 @@ final class SwitcherController: SwitcherViewDelegate {
                     // Same MRU self-heal as the primed prefetch (#85) — this
                     // branch serves gesture/scoped opens, which skip it.
                     if wid != 0, self.phase != .idle { self.windowMRU.bump(pid: pid, wid: wid) }
+                    // Ahead of the window-capture guard on purpose: which display
+                    // the app occupies is still the right answer even if something
+                    // else claimed `openFocusedWindow` first, and this applies its
+                    // own visible/age guards.
+                    self.adoptLateTargetScreen(target)
                     guard self.phase == .visible, self.openFocusedWindow == nil else { return }
                     self.openFocusedWindow = window
                     self.openFocusedWindowTitle = title
@@ -3040,7 +3032,6 @@ final class SwitcherController: SwitcherViewDelegate {
                         self.reExpandBrowserTabs(force: true)
                     }
                     self.prewarmActiveBrowserTabPreview()
-                    self.adoptLateTargetScreen(target)
                 }
             }
         }
@@ -4293,6 +4284,7 @@ final class SwitcherController: SwitcherViewDelegate {
         prefetchedFocusedWindow = nil
         prefetchedFocusedWindowTitle = ""
         prefetchedTarget = nil
+        visibleSince = nil
         // We picked a target — `pendingActivation` activates it, so there's
         // nothing to restore. Without a pick (committing out of the empty
         // state, or a primed commit that resolved no app) undo present()'s

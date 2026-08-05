@@ -194,9 +194,10 @@ final class BrowserTabFocusObserver {
               CFGetTypeID(focusedVal) == AXUIElementGetTypeID() else { return nil }
         let window = focusedVal as! AXUIElement
         let wid = PrivateAPI.cgWindowId(of: window)
-        var titleVal: AnyObject?
-        let title = (AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &titleVal) == .success
-            ? titleVal as? String : nil) ?? ""
-        return (wid, title)
+        // The 0.05 pinned above is on the app element and is NOT inherited by the
+        // window it handed back, so this read goes through `scanTitle` to get its
+        // own cap — otherwise it falls back to the multi-second system default,
+        // which is the one stall this function's own doc promises to bound.
+        return (wid, Activator.scanTitle(of: window))
     }
 }
