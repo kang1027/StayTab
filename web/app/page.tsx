@@ -22,11 +22,12 @@ const BREW = "brew install --cask bettercmdtab";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
-// Nothing on this page has an entrance animation, by design: the whole document
-// is prerendered, so every element ships already in its final position and the
-// static HTML is what you see. Motion is only used for what a click or a hover
-// asks for. Don't reintroduce a load/scroll reveal — it can't start until ~800 KB
-// of JS hydrates, which means content sits visibly parked and then hops.
+// The entrance cascade is the `enter`/`rise` classes in globals.css, and it stays
+// CSS: a keyframe on the prerendered HTML runs at the first paint, while anything
+// Motion-driven can't start until ~800 KB of JS hydrates, which means content
+// sits visibly parked and then hops. Same reason there is no scroll reveal —
+// everything below the fold ships in its final position. Motion here is only for
+// what a click or a hover asks for.
 
 // Shared utility strings — the recurring "components" of the page.
 const SECTION = "flex flex-col gap-4";
@@ -376,7 +377,9 @@ function Showcase() {
   const shot = layouts[shown];
 
   return (
-    <section className="flex flex-col gap-3">
+    // Drifts up under the hero cascade with no delay of its own, so the big
+    // picture is already settling while the text above it arrives.
+    <section className="rise flex flex-col gap-3">
       <div className="flex items-center justify-between gap-4 max-[560px]:flex-col max-[560px]:items-start max-[560px]:gap-1.5">
         <Tabs
           label="Switcher layouts"
@@ -1220,7 +1223,7 @@ export default function Home() {
             headline is the most default shape a landing page has. */}
         <header className="flex flex-col gap-5">
           {/* Brand mark, not a heading — the h1 is the promise. */}
-          <div className="flex items-center gap-2.5">
+          <div className="enter flex items-center gap-2.5">
             <motion.img
               className="block h-7 w-7 rounded-[7px]"
               // 56px source for a 28px box — 2x for retina and nothing more.
@@ -1242,7 +1245,7 @@ export default function Home() {
              holds together on one line and the step down lands exactly where
              it stops fitting. Phones still wrap — one line there would mean a
              19px headline, which is barely louder than the paragraph. */}
-          <h1 className="m-0 text-[34px] leading-[1.18] font-semibold tracking-[-0.02em] max-[640px]:text-[24px]">
+          <h1 className="enter m-0 text-[34px] leading-[1.18] font-semibold tracking-[-0.02em] [animation-delay:70ms] max-[640px]:text-[24px]">
             The <span className="text-accent">Cmd+Tab</span> macOS deserves.
             <span
               className="ml-1.5 inline-block h-[0.9em] w-[9px] animate-caret rounded-[1px] bg-accent align-[-0.06em] motion-reduce:animate-none"
@@ -1250,13 +1253,13 @@ export default function Home() {
             />
           </h1>
 
-          <p className="m-0 max-w-[56ch] text-muted">
+          <p className="enter m-0 max-w-[56ch] text-muted [animation-delay:140ms]">
             A fast, native window switcher and app launcher. Free forever, zero telemetry, no
             subscription.
           </p>
         </header>
 
-        <section className="flex flex-col gap-4">
+        <section className="enter flex flex-col gap-4 [animation-delay:210ms]">
           <div className="flex max-w-full flex-wrap items-center gap-2.5">
             <DownloadCta href={dmgUrl} beta={!!beta} channel={channel} onChange={setChannel} />
             <BrewCmd beta={channel === "beta"} />
