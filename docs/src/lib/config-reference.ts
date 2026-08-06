@@ -1,5 +1,7 @@
+import type { Locale } from '@/lib/i18n';
 import type { TOCItemType } from 'fumadocs-core/toc';
 import schema from '@/data/config-schema.json';
+import { getTranslations } from 'next-intl/server';
 
 /**
  * The reference tables are built from `src/data/config-schema.json` — a verbatim
@@ -188,6 +190,22 @@ const sections: { title: string; blurb: string; keys: string[] }[] = [
   },
 ];
 
+const sectionTranslationKeys: Record<string, string> = {
+  'Display & timing': 'displayTiming',
+  Layout: 'layout',
+  Appearance: 'appearance',
+  Contents: 'contents',
+  Tabs: 'tabs',
+  Search: 'search',
+  Keyboard: 'keyboard',
+  'Mouse & hover': 'mouseHover',
+  'Window management': 'windowManagement',
+  Shortcuts: 'shortcuts',
+  'Feedback & menu bar': 'feedbackMenuBar',
+  Experimental: 'experimental',
+  Legacy: 'legacy',
+};
+
 /**
  * Defaults as applied by `Preferences.reloadFromDefaults()` when the key is
  * absent. Rendered verbatim, so enums use their raw JSON value rather than the
@@ -280,6 +298,7 @@ export type ConfigKey = {
 
 export type ConfigSection = {
   title: string;
+  translationKey: string;
   blurb: string;
   keys: ConfigKey[];
 };
@@ -300,9 +319,15 @@ export function sectionSlug(title: string): string {
  * rather than in the MDX source, so fumadocs cannot extract them itself — this
  * is handed to `DocsPage` instead, listing every key under its section.
  */
-export function configReferenceToc(): TOCItemType[] {
+export async function configReferenceToc(locale: Locale): Promise<TOCItemType[]> {
+  const t = await getTranslations({ locale, namespace: 'ConfigReference' });
+
   return configSections().flatMap((section) => [
-    { title: section.title, url: `#${sectionSlug(section.title)}`, depth: 2 },
+    {
+      title: t(`sections.${section.translationKey}.title`),
+      url: `#${sectionSlug(section.title)}`,
+      depth: 2,
+    },
     ...section.keys.map((entry) => ({ title: entry.name, url: `#${entry.name}`, depth: 3 })),
   ]);
 }
@@ -319,14 +344,16 @@ export function configSections(): ConfigSection[] {
     .filter((name) => !placed.has(name))
     .sort();
 
-  const grouped = sections.map((section) => ({
+  const grouped: ConfigSection[] = sections.map((section) => ({
     ...section,
+    translationKey: sectionTranslationKeys[section.title] ?? 'other',
     keys: section.keys.filter((name) => name in properties).map(key),
   }));
 
   if (orphans.length > 0) {
     grouped.push({
       title: 'Other',
+      translationKey: 'other',
       blurb: 'Present in the schema but not yet grouped in these docs.',
       keys: orphans.map(key),
     });

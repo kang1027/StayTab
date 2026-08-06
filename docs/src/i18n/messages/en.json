@@ -1,0 +1,81 @@
+{
+  "Metadata": {
+    "defaultTitle": "BetterCmdTab documentation",
+    "description": "Documentation for BetterCmdTab, a faster and configurable Command-Tab switcher for macOS.",
+    "siteName": "BetterCmdTab documentation"
+  },
+  "Navigation": {
+    "downloadReleaseLabel": "Download the latest release",
+    "download": "Download",
+    "websiteLabel": "BetterCmdTab website",
+    "website": "Website"
+  },
+  "ConfigReference": {
+    "key": "Key",
+    "field": "Field",
+    "type": "Type",
+    "default": "Default",
+    "description": "Description",
+    "required": "required",
+    "any": "any",
+    "exactItems": "exactly {count} items",
+    "sections": {
+      "displayTiming": {
+        "title": "Display & timing",
+        "blurb": "Where the panel opens and how quickly it reacts."
+      },
+      "layout": {
+        "title": "Layout",
+        "blurb": "Which layout the switcher uses and how big it is."
+      },
+      "appearance": {
+        "title": "Appearance",
+        "blurb": "Colour, blur, corners and typography of the panel."
+      },
+      "contents": {
+        "title": "Contents",
+        "blurb": "Which apps and windows the switcher lists, and in what order."
+      },
+      "tabs": {
+        "title": "Tabs",
+        "blurb": "How browser and native tabs appear in the list."
+      },
+      "search": {
+        "title": "Search",
+        "blurb": "Type-to-filter and letter-jump behaviour."
+      },
+      "keyboard": {
+        "title": "Keyboard",
+        "blurb": "What happens while the shortcut is held, and how stepping works."
+      },
+      "mouseHover": {
+        "title": "Mouse & hover",
+        "blurb": "Pointer selection and the inline action buttons."
+      },
+      "windowManagement": {
+        "title": "Window management",
+        "blurb": "Behaviour of the tiling shortcuts."
+      },
+      "shortcuts": {
+        "title": "Shortcuts",
+        "blurb": "The key combinations themselves are recorded outside this file. Scoped shortcuts and per-shortcut overrides are documented on their own pages."
+      },
+      "feedbackMenuBar": {
+        "title": "Feedback & menu bar",
+        "blurb": "Sound, haptics, the menu-bar icon and screen-sharing privacy."
+      },
+      "experimental": {
+        "title": "Experimental",
+        "blurb": "Off by default and matching the Experimental settings pane. These can change or disappear between releases."
+      },
+      "legacy": {
+        "title": "Legacy",
+        "blurb": "Superseded keys — always set the replacement named in the description instead. Only panelSize is migrated and then deleted; currentSpaceOnly and scopedShortcutScopes are still written on every change so older builds reading the same file stay consistent, so expect to see them; excludedBundleIDs and experimentalUnreadBadges are read at most once and never removed."
+      },
+      "other": {
+        "title": "Other",
+        "blurb": "Present in the schema but not yet grouped in these docs."
+      }
+    }
+  }
+}

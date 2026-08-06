@@ -48,8 +48,9 @@ If you cannot verify a claim, write the weaker sentence that is true.
 
 | Path | What it is |
 | --- | --- |
-| `content/docs/*.mdx` | The pages. One file per page. |
-| `content/docs/meta.json` | Sidebar order and section separators. |
+| `content/docs/en/*.mdx` | English pages. |
+| `content/docs/pl/*.mdx` | Polish pages with matching English filenames. |
+| `content/docs/{en,pl}/meta.json` | Localized sidebar order and section separators. |
 | `src/lib/config-reference.ts` | Section grouping + defaults for the config reference. |
 | `src/components/config-reference.tsx` | Renders the reference tables. |
 | `src/data/config-schema.json` | **Generated** — a copy of the app's own `schema.json`. |
@@ -58,7 +59,7 @@ If you cannot verify a claim, write the weaker sentence that is true.
 
 ## Adding a page
 
-1. Create `content/docs/my-page.mdx` with frontmatter:
+1. Create `content/docs/en/my-page.mdx` with frontmatter:
 
    ```mdx
    ---
@@ -68,8 +69,12 @@ If you cannot verify a claim, write the weaker sentence that is true.
    ---
    ```
 
-2. Add it to `content/docs/meta.json` — pages are ordered by that list, not
+2. Add it to `content/docs/en/meta.json` — pages are ordered by that list, not
    alphabetically. `"---Label---"` inserts a section heading.
+3. Add the Polish translation as `content/docs/pl/my-page.mdx` and add the same
+   slug to `content/docs/pl/meta.json`. The build intentionally has no language
+   fallback: a missing translation must fail visibly rather than publish English
+   under `/pl`.
 
 **`icon` must exist in Fumadocs' Lucide set.** It is not the full `lucide-react`
 export; `FileJson` for example resolves in the package but the build logs
@@ -92,11 +97,17 @@ with `basePath: '/docs'`. Next adds that prefix to everything **it** generates, 
 - **Raw URLs are not rewritten.** A plain `<img src>` or `fetch()` bypasses Next,
   so those must prepend `docsBasePath` from `src/lib/shared.ts` by hand. The
   search client is exactly this case — it is passed an explicit `api` URL in
-  `src/app/layout.tsx` because its own default would resolve to `/api/search` and
-  hit the marketing site.
+  `src/components/docs-provider.tsx` because its own default would resolve to
+  `/api/search` and hit the marketing site.
 
 `docsRoute` in `src/lib/shared.ts` is `/` for the same reason: it is an internal
 route, and `basePath` supplies the public prefix.
+
+English keeps the existing `/docs/<slug>/` URLs; Polish is materialized at
+`/docs/pl/<slug>/`. There is no locale middleware — GitHub Pages cannot run one.
+The MDX renderer keeps ordinary Markdown links in the current page's language. Raw
+component props such as `<Card href>` bypass that resolver, so Polish cards must
+use `/pl/<slug>` (still without the `/docs` base path).
 
 ## Components available in MDX
 

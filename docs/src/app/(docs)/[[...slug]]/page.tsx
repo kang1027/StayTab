@@ -1,4 +1,10 @@
-import { getPageImageUrl, getPageMarkdownUrl, getPageUrl, source } from '@/lib/source';
+import {
+  getPageAlternates,
+  getPageImageUrl,
+  getPageMarkdownUrl,
+  getPageUrl,
+  source,
+} from '@/lib/source';
 import {
   DocsBody,
   DocsDescription,
@@ -13,23 +19,32 @@ import type { Metadata } from 'next';
 import { createRelativeLink } from 'fumadocs-ui/mdx';
 import { gitConfig } from '@/lib/shared';
 import { configReferenceToc } from '@/lib/config-reference';
+import { defaultLocale, localizedSegments, resolveLocalePath } from '@/lib/i18n';
+import { setRequestLocale } from 'next-intl/server';
 
 /** Page whose ToC is generated rather than extracted from MDX headings. */
-const CONFIG_REFERENCE_URL = '/config-reference';
+const CONFIG_REFERENCE_SLUG = 'config-reference';
 
-export default async function Page(props: PageProps<'/[[...slug]]'>) {
+type Props = { params: Promise<{ slug?: string[] }> };
+
+export const dynamicParams = false;
+
+export default async function Page(props: Props) {
   const params = await props.params;
-  const page = source.getPage(params.slug);
+  const { locale, slugs } = resolveLocalePath(params.slug);
+  const page = source.getPage(slugs, locale);
   if (!page) notFound();
 
+  setRequestLocale(locale);
   const MDX = page.data.body;
+  const Link = createRelativeLink(source, page);
   const markdownUrl = getPageMarkdownUrl(page).url;
   // The reference page's headings are rendered by <ConfigReference />, so they
   // never reach the MDX source fumadocs extracts the ToC from — supply them here.
-  // Coupled to the file name by CONFIG_REFERENCE_URL; rename both together.
+  // Coupled to the file name by CONFIG_REFERENCE_SLUG; rename both together.
   const toc =
-    page.url === CONFIG_REFERENCE_URL
-      ? [...page.data.toc, ...configReferenceToc()]
+    page.slugs.length === 1 && page.slugs[0] === CONFIG_REFERENCE_SLUG
+      ? [...page.data.toc, ...(await configReferenceToc(locale))]
       : page.data.toc;
 
   return (
@@ -48,8 +63,22 @@ export default async function Page(props: PageProps<'/[[...slug]]'>) {
       <DocsBody>
         <MDX
           components={getMDXComponents({
-            // this allows you to link to other pages with relative file paths
-            a: createRelativeLink(source, page),
+            // Fumadocs resolves relative file links, while this static export
+            // also needs absolute app routes to keep the current locale.
+            a: ({ href, ...props }) => (
+              <Link
+                {...props}
+                href={
+                  locale !== defaultLocale &&
+                  href?.startsWith('/') &&
+                  !href.startsWith('//') &&
+                  href !== `/${locale}` &&
+                  !href.startsWith(`/${locale}/`)
+                    ? `/${locale}${href}`
+                    : href
+                }
+              />
+            ),
           })}
         />
       </DocsBody>
@@ -57,13 +86,16 @@ export default async function Page(props: PageProps<'/[[...slug]]'>) {
   );
 }
 
-export async function generateStaticParams() {
-  return source.generateParams();
+export function generateStaticParams() {
+  return source.generateParams().map(({ lang, slug }) => ({
+    slug: localizedSegments(lang, slug),
+  }));
 }
 
-export async function generateMetadata(props: PageProps<'/[[...slug]]'>): Promise<Metadata> {
+export async function generateMetadata(props: Props): Promise<Metadata> {
   const params = await props.params;
-  const page = source.getPage(params.slug);
+  const { locale, slugs } = resolveLocalePath(params.slug);
+  const page = source.getPage(slugs, locale);
   if (!page) notFound();
 
   // Each page is reachable as both /docs/x/ and /docs/x (which GitHub Pages
@@ -75,9 +107,13 @@ export async function generateMetadata(props: PageProps<'/[[...slug]]'>): Promis
   return {
     title: page.data.title,
     description: page.data.description,
-    alternates: { canonical: url },
+    alternates: {
+      canonical: url,
+      languages: getPageAlternates(page),
+    },
     openGraph: {
       url,
+      locale: locale === defaultLocale ? 'en_US' : 'pl_PL',
       images: getPageImageUrl(page).url,
     },
   };

@@ -179,7 +179,7 @@ that would be a server rule has to be a property of the built tree instead:
   the one that exists. Canonicals, the sitemap and internal links all use that form; the bare form
   is Pages' own 301, and pointing at it wastes a hop.
 - `web/public/sitemap.xml` is hand-maintained. CI checks it both ways: every URL resolves to a real
-  file, and every `docs/content/docs/*.mdx` is listed.
+  file, and every `docs/content/docs/*/*.mdx` is listed.
 - Next writes an RSC payload twin (`index.txt`, `__next._full.txt`) beside every page holding that
   page's whole text. Pages cannot send `X-Robots-Tag`, so `web/public/robots.txt` disallows `*.txt$`
   and re-allows the two `llms*.txt` files. Do not relax that without a replacement.

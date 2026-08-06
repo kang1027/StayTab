@@ -5,19 +5,35 @@ import {
   type ConfigKey,
   type SchemaFragment,
 } from '@/lib/config-reference';
+import { useTranslations } from 'next-intl';
 
-/** `50…150`, `9 items`, or nothing when the type is unconstrained. */
-function constraint(f: SchemaFragment): string | null {
-  if (f.minimum !== undefined && f.maximum !== undefined) return `${f.minimum}…${f.maximum}`;
-  if (f.minItems !== undefined && f.minItems === f.maxItems) return `exactly ${f.minItems} items`;
+/** `50…150`, an exact item count, or nothing when the type is unconstrained. */
+function constraint(
+  fragment: SchemaFragment,
+  exactItems: (count: number) => string,
+): string | null {
+  if (fragment.minimum !== undefined && fragment.maximum !== undefined) {
+    return `${fragment.minimum}…${fragment.maximum}`;
+  }
+  if (fragment.minItems !== undefined && fragment.minItems === fragment.maxItems) {
+    return exactItems(fragment.minItems);
+  }
   return null;
 }
 
-function Type({ fragment }: { fragment: SchemaFragment }) {
-  const range = constraint(fragment);
+function Type({
+  fragment,
+  anyLabel,
+  exactItems,
+}: {
+  fragment: SchemaFragment;
+  anyLabel: string;
+  exactItems: (count: number) => string;
+}) {
+  const range = constraint(fragment, exactItems);
   return (
     <>
-      <code>{fragment.type ?? 'any'}</code>
+      <code>{fragment.type ?? anyLabel}</code>
       {range ? <span className="text-fd-muted-foreground"> {range}</span> : null}
     </>
   );
@@ -40,7 +56,15 @@ function Values({ fragment }: { fragment: SchemaFragment }) {
   );
 }
 
-function KeyRow({ entry }: { entry: ConfigKey }) {
+function KeyRow({
+  entry,
+  anyLabel,
+  exactItems,
+}: {
+  entry: ConfigKey;
+  anyLabel: string;
+  exactItems: (count: number) => string;
+}) {
   return (
     <tr>
       <td className="align-top whitespace-nowrap">
@@ -50,7 +74,7 @@ function KeyRow({ entry }: { entry: ConfigKey }) {
         </code>
       </td>
       <td className="align-top whitespace-nowrap">
-        <Type fragment={entry.fragment} />
+        <Type fragment={entry.fragment} anyLabel={anyLabel} exactItems={exactItems} />
       </td>
       <td className="align-top whitespace-nowrap">
         {entry.default ? <code>{entry.default}</code> : <span aria-hidden>—</span>}
@@ -65,24 +89,35 @@ function KeyRow({ entry }: { entry: ConfigKey }) {
 
 /** Every grouped scalar/array key, as one table per section. */
 export function ConfigReference() {
+  const t = useTranslations('ConfigReference');
+  const exactItems = (count: number) => t('exactItems', { count });
+  const anyLabel = t('any');
+
   return (
     <>
       {configSections().map((section) => (
         <section key={section.title}>
-          <h2 id={sectionSlug(section.title)}>{section.title}</h2>
-          <p>{section.blurb}</p>
+          <h2 id={sectionSlug(section.title)}>
+            {t(`sections.${section.translationKey}.title`)}
+          </h2>
+          <p>{t(`sections.${section.translationKey}.blurb`)}</p>
           <table>
             <thead>
               <tr>
-                <th>Key</th>
-                <th>Type</th>
-                <th>Default</th>
-                <th>Description</th>
+                <th>{t('key')}</th>
+                <th>{t('type')}</th>
+                <th>{t('default')}</th>
+                <th>{t('description')}</th>
               </tr>
             </thead>
             <tbody>
               {section.keys.map((entry) => (
-                <KeyRow key={entry.name} entry={entry} />
+                <KeyRow
+                  key={entry.name}
+                  entry={entry}
+                  anyLabel={anyLabel}
+                  exactItems={exactItems}
+                />
               ))}
             </tbody>
           </table>
@@ -98,6 +133,9 @@ export function ConfigReference() {
  * falls back to the global setting of the same name.
  */
 export function ConfigObject({ name }: { name: string }) {
+  const t = useTranslations('ConfigReference');
+  const exactItems = (count: number) => t('exactItems', { count });
+  const anyLabel = t('any');
   const entry = objectKey(name);
   const item = entry.fragment.items;
   const properties = item?.properties ?? {};
@@ -112,9 +150,9 @@ export function ConfigObject({ name }: { name: string }) {
       <table>
         <thead>
           <tr>
-            <th>Field</th>
-            <th>Type</th>
-            <th>Description</th>
+            <th>{t('field')}</th>
+            <th>{t('type')}</th>
+            <th>{t('description')}</th>
           </tr>
         </thead>
         <tbody>
@@ -123,11 +161,15 @@ export function ConfigObject({ name }: { name: string }) {
               <td className="align-top whitespace-nowrap">
                 <code>{field}</code>
                 {required.has(field) ? (
-                  <span className="text-fd-muted-foreground"> required</span>
+                  <span className="text-fd-muted-foreground"> {t('required')}</span>
                 ) : null}
               </td>
               <td className="align-top whitespace-nowrap">
-                <Type fragment={properties[field]} />
+                <Type
+                  fragment={properties[field]}
+                  anyLabel={anyLabel}
+                  exactItems={exactItems}
+                />
               </td>
               <td className="align-top">
                 {properties[field].description}

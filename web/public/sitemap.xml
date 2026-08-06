@@ -56,4 +56,24 @@
   <url>
     <loc>https://bettercmdtab.app/docs/contributing/</loc>
   </url>
+
+  <!-- Polish documentation. -->
+  <url>
+    <loc>https://bettercmdtab.app/docs/pl/</loc>
+  </url>
+  <url>
+    <loc>https://bettercmdtab.app/docs/pl/configuration/</loc>
+  </url>
+  <url>
+    <loc>https://bettercmdtab.app/docs/pl/config-reference/</loc>
+  </url>
+  <url>
+    <loc>https://bettercmdtab.app/docs/pl/app-rules/</loc>
+  </url>
+  <url>
+    <loc>https://bettercmdtab.app/docs/pl/overrides/</loc>
+  </url>
+  <url>
+    <loc>https://bettercmdtab.app/docs/pl/contributing/</loc>
+  </url>
 </urlset>

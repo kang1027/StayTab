@@ -1,0 +1,81 @@
+{
+  "Metadata": {
+    "defaultTitle": "Dokumentacja BetterCmdTab",
+    "description": "Dokumentacja BetterCmdTab — szybszego i konfigurowalnego przełącznika Command-Tab dla macOS.",
+    "siteName": "Dokumentacja BetterCmdTab"
+  },
+  "Navigation": {
+    "downloadReleaseLabel": "Pobierz najnowszą wersję",
+    "download": "Pobierz",
+    "websiteLabel": "Witryna BetterCmdTab",
+    "website": "Witryna"
+  },
+  "ConfigReference": {
+    "key": "Klucz",
+    "field": "Pole",
+    "type": "Typ",
+    "default": "Wartość domyślna",
+    "description": "Opis",
+    "required": "wymagane",
+    "any": "dowolny",
+    "exactItems": "dokładnie {count} elementów",
+    "sections": {
+      "displayTiming": {
+        "title": "Ekran i czas",
+        "blurb": "Gdzie otwiera się panel i jak szybko reaguje."
+      },
+      "layout": {
+        "title": "Układ",
+        "blurb": "Jakiego układu używa przełącznik i jaki ma rozmiar."
+      },
+      "appearance": {
+        "title": "Wygląd",
+        "blurb": "Kolor, rozmycie, narożniki i typografia panelu."
+      },
+      "contents": {
+        "title": "Zawartość",
+        "blurb": "Które aplikacje i okna wyświetla przełącznik oraz w jakiej kolejności."
+      },
+      "tabs": {
+        "title": "Karty",
+        "blurb": "Jak karty przeglądarek i karty natywne pojawiają się na liście."
+      },
+      "search": {
+        "title": "Wyszukiwanie",
+        "blurb": "Filtrowanie podczas pisania i przechodzenie po literach."
+      },
+      "keyboard": {
+        "title": "Klawiatura",
+        "blurb": "Co dzieje się podczas przytrzymywania skrótu i jak działa przechodzenie między pozycjami."
+      },
+      "mouseHover": {
+        "title": "Mysz i wskazywanie",
+        "blurb": "Wybieranie wskaźnikiem i przyciski szybkich działań."
+      },
+      "windowManagement": {
+        "title": "Zarządzanie oknami",
+        "blurb": "Działanie skrótów układania okien."
+      },
+      "shortcuts": {
+        "title": "Skróty",
+        "blurb": "Same kombinacje klawiszy są zapisywane poza tym plikiem. Skróty zakresowe i ustawienia poszczególnych skrótów opisano na osobnych stronach."
+      },
+      "feedbackMenuBar": {
+        "title": "Sygnały i pasek menu",
+        "blurb": "Dźwięk, haptyka, ikona paska menu i prywatność udostępniania ekranu."
+      },
+      "experimental": {
+        "title": "Eksperymentalne",
+        "blurb": "Domyślnie wyłączone ustawienia odpowiadające panelowi Eksperymentalne. Mogą się zmienić lub zniknąć między wydaniami."
+      },
+      "legacy": {
+        "title": "Przestarzałe",
+        "blurb": "Zastąpione klucze — zawsze ustawiaj zamiennik wskazany w opisie. Tylko panelSize jest migrowany, a następnie usuwany; currentSpaceOnly i scopedShortcutScopes nadal są zapisywane przy każdej zmianie, aby starsze wersje korzystające z tego samego pliku zachowały spójność. excludedBundleIDs i experimentalUnreadBadges są odczytywane najwyżej raz i nigdy nie są usuwane."
+      },
+      "other": {
+        "title": "Inne",
+        "blurb": "Klucze obecne w schemacie, ale jeszcze nieprzypisane do sekcji dokumentacji."
+      }
+    }
+  }
+}

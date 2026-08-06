@@ -1,10 +1,17 @@
+import { SearchableLanguageSelect } from '@/components/language-select';
+import { defaultLocale, type Locale } from '@/lib/i18n';
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
+import { LanguageSelectText } from 'fumadocs-ui/layouts/shared/slots/language-select';
 import { Download, Globe } from 'lucide-react';
+import { getTranslations } from 'next-intl/server';
 import { appName, gitConfig, homeUrl, docsBasePath } from './shared';
 
-export function baseOptions(): BaseLayoutProps {
+export async function baseOptions(locale: Locale): Promise<BaseLayoutProps> {
+  const t = await getTranslations({ locale, namespace: 'Navigation' });
+
   return {
     nav: {
+      url: locale === defaultLocale ? '/' : `/${locale}/`,
       title: (
         <>
           {/* A pre-sized 64px copy (6.5 KB), not the 256px 56 KB master: a
@@ -26,22 +33,28 @@ export function baseOptions(): BaseLayoutProps {
     // Dark-only site, so next-themes is off in the provider — without this the
     // layout still renders a switch that cannot do anything.
     themeSwitch: { enabled: false },
+    slots: {
+      languageSelect: {
+        root: SearchableLanguageSelect,
+        text: LanguageSelectText,
+      },
+    },
     githubUrl: `https://github.com/${gitConfig.user}/${gitConfig.repo}`,
     // `type: 'icon'` items are secondary by default, which is what puts them in
     // the sidebar footer pill alongside the icon `githubUrl` generates.
     links: [
       {
         type: 'icon',
-        label: 'Download the latest release',
-        text: 'Download',
+        label: t('downloadReleaseLabel'),
+        text: t('download'),
         icon: <Download />,
         url: `https://github.com/${gitConfig.user}/${gitConfig.repo}/releases/latest`,
         external: true,
       },
       {
         type: 'icon',
-        label: `${appName} website`,
-        text: 'Website',
+        label: t('websiteLabel'),
+        text: t('website'),
         icon: <Globe />,
         // Absolute + external on purpose: the marketing site is a different app
         // on the same host, so client-side routing must not try to handle it.

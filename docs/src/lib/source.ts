@@ -3,6 +3,7 @@ import { lucideIconsPlugin } from 'fumadocs-core/source/lucide-icons';
 import { docsBasePath, docsContentRoute, docsImageRoute, docsRoute, siteUrl } from './shared';
 import { defineDocs } from 'fumadocs-mdx/macro';
 import { metaSchema, pageSchema } from 'fumadocs-core/source/schema';
+import { defaultLocale, i18n, isLocale, localizedSegments } from './i18n';
 
 const docs = defineDocs({
   dir: 'content/docs',
@@ -20,6 +21,7 @@ const docs = defineDocs({
 // See https://fumadocs.dev/docs/headless/source-api for more info
 export const source = loader({
   baseUrl: docsRoute,
+  i18n,
   source: docs.toFumadocsSource(),
   plugins: [lucideIconsPlugin()],
 });
@@ -29,13 +31,11 @@ export const source = loader({
  * Next never applies `basePath` to them — it has to be prepended here or the
  * request lands on the marketing site at the origin root and 404s.
  *
- * `segments` stays unprefixed: it feeds `generateStaticParams`, which wants
- * route params, not public URLs.
+ * `segments` also feeds route-handler `generateStaticParams`, so the locale
+ * sits inside the catch-all after the fixed route rather than before it.
  */
-function publicUrl(route: string, locale: string | undefined, segments: string[]) {
-  return (
-    docsBasePath + '/' + [locale, ...route.split('/'), ...segments].filter(Boolean).join('/')
-  );
+function publicUrl(route: string, segments: string[]) {
+  return docsBasePath + '/' + [...route.split('/'), ...segments].filter(Boolean).join('/');
 }
 
 /**
@@ -55,22 +55,55 @@ export function getPageUrl(page: (typeof source)['$inferPage']) {
   return siteUrl + docsBasePath + (page.url.endsWith('/') ? page.url : `${page.url}/`);
 }
 
-export function getPageImageUrl(page: (typeof source)['$inferPage']) {
-  const segments = [...page.slugs, 'image.png'];
+export function getPageAlternates(page: (typeof source)['$inferPage']) {
+  const languages: Record<string, string> = {};
 
-  return { segments, url: publicUrl(docsImageRoute, page.locale, segments) };
+  for (const locale of i18n.languages) {
+    const translation = source.getPage(page.slugs, locale);
+    if (translation) languages[locale] = getPageUrl(translation);
+  }
+
+  languages['x-default'] = languages[defaultLocale];
+  return languages;
+}
+
+export function getPageImageUrl(page: (typeof source)['$inferPage']) {
+  const segments = localizedSegments(page.locale, [...page.slugs, 'image.png']);
+
+  return { segments, url: publicUrl(docsImageRoute, segments) };
 }
 
 export function getPageMarkdownUrl(page: (typeof source)['$inferPage']) {
-  const segments = [...page.slugs, 'content.md'];
+  const segments = localizedSegments(page.locale, [...page.slugs, 'content.md']);
 
-  return { segments, url: publicUrl(docsContentRoute, page.locale, segments) };
+  return { segments, url: publicUrl(docsContentRoute, segments) };
+}
+
+export function canonicalizeLLMLinks(markdown: string, locale?: string) {
+  return markdown.replace(/\]\((\/(?!\/)[^)\s]*)\)/g, (_link, href: string) => {
+    const suffixStart = href.search(/[?#]/);
+    const pathname = suffixStart === -1 ? href : href.slice(0, suffixStart);
+    const suffix = suffixStart === -1 ? '' : href.slice(suffixStart);
+    const slugs = pathname.split('/').filter(Boolean);
+    const prefixedLocale = slugs[0];
+    let targetLocale = isLocale(locale) ? locale : defaultLocale;
+
+    if (isLocale(prefixedLocale)) {
+      targetLocale = prefixedLocale;
+      slugs.shift();
+    }
+
+    const page = source.getPage(slugs.length === 0 ? undefined : slugs, targetLocale);
+    if (!page) throw new Error(`LLM export contains an unknown docs link: ${href}`);
+
+    return `](${getPageUrl(page)}${suffix})`;
+  });
 }
 
 export async function getLLMText(page: (typeof source)['$inferPage']) {
   const processed = await page.data.getText('processed');
 
-  return `# ${page.data.title} (${page.url})
+  return `# ${page.data.title} (${getPageUrl(page)})
 
-${processed}`;
+${canonicalizeLLMLinks(processed, page.locale)}`;
 }
