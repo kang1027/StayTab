@@ -163,7 +163,8 @@ struct ShortcutOverrideTests {
         showMinimized: Bool = true,
         spaceScope: SpaceScope = .allSpaces,
         sortOrder: SwitcherSortOrder = .mru,
-        sinkHiddenApps: Bool = true
+        sinkHiddenApps: Bool = true,
+        sinkMinimizedWindows: Bool = true
     ) -> CatalogFilter.Config {
         CatalogFilter.Config(
             hideModes: ["com.example.app": .always],
@@ -173,7 +174,8 @@ struct ShortcutOverrideTests {
             showWindowless: true,
             spaceScope: spaceScope,
             sortOrder: sortOrder,
-            sinkHiddenApps: sinkHiddenApps
+            sinkHiddenApps: sinkHiddenApps,
+            sinkMinimizedWindows: sinkMinimizedWindows
         )
     }
 
@@ -181,6 +183,12 @@ struct ShortcutOverrideTests {
     func overlayPassesThroughSinkHiddenApps() {
         let result = CatalogFilter.overlay(baseConfig(sinkHiddenApps: false), ShortcutOverride())
         #expect(result.sinkHiddenApps == false)
+    }
+
+    @Test("sinkMinimizedWindows isn't per-shortcut overridable — it always passes through from the base config")
+    func overlayPassesThroughSinkMinimizedWindows() {
+        let result = CatalogFilter.overlay(baseConfig(sinkMinimizedWindows: false), ShortcutOverride())
+        #expect(result.sinkMinimizedWindows == false)
     }
 
     @Test("empty overlay leaves the config untouched")
@@ -220,7 +228,9 @@ struct ShortcutOverrideTests {
 
     @Test("overlaying an empty override preserves an identity config")
     func overlayKeepsIdentity() {
-        let identity = CatalogFilter.Config(hideModes: [:], pinned: [], showMinimized: true, showHidden: true, showWindowless: true, spaceScope: .allSpaces, sortOrder: .mru, sinkHiddenApps: true)
+        let identity = CatalogFilter.Config(
+            hideModes: [:], pinned: [], showMinimized: true, showHidden: true, showWindowless: true,
+            spaceScope: .allSpaces, sortOrder: .mru, sinkHiddenApps: true, sinkMinimizedWindows: true)
         #expect(identity.isIdentity)
         #expect(CatalogFilter.overlay(identity, ShortcutOverride()).isIdentity)
     }

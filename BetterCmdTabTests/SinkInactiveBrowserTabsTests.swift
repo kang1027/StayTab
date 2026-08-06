@@ -35,7 +35,8 @@ struct SinkInactiveBrowserTabsTests {
             rows,
             activeIndex: [AXRef(element: browserWindow): 1],
             pinnedIDs: [],
-            sinkHiddenApps: true
+            sinkHiddenApps: true,
+            sinkMinimizedWindows: true
         )
         #expect(out.map(\.windowTitle) == ["Docs", "Editor", "Inbox", "News"])
     }
@@ -43,7 +44,8 @@ struct SinkInactiveBrowserTabsTests {
     @Test("a window without a cached active-tab index stays whole")
     func uncachedWindowStaysWhole() {
         let rows = tabRows(["Inbox", "Docs"]) + [windowRow(otherWindow, title: "Editor")]
-        let out = SwitcherController.sinkInactiveBrowserTabs(rows, activeIndex: [:], pinnedIDs: [], sinkHiddenApps: true)
+        let out = SwitcherController.sinkInactiveBrowserTabs(
+            rows, activeIndex: [:], pinnedIDs: [], sinkHiddenApps: true, sinkMinimizedWindows: true)
         #expect(out.map(\.windowTitle) == rows.map(\.windowTitle))
     }
 
@@ -56,9 +58,27 @@ struct SinkInactiveBrowserTabsTests {
             rows,
             activeIndex: [AXRef(element: browserWindow): 0],
             pinnedIDs: [],
-            sinkHiddenApps: true
+            sinkHiddenApps: true,
+            sinkMinimizedWindows: true
         )
         #expect(out.map(\.windowTitle) == ["Inbox", "Docs", "Minimized", "Windowless"])
+    }
+
+    @Test("with sinkMinimizedWindows off a minimized window keeps its slot ahead of sunk tabs (#159)")
+    func minimizedKeepsSlotWhenSinkingOff() {
+        let rows = tabRows(["Inbox", "Docs"])
+            + [windowRow(otherWindow, title: "Minimized", minimized: true),
+               windowRow(nil, title: "Windowless")]
+        let out = SwitcherController.sinkInactiveBrowserTabs(
+            rows,
+            activeIndex: [AXRef(element: browserWindow): 0],
+            pinnedIDs: [],
+            sinkHiddenApps: true,
+            sinkMinimizedWindows: false
+        )
+        // Mirror of `sunkTabsStayAboveStatusBuckets`: no minimized bucket, so the
+        // minimized window stays put and only the windowless row trails.
+        #expect(out.map(\.windowTitle) == ["Inbox", "Minimized", "Docs", "Windowless"])
     }
 
     @Test("pinned apps get the front back after the sink")
@@ -73,7 +93,8 @@ struct SinkInactiveBrowserTabsTests {
             rows,
             activeIndex: [AXRef(element: browserWindow): 0],
             pinnedIDs: ["com.example.pinned"],
-            sinkHiddenApps: true
+            sinkHiddenApps: true,
+            sinkMinimizedWindows: true
         )
         #expect(out.first?.bundleIdentifier == "com.example.pinned")
         #expect(out.dropFirst().map(\.windowTitle) == ["Inbox", "Docs"])
@@ -86,7 +107,8 @@ struct SinkInactiveBrowserTabsTests {
             rows,
             activeIndex: [AXRef(element: browserWindow): 0],
             pinnedIDs: [],
-            sinkHiddenApps: true
+            sinkHiddenApps: true,
+            sinkMinimizedWindows: true
         )
         #expect(out.map(\.windowTitle) == ["One", "Two"])
     }

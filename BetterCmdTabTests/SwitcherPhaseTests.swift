@@ -551,3 +551,93 @@ struct EligiblePrimedIndexTests {
             primedPids: [1, 2, 3], eligiblePids: [2, 3], step: 0, anchorPid: nil) == 1)
     }
 }
+
+/// A fast ⌘⇥ tap commits without ever showing the panel, so it must elect the
+/// same row the panel would. While the list collapses to one row per app and
+/// "Move minimized windows to the bottom" is on, `collapseToApplications` elects
+/// the app's first *visible* window, because per-app window recency can still put
+/// a just-minimized window at the head of the run — a same-pid run can straddle
+/// the bucket boundary, and `.alphabetical` / `.launchOrder` make an app's rows
+/// contiguous across buckets outright. Committing that row would un-minimize a
+/// window the user deliberately put away. With the preference off the user asked
+/// for pure recency, so the minimized leader stands (#159).
+@Suite("Quick-tap visible-window election (#159)")
+struct PrimedTargetIndexTests {
+    /// Rows 0 and 2 belong to the app; row 0 is the just-minimized one.
+    private func target(preferVisible: Bool,
+                        eligible: [Int],
+                        minimized: [Int],
+                        count: Int = 4) -> Int? {
+        SwitcherController.primedTargetIndex(
+            count: count,
+            preferVisible: preferVisible,
+            eligible: { eligible.contains($0) },
+            isMinimized: { minimized.contains($0) })
+    }
+
+    @Test func collapsed_skipsMinimizedLeadingRow() {
+        // The app leads with a minimized window at 0; elect the visible one at 2.
+        #expect(target(preferVisible: true, eligible: [0, 2], minimized: [0]) == 2)
+    }
+
+    @Test func collapsed_allMinimizedFallsBackToFirst() {
+        // Nothing visible to upgrade to — the first eligible row stands, matching
+        // `keptApplicationIndices`' all-minimized fallback.
+        #expect(target(preferVisible: true, eligible: [1, 3], minimized: [1, 3]) == 1)
+    }
+
+    @Test func collapsed_keepsFirstWhenAlreadyVisible() {
+        #expect(target(preferVisible: true, eligible: [1, 2], minimized: [2]) == 1)
+    }
+
+    /// Expanded (per-window) lists show each window as its own row, so the
+    /// leading row genuinely is what the panel selects — including a minimized
+    /// one. The upgrade must not apply there.
+    @Test func expanded_keepsMinimizedLeadingRow() {
+        #expect(target(preferVisible: false, eligible: [0, 2], minimized: [0]) == 0)
+    }
+
+    @Test func noEligibleRow_returnsNil() {
+        #expect(target(preferVisible: true, eligible: [], minimized: []) == nil)
+        #expect(target(preferVisible: false, eligible: [], minimized: []) == nil)
+    }
+
+    @Test func emptyList_returnsNil() {
+        #expect(target(preferVisible: true, eligible: [0], minimized: [], count: 0) == nil)
+    }
+
+    /// The panel (`keptApplicationIndices`) and the fast tap (`primedTargetIndex`)
+    /// are two independent implementations of one election rule, and
+    /// `primedAppTargetRow`'s doc claims they agree. Pin that: drift is invisible
+    /// at runtime — the panel would display one window while a quick tap raised
+    /// another, and only the tap path un-minimizes. Proven for placeholder-free
+    /// input only, which is all production feeds these paths (the sole placeholder
+    /// is the never-minimized prewarm row).
+    @Test("a quick tap elects the same row the panel collapses to", arguments: [true, false])
+    func quickTapMatchesPanelElection(preferVisible: Bool) {
+        let vectors: [(pids: [pid_t?], minimized: [Bool])] = [
+            ([7, 9, 7], [true, false, false]),                  // minimized leader, visible later
+            ([7, 7, 9, 9], [false, false, true, false]),        // slot ≠ row index after a collapse
+            ([7, 7], [true, true]),                             // all-minimized fallback
+            ([7, 9, 7, 9, 7], [true, true, true, false, false]),// interleaved, both apps upgrade
+            ([nil, 4, 4], [false, true, false]),                // pid-less row in front
+        ]
+        for (pids, minimized) in vectors {
+            let kept = CatalogFilter.keptApplicationIndices(
+                pids: pids,
+                placeholders: Array(repeating: false, count: pids.count),
+                minimized: minimized,
+                preferVisible: preferVisible)
+            for pid in Set(pids.compactMap { $0 }) {
+                let panelElected = kept.first { pids[$0] == pid }
+                let tapElected = SwitcherController.primedTargetIndex(
+                    count: pids.count,
+                    preferVisible: preferVisible,
+                    eligible: { pids[$0] == pid },
+                    isMinimized: { minimized[$0] })
+                #expect(panelElected == tapElected,
+                        "pid \(pid) diverged for \(pids)/\(minimized) preferVisible=\(preferVisible)")
+            }
+        }
+    }
+}

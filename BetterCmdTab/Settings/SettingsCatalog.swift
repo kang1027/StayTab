@@ -91,6 +91,7 @@ enum SearchID {
     static let showMinimized = "switcher.showMinimized"
     static let showHidden = "switcher.showHidden"
     static let sinkHiddenApps = "switcher.sinkHiddenApps"
+    static let sinkMinimizedWindows = "switcher.sinkMinimizedWindows"
     static let showWindowless = "switcher.showWindowless"
     static let applicationsOnly = "switcher.applicationsOnly"
     static let showBadges = "switcher.showBadges"
@@ -401,6 +402,9 @@ enum SettingsCatalog {
              String(localized: "Show hidden apps"), ["hidden", "hide"]),
         item(SearchID.sinkHiddenApps, .switcher, SettingsAnchor.contents, String(localized: "Behavior"), String(localized: "Contents"),
              String(localized: "Move hidden apps to the bottom"), ["hidden", "hide", "sort", "bottom", "position", "order"]),
+        item(SearchID.sinkMinimizedWindows, .switcher, SettingsAnchor.contents, String(localized: "Behavior"), String(localized: "Contents"),
+             String(localized: "Move minimized windows to the bottom"),
+             ["minimized", "minimize", "sort", "bottom", "position", "order"]),
         item(SearchID.showWindowless, .switcher, SettingsAnchor.contents, String(localized: "Behavior"), String(localized: "Contents"),
              String(localized: "Show apps without windows"), ["windowless", "no windows", "background apps"]),
         item(SearchID.applicationsOnly, .switcher, SettingsAnchor.contents, String(localized: "Behavior"), String(localized: "Contents"),

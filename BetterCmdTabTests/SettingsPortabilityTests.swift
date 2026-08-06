@@ -56,6 +56,61 @@ struct SettingsPortabilityTests {
         #expect(prefs.panelOpacity == 55)
     }
 
+    /// The add-preference contract: a new `Switcher.*` key must export and
+    /// re-import with no portability edits (#159's `sinkMinimizedWindows`).
+    @Test("sinkMinimizedWindows survives an export → import round trip")
+    func sinkMinimizedWindowsRoundTrip() throws {
+        let prefs = Preferences.shared
+        let key = Preferences.Keys.sinkMinimizedWindows
+        let savedRaw = UserDefaults.standard.object(forKey: key)
+        let saved = prefs.sinkMinimizedWindows
+        defer {
+            // Restore the published property for the rest of the serialized suite,
+            // then drop the key again if this host never had it — writing it back
+            // unconditionally would leave the default pinned for good.
+            prefs.sinkMinimizedWindows = saved
+            if savedRaw == nil { UserDefaults.standard.removeObject(forKey: key) }
+        }
+
+        // Export the non-default value — it must appear, bare, in the payload.
+        prefs.sinkMinimizedWindows = false
+        let data = try Preferences.exportedJSONData()
+        let root = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(root["sinkMinimizedWindows"] as? Bool == false)
+
+        // Flip away, re-import, and confirm the published property follows.
+        prefs.sinkMinimizedWindows = true
+        try prefs.importSettings(from: data)
+        #expect(prefs.sinkMinimizedWindows == false)
+    }
+
+    /// Default-true is what makes #159 upgrade-safe: it reproduces the historical
+    /// unconditional sink, so a `?? false` typo would silently change behavior
+    /// for every existing user. Pins the two reachable fallbacks: the raw-key
+    /// read in `CatalogFilter.config()` and `Preferences.reloadFromDefaults()`.
+    /// The fallback in `Preferences.init` is *not* covered — `Preferences.shared`
+    /// is already built before any test runs — so a wrong default there would
+    /// ship a wrong first-launch value with this suite still green.
+    @Test("sinkMinimizedWindows defaults to true when the key is absent")
+    func sinkMinimizedWindowsDefaultsToTrue() {
+        let defaults = UserDefaults.standard
+        let key = Preferences.Keys.sinkMinimizedWindows
+        let saved = defaults.object(forKey: key)
+        defer {
+            if let saved { defaults.set(saved, forKey: key) } else { defaults.removeObject(forKey: key) }
+            // Put the published property back in step with the restored key for
+            // the rest of the serialized suite.
+            Preferences.shared.reloadFromDefaults()
+        }
+
+        defaults.removeObject(forKey: key)
+        #expect(CatalogFilter.config().sinkMinimizedWindows == true)
+        // The switcher reads the published property, not the key, so its own
+        // absent-key fallback has to default true as well.
+        Preferences.shared.reloadFromDefaults()
+        #expect(Preferences.shared.sinkMinimizedWindows == true)
+    }
+
     @Test("flat import accepts keys that already carry the Switcher. prefix")
     func flatImportPrefixLeniency() throws {
         let prefs = Preferences.shared

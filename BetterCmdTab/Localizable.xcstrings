@@ -4119,6 +4119,40 @@
         }
       }
     },
+    "Groups minimized windows at the end of the list. Turn off to leave them in their most-recently-used position instead." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gruppiert minimierte Fenster am Ende der Liste. Schalte diese Option aus, um sie stattdessen an ihrer zuletzt verwendeten Position zu belassen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agrupa las ventanas minimizadas al final de la lista. Desactívalo para dejarlas en su posición de uso más reciente."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Regroupe les fenêtres réduites à la fin de la liste. Désactivez cette option pour les laisser à leur position d’utilisation la plus récente."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grupuje zminimalizowane okna na końcu listy. Wyłącz tę opcję, aby zamiast tego pozostawić je na pozycji ostatnio używanej."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将最小化窗口归组到列表末尾。关闭后会保留它们最近使用的位置。"
+          }
+        }
+      }
+    },
     "HUD (default)" : {
       "localizations" : {
         "de" : {
@@ -6837,6 +6871,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "将隐藏的应用移到底部"
+          }
+        }
+      }
+    },
+    "Move minimized windows to the bottom" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Minimierte Fenster ans Ende verschieben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mover ventanas minimizadas al final"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplacer les fenêtres réduites en bas"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przenieś zminimalizowane okna na dół"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将最小化窗口移到底部"
           }
         }
       }
@@ -12520,6 +12588,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请先开启上方的“显示隐藏的应用”。"
+          }
+        }
+      }
+    },
+    "Turn on “Show minimized windows” above first." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zuerst oben „Minimierte Fenster anzeigen“ einschalten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activa primero «Mostrar ventanas minimizadas», justo arriba."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activez d’abord « Afficher les fenêtres réduites » juste au-dessus."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Najpierw włącz powyżej „Pokazuj zminimalizowane okna”."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先开启上方的“显示最小化窗口”。"
           }
         }
       }

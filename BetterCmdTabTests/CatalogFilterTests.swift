@@ -15,9 +15,14 @@ struct CatalogFilterTests {
         showWindowless: Bool = true,
         spaceScope: SpaceScope = .allSpaces,
         sortOrder: SwitcherSortOrder = .mru,
-        sinkHiddenApps: Bool = true
+        sinkHiddenApps: Bool = true,
+        sinkMinimizedWindows: Bool = true
     ) -> CatalogFilter.Config {
-        CatalogFilter.Config(hideModes: hideModes, pinned: pinned, showMinimized: showMinimized, showHidden: showHidden, showWindowless: showWindowless, spaceScope: spaceScope, sortOrder: sortOrder, sinkHiddenApps: sinkHiddenApps)
+        CatalogFilter.Config(
+            hideModes: hideModes, pinned: pinned,
+            showMinimized: showMinimized, showHidden: showHidden, showWindowless: showWindowless,
+            spaceScope: spaceScope, sortOrder: sortOrder, sinkHiddenApps: sinkHiddenApps,
+            sinkMinimizedWindows: sinkMinimizedWindows)
     }
 
     // MARK: - isIdentity
@@ -37,33 +42,6 @@ struct CatalogFilterTests {
         // .mruWindows is not identity: the full filter path must run so the
         // cross-app window sort can be applied downstream in SwitcherController.
         #expect(!config(sortOrder: .mruWindows).isIdentity)
-    }
-
-    // MARK: - applications-only collapse
-
-    @Test("applications-only keeps the first window of each app")
-    func applicationsOnlyCollapsesByPid() {
-        // pids 7,7,9,7,9 → keep first 7 (idx 0) and first 9 (idx 2).
-        let kept = CatalogFilter.keptApplicationIndices(
-            pids: [7, 7, 9, 7, 9],
-            placeholders: [false, false, false, false, false])
-        #expect(kept == [0, 2])
-    }
-
-    @Test("applications-only passes through pid-less and placeholder rows")
-    func applicationsOnlyKeepsSpecialRows() {
-        // nil pid (launchable / recently-closed) is always kept; duplicate pids
-        // still collapse around them.
-        let pidless = CatalogFilter.keptApplicationIndices(
-            pids: [nil, 4, 4, nil],
-            placeholders: [false, false, false, false])
-        #expect(pidless == [0, 1, 3])
-
-        // A placeholder row is kept even though its pid duplicates a real row's.
-        let withPlaceholder = CatalogFilter.keptApplicationIndices(
-            pids: [5, 5],
-            placeholders: [true, false])
-        #expect(withPlaceholder == [0, 1])
     }
 
     // MARK: - includes
@@ -479,5 +457,100 @@ struct CatalogFilterTests {
         #expect(CatalogFilter.spaceMemoValid(
             scope: .allSpaces, candidates: [],
             memoScope: .allSpaces, memoWids: memoWids, age: 0.05))
+    }
+}
+
+@Suite("CatalogFilter applications-only collapse")
+struct CatalogFilterCollapseTests {
+
+    @Test("applications-only keeps the first window of each app")
+    func applicationsOnlyCollapsesByPid() {
+        // pids 7,7,9,7,9 → keep first 7 (idx 0) and first 9 (idx 2).
+        let kept = CatalogFilter.keptApplicationIndices(
+            pids: [7, 7, 9, 7, 9],
+            placeholders: [false, false, false, false, false],
+            minimized: [false, false, false, false, false],
+            preferVisible: true)
+        #expect(kept == [0, 2])
+    }
+
+    @Test("applications-only elects a visible window without moving the app (#159)")
+    func applicationsOnlySkipsMinimizedRepresentative() {
+        // pid 7 leads with a just-minimized window: the app keeps slot 0 (its MRU
+        // position) but is represented by the visible window at index 2, so
+        // committing the row raises it instead of un-minimizing.
+        let kept = CatalogFilter.keptApplicationIndices(
+            pids: [7, 9, 7],
+            placeholders: [false, false, false],
+            minimized: [true, false, false],
+            preferVisible: true)
+        #expect(kept == [2, 1])
+
+        // Every window minimized — nothing to upgrade to, the first row stands.
+        let allMinimized = CatalogFilter.keptApplicationIndices(
+            pids: [7, 7],
+            placeholders: [false, false],
+            minimized: [true, true],
+            preferVisible: true)
+        #expect(allMinimized == [0])
+    }
+
+    /// The other half of #159: turning "move minimized windows to the bottom" off
+    /// means the user wants pure recency, so a collapsed app row must stay on its
+    /// most recent window even when that window is minimized. Same input as
+    /// `applicationsOnlySkipsMinimizedRepresentative`, opposite election — without
+    /// the gate the feature silently does nothing in applications-only mode.
+    @Test("applications-only keeps a minimized representative when sinking is off (#159)")
+    func applicationsOnlyKeepsMinimizedRepresentativeWhenNotSinking() {
+        let kept = CatalogFilter.keptApplicationIndices(
+            pids: [7, 9, 7],
+            placeholders: [false, false, false],
+            minimized: [true, false, false],
+            preferVisible: false)
+        #expect(kept == [0, 1])
+
+        // The slot/row-index case must not upgrade either.
+        let laterSlot = CatalogFilter.keptApplicationIndices(
+            pids: [7, 7, 9, 9],
+            placeholders: [false, false, false, false],
+            minimized: [false, false, true, false],
+            preferVisible: false)
+        #expect(laterSlot == [0, 2])
+    }
+
+    /// The upgrade bookkeeping runs in two coordinate spaces: `slot` indexes into
+    /// `kept`, while `kept[slot]` indexes into `minimized`. Every other case here
+    /// keeps them accidentally equal because no earlier row was ever collapsed.
+    /// Here pid 7 collapses first, so pid 9's slot (1) is no longer its row index
+    /// (2) — reading `minimized[slot]` instead of `isMinimized(kept[slot])` would
+    /// wrongly return [0, 2].
+    @Test("applications-only upgrades correctly when a pid's slot differs from its row index")
+    func applicationsOnlyUpgradeUsesRowIndexNotSlot() {
+        let kept = CatalogFilter.keptApplicationIndices(
+            pids: [7, 7, 9, 9],
+            placeholders: [false, false, false, false],
+            minimized: [false, false, true, false],
+            preferVisible: true)
+        #expect(kept == [0, 3])
+    }
+
+    @Test("applications-only passes through pid-less and placeholder rows")
+    func applicationsOnlyKeepsSpecialRows() {
+        // nil pid (launchable / recently-closed) is always kept; duplicate pids
+        // still collapse around them.
+        let pidless = CatalogFilter.keptApplicationIndices(
+            pids: [nil, 4, 4, nil],
+            placeholders: [false, false, false, false],
+            minimized: [false, false, false, false],
+            preferVisible: true)
+        #expect(pidless == [0, 1, 3])
+
+        // A placeholder row is kept even though its pid duplicates a real row's.
+        let withPlaceholder = CatalogFilter.keptApplicationIndices(
+            pids: [5, 5],
+            placeholders: [true, false],
+            minimized: [false, false],
+            preferVisible: true)
+        #expect(withPlaceholder == [0, 1])
     }
 }

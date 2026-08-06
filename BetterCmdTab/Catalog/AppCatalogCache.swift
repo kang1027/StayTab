@@ -263,7 +263,10 @@ final class AppCatalogCache {
         // queries); decorating up front makes it O(n). Tie-break on the
         // original offset keeps the order byte-identical to before.
         let sorted = result.enumerated()
-            .map { (priority: Self.statusPriority($0.element, sinkHiddenApps: resolvedCfg.sinkHiddenApps), offset: $0.offset, row: $0.element) }
+            .map { (priority: Self.statusPriority($0.element,
+                                                  sinkHiddenApps: resolvedCfg.sinkHiddenApps,
+                                                  sinkMinimizedWindows: resolvedCfg.sinkMinimizedWindows),
+                    offset: $0.offset, row: $0.element) }
             .sorted { lhs, rhs in
                 if lhs.priority != rhs.priority { return lhs.priority < rhs.priority }
                 return lhs.offset < rhs.offset
@@ -275,16 +278,17 @@ final class AppCatalogCache {
     /// The one bucketing rule for the whole app: internal (not private) so the
     /// `.mruWindows` re-sort can re-apply it after its global shuffle, and
     /// `nonisolated` so the off-main cold path (`AppCatalog.snapshot`) shares it
-    /// instead of mirroring it. No default for `sinkHiddenApps` — every caller
-    /// must pass the live preference, or rows sort one way here and another way
-    /// on the next refresh.
-    nonisolated static func statusPriority(_ row: SwitcherRow, sinkHiddenApps: Bool) -> Int {
+    /// instead of mirroring it. No defaults for the two sink preferences —
+    /// every caller must pass the live values, or rows sort one way here and
+    /// another way on the next refresh.
+    nonisolated static func statusPriority(_ row: SwitcherRow, sinkHiddenApps: Bool, sinkMinimizedWindows: Bool) -> Int {
         statusPriority(
             hasWindow: row.window != nil,
             isPlaceholder: row.isPlaceholder,
             isHidden: row.isHidden,
             isMinimized: row.isMinimized,
-            sinkHiddenApps: sinkHiddenApps
+            sinkHiddenApps: sinkHiddenApps,
+            sinkMinimizedWindows: sinkMinimizedWindows
         )
     }
 
@@ -292,18 +296,27 @@ final class AppCatalogCache {
     /// testable without a live `NSRunningApplication` (`isHidden` can't be faked
     /// for the test host).
     ///
-    /// With `sinkHiddenApps` on (the default preference), windowless and hidden
-    /// regular apps pool into one trailing "inactive" bucket: an app closing its
-    /// last window can flip between "no window" and "hidden window" across AX
-    /// refreshes (Electron apps hide rather than go windowless), and one bucket
-    /// stops that flip from reordering it. Off, a hidden app keeps its MRU slot
-    /// instead — the whole point of the preference — so that same flip does move
-    /// the app between buckets; the jitter is the accepted cost of opting out.
-    /// Placeholders stay at 0 so they aren't demoted while warming.
-    nonisolated static func statusPriority(hasWindow: Bool, isPlaceholder: Bool, isHidden: Bool, isMinimized: Bool, sinkHiddenApps: Bool) -> Int {
+    /// The two sink preferences are independent (#159). With `sinkHiddenApps`
+    /// on (the default), windowless and hidden regular apps pool into one
+    /// trailing "inactive" bucket: an app closing its last window can flip
+    /// between "no window" and "hidden window" across AX refreshes (Electron
+    /// apps hide rather than go windowless), and one bucket stops that flip from
+    /// reordering it. Off, a hidden app keeps its MRU slot instead — so that
+    /// same flip does move the app between buckets; the jitter is the accepted
+    /// cost of opting out.
+    ///
+    /// With `sinkMinimizedWindows` on (also the default, matching the previous
+    /// unconditional behavior) minimized windows sit in their own bucket just
+    /// above the inactive one. Off, they keep their MRU slot — a user who
+    /// minimizes rather than stacks windows doesn't want that to rewrite recency
+    /// order. Windowless rows are bucket 2 regardless of either preference,
+    /// except placeholders — `isPlaceholder` exempts a row from that windowless
+    /// demotion only; a hidden or minimized placeholder still sinks like any
+    /// other row.
+    nonisolated static func statusPriority(hasWindow: Bool, isPlaceholder: Bool, isHidden: Bool, isMinimized: Bool, sinkHiddenApps: Bool, sinkMinimizedWindows: Bool) -> Int {
         if !hasWindow, !isPlaceholder { return 2 }
         if sinkHiddenApps, isHidden { return 2 }
-        if isMinimized { return 1 }
+        if sinkMinimizedWindows, isMinimized { return 1 }
         return 0
     }
 

@@ -27,6 +27,12 @@ enum CatalogFilter {
         /// Not per-shortcut overridable, so `overlay` passes it through.
         let sinkHiddenApps: Bool
 
+        /// Sink minimized windows into their own bucket via `statusPriority`
+        /// (not `filteredRows`; `showMinimized` still governs whether they
+        /// appear). Independent of `sinkHiddenApps` since #159.
+        /// Not per-shortcut overridable, so `overlay` passes it through.
+        let sinkMinimizedWindows: Bool
+
         /// No filtering and no reordering — lets callers skip work entirely.
         var isIdentity: Bool {
             hideModes.isEmpty && pinned.isEmpty && showMinimized && showHidden && showWindowless && spaceScope == .allSpaces && sortOrder == .mru
@@ -52,7 +58,8 @@ enum CatalogFilter {
             showWindowless: defaults.object(forKey: Preferences.Keys.showWindowlessApps) as? Bool ?? true,
             spaceScope: Preferences.storedSpaceScope(defaults),
             sortOrder: sortRaw.flatMap(SwitcherSortOrder.init(rawValue:)) ?? .mru,
-            sinkHiddenApps: defaults.object(forKey: Preferences.Keys.sinkHiddenApps) as? Bool ?? true
+            sinkHiddenApps: defaults.object(forKey: Preferences.Keys.sinkHiddenApps) as? Bool ?? true,
+            sinkMinimizedWindows: defaults.object(forKey: Preferences.Keys.sinkMinimizedWindows) as? Bool ?? true
         )
     }
 
@@ -70,7 +77,8 @@ enum CatalogFilter {
             showWindowless: ov.showWindowless ?? base.showWindowless,
             spaceScope: ov.spaceScope.resolvedScope ?? base.spaceScope,
             sortOrder: ov.sortOrder ?? base.sortOrder,
-            sinkHiddenApps: base.sinkHiddenApps
+            sinkHiddenApps: base.sinkHiddenApps,
+            sinkMinimizedWindows: base.sinkMinimizedWindows
         )
     }
 
@@ -132,35 +140,63 @@ enum CatalogFilter {
     }
 
     /// Collapse a window-level row list to one row per application (classic
-    /// ⌘Tab). Keeps the first row of each process id — which, after the upstream
-    /// `statusPriority` sort, is that app's frontmost/active window — so selecting
-    /// the row activates the app on its current window. Rows without a pid
-    /// (launchables, recently-closed) and placeholders pass through untouched, so
-    /// search/launcher results and cache-warm rows are unaffected.
+    /// ⌘Tab). Each app lands at the position of its first row — its place in the
+    /// MRU order — and, when `preferVisible` is set, is represented by its first
+    /// *non-minimized* window so selecting the row activates the app on a visible
+    /// window. Rows without a pid (launchables, recently-closed) and placeholders
+    /// pass through untouched, so search/launcher results and cache-warm rows are
+    /// unaffected.
     ///
     /// Applied by `SwitcherController` on the app-switch reveal paths only — not
     /// inside `filteredRows`, so the cache stays a canonical per-window list that
     /// the windows-only (⌘`) and current-app-windows scope paths can still read in
     /// full.
-    static func collapseToApplications(_ rows: [SwitcherRow]) -> [SwitcherRow] {
-        keptApplicationIndices(pids: rows.map(\.pid), placeholders: rows.map(\.isPlaceholder))
+    static func collapseToApplications(_ rows: [SwitcherRow], preferVisible: Bool) -> [SwitcherRow] {
+        keptApplicationIndices(pids: rows.map(\.pid),
+                               placeholders: rows.map(\.isPlaceholder),
+                               minimized: rows.map(\.isMinimized),
+                               preferVisible: preferVisible)
             .map { rows[$0] }
     }
 
     /// Pure index-level core of `collapseToApplications`, split out so it can be
-    /// unit-tested without constructing `NSRunningApplication`s. Returns the
-    /// indices to keep: the first occurrence of each pid, plus every index whose
-    /// pid is nil (launchables / recently-closed) or that is a placeholder.
-    static func keptApplicationIndices(pids: [pid_t?], placeholders: [Bool]) -> [Int] {
-        var seen = Set<pid_t>()
+    /// unit-tested without constructing `NSRunningApplication`s. Returns one index
+    /// per process id — at the slot of that pid's first row — plus every index
+    /// whose pid is nil (launchables / recently-closed) or that is a placeholder.
+    ///
+    /// `preferVisible` moves that index on to the app's first non-minimized
+    /// window, keeping the slot. It carries `sinkMinimizedWindows`, because the
+    /// two are the same question: a collapsed row means "the app", not "this
+    /// window", and `Activator` un-minimizes whatever it is handed, so while the
+    /// user sinks minimized windows, electing one would restore a window they
+    /// deliberately put away. With sinking off they asked for pure recency
+    /// instead (#159) — the most recent window then represents the app even when
+    /// it is minimized, which is the entire point of the preference.
+    ///
+    /// While it is on the upgrade is never redundant: a same-pid run can straddle
+    /// the bucket boundary (one app owning the last bucket-0 row and the first
+    /// bucket-1 row), and under `.alphabetical` / `.launchOrder` the name/pid sort
+    /// makes an app's rows contiguous across buckets outright — either way per-app
+    /// window recency can put a just-minimized window at the head of the run.
+    static func keptApplicationIndices(pids: [pid_t?], placeholders: [Bool], minimized: [Bool],
+                                       preferVisible: Bool) -> [Int] {
+        var slotByPid: [pid_t: Int] = [:]
         var kept: [Int] = []
         kept.reserveCapacity(pids.count)
+        func isMinimized(_ index: Int) -> Bool { index < minimized.count && minimized[index] }
         for index in pids.indices {
             let isPlaceholder = index < placeholders.count && placeholders[index]
             if isPlaceholder {
                 kept.append(index)                       // cache-warm rows pass through
             } else if let pid = pids[index] {
-                if seen.insert(pid).inserted { kept.append(index) }  // first window of the app
+                guard let slot = slotByPid[pid] else {
+                    slotByPid[pid] = kept.count           // first window of the app
+                    kept.append(index)
+                    continue
+                }
+                // Upgrade the app's representative to a visible window, keeping
+                // its slot; all-minimized apps keep the first row as elected.
+                if preferVisible, !isMinimized(index), isMinimized(kept[slot]) { kept[slot] = index }
             } else {
                 kept.append(index)                       // no pid (launchable / recently-closed)
             }
@@ -517,8 +553,10 @@ enum CatalogFilter {
 
     /// Move items with a non-nil rank to the front, ordered by (rank, original
     /// offset); everything else keeps its relative order behind them. Stable on
-    /// offset preserves each pinned app's internal window ordering (active
-    /// window before minimized) produced by the upstream `statusPriority` sort.
+    /// offset preserves each pinned app's internal window ordering exactly as it
+    /// arrives (active window before minimized while `sinkMinimizedWindows` is
+    /// on, from the upstream `statusPriority` sort; otherwise whatever order the
+    /// caller passed in).
     static func stablePartition<T>(_ items: [T], rank: (T) -> Int?) -> [T] {
         var pinned: [(rank: Int, offset: Int, item: T)] = []
         var rest: [T] = []

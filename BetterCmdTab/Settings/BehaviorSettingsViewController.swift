@@ -23,9 +23,12 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
     private let minimizedSwitch = NSSwitch()
     private let hiddenSwitch = NSSwitch()
     private let sinkHiddenSwitch = NSSwitch()
+    private let sinkMinimizedSwitch = NSSwitch()
     /// Kept so the row can visibly lock (dim + tooltip) while its prerequisite
     /// "Show hidden apps" is off — mirrors `stayOpenQuickTapRow`.
     private var sinkHiddenRow: SettingsRowView?
+    /// Same, gated on "Show minimized windows" instead.
+    private var sinkMinimizedRow: SettingsRowView?
     private let windowlessSwitch = NSSwitch()
     private let applicationsOnlySwitch = NSSwitch()
     private let badgesSwitch = NSSwitch()
@@ -159,6 +162,10 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
         sinkHiddenRow = addRow(to: contents, title: String(localized: "Move hidden apps to the bottom"),
                subtitle: String(localized: "Groups hidden apps at the end of the list. Turn off to leave them in their normal position instead."),
                accessory: sinkHiddenSwitch, searchItemID: SearchID.sinkHiddenApps)
+        configureSwitch(sinkMinimizedSwitch, action: #selector(toggleSinkMinimized(_:)))
+        sinkMinimizedRow = addRow(to: contents, title: String(localized: "Move minimized windows to the bottom"),
+               subtitle: String(localized: "Groups minimized windows at the end of the list. Turn off to leave them in their most-recently-used position instead."),
+               accessory: sinkMinimizedSwitch, searchItemID: SearchID.sinkMinimizedWindows)
         configureSwitch(windowlessSwitch, action: #selector(toggleWindowless(_:)))
         addRow(to: contents, title: String(localized: "Show apps without windows"),
                subtitle: String(localized: "Running apps with no open windows."),
@@ -377,7 +384,9 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
         minimizedSwitch.state = prefs.showMinimizedWindows ? .on : .off
         hiddenSwitch.state = prefs.showHiddenApps ? .on : .off
         sinkHiddenSwitch.state = prefs.sinkHiddenApps ? .on : .off
+        sinkMinimizedSwitch.state = prefs.sinkMinimizedWindows ? .on : .off
         syncSinkHiddenRow()
+        syncSinkMinimizedRow()
         windowlessSwitch.state = prefs.showWindowlessApps ? .on : .off
         applicationsOnlySwitch.state = prefs.applicationsOnly ? .on : .off
         badgesSwitch.state = prefs.showUnreadBadges ? .on : .off
@@ -424,6 +433,23 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
         prefs.$searchDismissMode
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.selectSearchMode($0) }
+            .store(in: &cancellables)
+        // Each sink row's prerequisite can also flip from outside this pane (a
+        // settings import or the config.json watcher), which would leave it
+        // enabled with nothing left to sink.
+        prefs.$showHiddenApps
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in
+                self?.hiddenSwitch.state = $0 ? .on : .off
+                self?.syncSinkHiddenRow()
+            }
+            .store(in: &cancellables)
+        prefs.$showMinimizedWindows
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in
+                self?.minimizedSwitch.state = $0 ? .on : .off
+                self?.syncSinkMinimizedRow()
+            }
             .store(in: &cancellables)
         // Keep the sliders in sync if the values change underneath us (e.g. a
         // settings import calls reloadFromDefaults while this pane is open).
@@ -733,6 +759,7 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
 
     @objc private func toggleMinimized(_ sender: NSSwitch) {
         Preferences.shared.showMinimizedWindows = (sender.state == .on)
+        syncSinkMinimizedRow()
     }
 
     @objc private func toggleHidden(_ sender: NSSwitch) {
@@ -751,8 +778,21 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
             : String(localized: "Turn on \u{201C}Show hidden apps\u{201D} above first.")
     }
 
+    /// Same gate for the minimized sink, keyed on its own prerequisite.
+    private func syncSinkMinimizedRow() {
+        let on = Preferences.shared.showMinimizedWindows
+        sinkMinimizedSwitch.isEnabled = on
+        sinkMinimizedRow?.alphaValue = on ? 1 : 0.45
+        sinkMinimizedRow?.toolTip = on ? nil
+            : String(localized: "Turn on \u{201C}Show minimized windows\u{201D} above first.")
+    }
+
     @objc private func toggleSinkHidden(_ sender: NSSwitch) {
         Preferences.shared.sinkHiddenApps = (sender.state == .on)
+    }
+
+    @objc private func toggleSinkMinimized(_ sender: NSSwitch) {
+        Preferences.shared.sinkMinimizedWindows = (sender.state == .on)
     }
 
     @objc private func toggleWindowless(_ sender: NSSwitch) {

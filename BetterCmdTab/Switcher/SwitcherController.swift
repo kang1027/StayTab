@@ -2058,13 +2058,20 @@ final class SwitcherController: SwitcherViewDelegate {
     /// global toggle is on (that's the whole point of ⌘` — see the user's per-app
     /// vs per-window split). All other scopes (and plain ⌘Tab) collapse.
     private func applyApplicationsOnly(_ rows: [SwitcherRow]) -> [SwitcherRow] {
-        guard effective.applicationsOnly, !windowsOnlyMode else { return rows }
-        switch activeScope {
-        case .currentAppWindows, .minimizedOnly:
-            return rows
-        case .allAppsAllSpaces, .allAppsCurrentSpace, .none:
-            return CatalogFilter.collapseToApplications(rows)
-        }
+        guard applicationsCollapseActive else { return rows }
+        return CatalogFilter.collapseToApplications(rows, preferVisible: sinksMinimizedWindows)
+    }
+
+    /// #159's sink switch. Governs whether a collapsed app row is upgraded past a
+    /// minimized window: with sinking off the user asked for pure recency, so their
+    /// most recent window represents the app even while it is minimized. Not
+    /// per-shortcut overridable (`CatalogFilter.overlay` passes it through), so
+    /// `activeFilterConfig` can never disagree with this read — as long as the
+    /// key is only ever written through `Preferences` (an out-of-band `defaults
+    /// write` is seen by `CatalogFilter.config()`'s raw read but not here until
+    /// relaunch).
+    private var sinksMinimizedWindows: Bool {
+        Preferences.shared.sinkMinimizedWindows
     }
 
     /// True when the visible list is collapsed to one row per app — the exact
@@ -3352,10 +3359,11 @@ final class SwitcherController: SwitcherViewDelegate {
         // order is preserved within each bucket. Then re-pin.
         let ranked = windowMRU.sortRowsGlobally(stable)
         let sinkHiddenApps = Preferences.shared.sinkHiddenApps
+        let sinkMinimized = Preferences.shared.sinkMinimizedWindows
         let bucketed = ranked.enumerated()
             .sorted { lhs, rhs in
-                let lp = AppCatalogCache.statusPriority(lhs.element, sinkHiddenApps: sinkHiddenApps)
-                let rp = AppCatalogCache.statusPriority(rhs.element, sinkHiddenApps: sinkHiddenApps)
+                let lp = AppCatalogCache.statusPriority(lhs.element, sinkHiddenApps: sinkHiddenApps, sinkMinimizedWindows: sinkMinimized)
+                let rp = AppCatalogCache.statusPriority(rhs.element, sinkHiddenApps: sinkHiddenApps, sinkMinimizedWindows: sinkMinimized)
                 return lp != rp ? lp < rp : lhs.offset < rhs.offset
             }
             .map(\.element)
@@ -3363,11 +3371,12 @@ final class SwitcherController: SwitcherViewDelegate {
     }
 
     /// App-grouped sorts only: re-order each app's window rows by per-app
-    /// window recency, so the row an app entry leads with — the one
-    /// `collapseToApplications` elects, the pid anchor selects, and an app
-    /// commit activates — is the app's most recently used window rather than
-    /// the AX scan order (#83, #30). `.mruWindows` ranks every window globally
-    /// instead, so it must pass through untouched.
+    /// window recency, so the row an app entry leads with — the one the pid
+    /// anchor selects and an app commit activates — is the app's most recently
+    /// used window rather than the AX scan order (#83, #30). (`collapseToApplications`
+    /// then elects that run's first *visible* window, which differs from the
+    /// leading row only when `sinkMinimizedWindows` is on.) `.mruWindows` ranks
+    /// every window globally instead, so it must pass through untouched.
     private func applyPerAppWindowMRU(_ rows: [SwitcherRow]) -> [SwitcherRow] {
         guard effective.sortOrder != .mruWindows else { return rows }
         return windowMRU.sortRowsWithinAppRuns(rows)
@@ -3415,10 +3424,11 @@ final class SwitcherController: SwitcherViewDelegate {
         guard browserTabMRUActive else { return sinkInactiveBrowserTabs(rows) }
         let ranked = tabMRU.sortRows(rows)
         let sinkHiddenApps = Preferences.shared.sinkHiddenApps
+        let sinkMinimized = Preferences.shared.sinkMinimizedWindows
         let bucketed = ranked.enumerated()
             .sorted { lhs, rhs in
-                let lp = AppCatalogCache.statusPriority(lhs.element, sinkHiddenApps: sinkHiddenApps)
-                let rp = AppCatalogCache.statusPriority(rhs.element, sinkHiddenApps: sinkHiddenApps)
+                let lp = AppCatalogCache.statusPriority(lhs.element, sinkHiddenApps: sinkHiddenApps, sinkMinimizedWindows: sinkMinimized)
+                let rp = AppCatalogCache.statusPriority(rhs.element, sinkHiddenApps: sinkHiddenApps, sinkMinimizedWindows: sinkMinimized)
                 return lp != rp ? lp < rp : lhs.offset < rhs.offset
             }
             .map(\.element)
@@ -3448,7 +3458,8 @@ final class SwitcherController: SwitcherViewDelegate {
             rows,
             activeIndexFor: { [browserTabsCache] in browserTabsCache[$0]?.activeIndex },
             pinnedIDs: Preferences.shared.pinnedBundleIDs,
-            sinkHiddenApps: Preferences.shared.sinkHiddenApps
+            sinkHiddenApps: Preferences.shared.sinkHiddenApps,
+            sinkMinimizedWindows: Preferences.shared.sinkMinimizedWindows
         )
     }
 
@@ -3457,23 +3468,29 @@ final class SwitcherController: SwitcherViewDelegate {
     /// did sink, re-bucket by status and re-pin exactly like the tab-MRU branch of
     /// `applyBrowserTabMRU`: a sunk (visible) tab must land BEFORE the hidden/
     /// minimized bucket, not behind it, and pinned apps must get the front back —
-    /// the pin guarantee outranks the sink. `sinkHiddenApps` is explicit (no
-    /// default) so a caller can't silently re-bucket against a different rule
-    /// than the catalog just used.
+    /// the pin guarantee outranks the sink. The sink preferences are explicit
+    /// (no defaults) so a caller can't silently re-bucket against a different
+    /// rule than the catalog just used.
     static func sinkInactiveBrowserTabs(
         _ rows: [SwitcherRow],
         activeIndex: [AXRef: Int],
         pinnedIDs: [String],
-        sinkHiddenApps: Bool
+        sinkHiddenApps: Bool,
+        sinkMinimizedWindows: Bool
     ) -> [SwitcherRow] {
-        sinkInactiveBrowserTabs(rows, activeIndexFor: { activeIndex[$0] }, pinnedIDs: pinnedIDs, sinkHiddenApps: sinkHiddenApps)
+        sinkInactiveBrowserTabs(rows,
+                                activeIndexFor: { activeIndex[$0] },
+                                pinnedIDs: pinnedIDs,
+                                sinkHiddenApps: sinkHiddenApps,
+                                sinkMinimizedWindows: sinkMinimizedWindows)
     }
 
     private static func sinkInactiveBrowserTabs(
         _ rows: [SwitcherRow],
         activeIndexFor: (AXRef) -> Int?,
         pinnedIDs: [String],
-        sinkHiddenApps: Bool
+        sinkHiddenApps: Bool,
+        sinkMinimizedWindows: Bool
     ) -> [SwitcherRow] {
         var active: [SwitcherRow] = []
         var inactive: [SwitcherRow] = []
@@ -3490,8 +3507,8 @@ final class SwitcherController: SwitcherViewDelegate {
         guard !inactive.isEmpty else { return rows }
         let bucketed = (active + inactive).enumerated()
             .sorted { lhs, rhs in
-                let lp = AppCatalogCache.statusPriority(lhs.element, sinkHiddenApps: sinkHiddenApps)
-                let rp = AppCatalogCache.statusPriority(rhs.element, sinkHiddenApps: sinkHiddenApps)
+                let lp = AppCatalogCache.statusPriority(lhs.element, sinkHiddenApps: sinkHiddenApps, sinkMinimizedWindows: sinkMinimizedWindows)
+                let rp = AppCatalogCache.statusPriority(rhs.element, sinkHiddenApps: sinkHiddenApps, sinkMinimizedWindows: sinkMinimizedWindows)
                 return lp != rp ? lp < rp : lhs.offset < rhs.offset
             }
             .map(\.element)
@@ -4077,14 +4094,55 @@ final class SwitcherController: SwitcherViewDelegate {
     /// used catalogued window, or its scoped windowless row under a narrowed
     /// scope. `rows` is the `applyPerAppWindowMRU`-sorted scoped list built by
     /// commit(), so the first windowed row for a pid is the app's window-MRU
-    /// front (#83) — a fast tap and a held-open panel agree on the target.
+    /// front (#83).
+    ///
+    /// While the panel collapses to one row per app, that leading row is not
+    /// necessarily the one the panel would show: with `sinkMinimizedWindows` on,
+    /// `collapseToApplications` elects the app's first *visible* window, and a
+    /// just-minimized window can still lead the run on recency alone — a same-pid
+    /// run can straddle the bucket boundary, and under `.alphabetical` /
+    /// `.launchOrder` an app's rows are contiguous across status buckets outright.
+    /// Committing it would un-minimize a window the user deliberately put away
+    /// (`Activator` un-minimizes whatever it is handed), so mirror the panel's
+    /// election here — `quickTapMatchesPanelElection` pins that both paths apply
+    /// the same election rule to the same rows. The two row sets are not
+    /// identical, though: the panel reveal scope-filters before collapsing while
+    /// this path does not, so a scoped shortcut can still land on a different
+    /// window. Both halves of the sinking gate matter:
+    /// expanded (per-window) lists keep the plain first-row behavior, where each
+    /// window is its own row and the leading one is genuinely what the panel
+    /// selects, and with sinking off recency wins outright (#159).
+    ///
     /// nil — a windowless app under All Spaces, a cold cache, or a narrowed
     /// scope with no eligible app — makes commit() fall back or no-op.
     private func primedAppTargetRow(in rows: [SwitcherRow], scope: SpaceScope) -> SwitcherRow? {
         guard let app = eligiblePrimedApp(in: rows, scope: scope) else { return nil }
-        return rows.first {
-            $0.pid == app.processIdentifier && (scope != .allSpaces || $0.window != nil)
+        let pid = app.processIdentifier
+        let requiresWindow = scope == .allSpaces
+        return Self.primedTargetIndex(
+            count: rows.count,
+            preferVisible: applicationsCollapseActive && sinksMinimizedWindows,
+            eligible: { rows[$0].pid == pid && (!requiresWindow || rows[$0].window != nil) },
+            isMinimized: { rows[$0].isMinimized }
+        ).map { rows[$0] }
+    }
+
+    /// Pure index-level core of `primedAppTargetRow` (split out for unit tests,
+    /// like `eligiblePrimedIndex`). Returns the first eligible index, upgraded to
+    /// the first eligible non-minimized one when `preferVisible` is set and any
+    /// exists. Single pass, no allocation — this is the hottest commit path.
+    nonisolated static func primedTargetIndex(
+        count: Int,
+        preferVisible: Bool,
+        eligible: (Int) -> Bool,
+        isMinimized: (Int) -> Bool
+    ) -> Int? {
+        var first: Int?
+        for index in 0..<count where eligible(index) {
+            if !preferVisible || !isMinimized(index) { return index }
+            if first == nil { first = index }        // all-minimized fallback
         }
+        return first
     }
 
     /// App priming is Space-agnostic; remap it to scoped rows at commit time.
