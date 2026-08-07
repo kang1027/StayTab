@@ -6228,6 +6228,40 @@
         }
       }
     },
+    "Mark hidden, minimized, full-screen and windowless entries with a small glyph. The audio, Launch and Reopen cues always show." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Markiert ausgeblendete, minimierte, Vollbild- und fensterlose Einträge mit einem kleinen Symbol. Ton-, Öffnen- und Wiederherstellen-Hinweise bleiben immer sichtbar."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marca las entradas ocultas, minimizadas, en pantalla completa y sin ventanas con un pequeño icono. Los indicadores de audio, Abrir y Reabrir siempre se muestran."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marque d’un petit symbole les entrées masquées, réduites, en plein écran et sans fenêtre. Les indicateurs audio, Ouvrir et Rouvrir restent toujours visibles."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oznacza małym symbolem pozycje ukryte, zminimalizowane, pełnoekranowe i bez okien. Wskaźniki dźwięku, Uruchom i Przywróć są zawsze widoczne."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用小图标标记已隐藏、已最小化、全屏和无窗口的项目。音频、启动和重新打开提示始终显示。"
+          }
+        }
+      }
+    },
     "Maximize" : {
       "localizations" : {
         "de" : {
@@ -10582,6 +10616,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示最近关闭的应用"
+          }
+        }
+      }
+    },
+    "Show status icons" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Statussymbole anzeigen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar iconos de estado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher les icônes d’état"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pokazuj ikony stanu"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示状态图标"
           }
         }
       }

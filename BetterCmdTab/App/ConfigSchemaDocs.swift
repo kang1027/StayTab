@@ -187,7 +187,7 @@ enum ConfigSchemaDocs {
         "gridMaxColumns", "listWidthPercent", "panelOpacity", "panelCornerRadius",
         "backdropMaterial", "showWindowTitleLabel", "previewTitleAlignment",
         "titleTruncationMode", "boldSelectedLabel", "showApplicationNames",
-        "showUnreadBadges", "letterHintsEnabled",
+        "showWindowStatusIcons", "showUnreadBadges", "letterHintsEnabled",
     ]
 
     private static func overrideProperties(from base: [String: ConfigSettingDoc]) -> [String: ConfigSettingDoc] {
@@ -277,6 +277,8 @@ enum ConfigSchemaDocs {
         "boldSelectedLabel": ConfigSettingDoc("boolean", "Show the highlighted entry's title in bold."),
         "showWindowTitleLabel": ConfigSettingDoc("boolean", "Show each window's title, not just its app."),
         "showApplicationNames": ConfigSettingDoc("boolean", "Show application names next to the icons."),
+        "showWindowStatusIcons": ConfigSettingDoc(
+            "boolean", "Show the hidden, minimized, full-screen and no-window glyphs on each entry."),
         "previewTitleAlignment": ConfigSettingDoc(
             "string", "Where the title sits under each window-preview tile.",
             values: ConfigValues(PreviewTitleAlignment.self, \.displayName)),

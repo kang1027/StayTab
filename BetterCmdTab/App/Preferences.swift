@@ -358,6 +358,7 @@ struct ShortcutOverride: Equatable, Sendable {
     var titleTruncationMode: TitleTruncationMode?
     var boldSelectedLabel: Bool?
     var showApplicationNames: Bool?
+    var showWindowStatusIcons: Bool?
     var showUnreadBadges: Bool?
     var letterHintsEnabled: Bool?
     /// Stored keys this build doesn't understand — from a newer version or a
@@ -382,6 +383,7 @@ struct ShortcutOverride: Equatable, Sendable {
             && showWindowTitleLabel == nil && previewTitleAlignment == nil
             && titleTruncationMode == nil
             && boldSelectedLabel == nil && showApplicationNames == nil
+            && showWindowStatusIcons == nil
             && showUnreadBadges == nil && letterHintsEnabled == nil
             && passthrough.isEmpty
     }
@@ -417,6 +419,7 @@ struct ShortcutOverride: Equatable, Sendable {
         if let titleTruncationMode { d["titleTruncationMode"] = titleTruncationMode.rawValue }
         put("boldSelectedLabel", boldSelectedLabel)
         put("showApplicationNames", showApplicationNames)
+        put("showWindowStatusIcons", showWindowStatusIcons)
         put("showUnreadBadges", showUnreadBadges)
         put("letterHintsEnabled", letterHintsEnabled)
         return d
@@ -433,7 +436,7 @@ struct ShortcutOverride: Equatable, Sendable {
         "panelAppearance", "fontScale", "fontFace",
         "gridMaxColumns", "listWidthPercent", "panelOpacity", "panelCornerRadius", "backdropMaterial",
         "showWindowTitleLabel", "previewTitleAlignment", "titleTruncationMode",
-        "boldSelectedLabel", "showApplicationNames", "showUnreadBadges",
+        "boldSelectedLabel", "showApplicationNames", "showWindowStatusIcons", "showUnreadBadges",
         "letterHintsEnabled",
     ]
 
@@ -470,6 +473,7 @@ struct ShortcutOverride: Equatable, Sendable {
         titleTruncationMode = dictionary["titleTruncationMode"].flatMap(TitleTruncationMode.init(rawValue:))
         boldSelectedLabel = bool("boldSelectedLabel")
         showApplicationNames = bool("showApplicationNames")
+        showWindowStatusIcons = bool("showWindowStatusIcons")
         showUnreadBadges = bool("showUnreadBadges")
         letterHintsEnabled = bool("letterHintsEnabled")
         passthrough = dictionary.filter { !Self.knownKeys.contains($0.key) }
@@ -797,6 +801,9 @@ final class Preferences: ObservableObject {
         static let legacyUnreadBadges = "Switcher.experimentalUnreadBadges"
         static let showWindowTitleLabel = "Switcher.showWindowTitleLabel"
         static let showApplicationNames = "Switcher.showApplicationNames"
+        /// Show the window-state glyphs (hidden / minimized / no window /
+        /// full-screen) at the end of each entry (#149).
+        static let showWindowStatusIcons = "Switcher.showWindowStatusIcons"
         static let panelOpacity = "Switcher.panelOpacity"
         static let panelCornerRadius = "Switcher.panelCornerRadius"
         static let listWidthPercent = "Switcher.listWidthPercent"
@@ -1517,6 +1524,17 @@ final class Preferences: ObservableObject {
         }
     }
 
+    /// Show the window-state glyphs — hidden, minimized, no open window,
+    /// full-screen — at the end of each List row and under each Grid tile
+    /// (#149). Default on. The audio, Launch and Reopen cues are unaffected:
+    /// they signal activity and available actions, not window state.
+    @Published var showWindowStatusIcons: Bool {
+        didSet {
+            guard oldValue != showWindowStatusIcons else { return }
+            UserDefaults.standard.set(showWindowStatusIcons, forKey: Keys.showWindowStatusIcons)
+        }
+    }
+
     /// Panel opacity as a 30–100 percentage. Default 100 (fully opaque).
     @Published var panelOpacity: Int {
         didSet {
@@ -2028,6 +2046,7 @@ final class Preferences: ObservableObject {
 
         self.showWindowTitleLabel = defaults.object(forKey: Keys.showWindowTitleLabel) as? Bool ?? true
         self.showApplicationNames = defaults.object(forKey: Keys.showApplicationNames) as? Bool ?? true
+        self.showWindowStatusIcons = defaults.object(forKey: Keys.showWindowStatusIcons) as? Bool ?? true
         self.previewTitleAlignment = defaults.string(forKey: Keys.previewTitleAlignment)
             .flatMap(PreviewTitleAlignment.init(rawValue:)) ?? .center
         self.titleTruncationMode = defaults.string(forKey: Keys.titleTruncationMode)
@@ -2167,6 +2186,7 @@ final class Preferences: ObservableObject {
         showUnreadBadges = defaults.object(forKey: Keys.showUnreadBadges) as? Bool ?? true
 
         showWindowTitleLabel = defaults.object(forKey: Keys.showWindowTitleLabel) as? Bool ?? true
+        showWindowStatusIcons = defaults.object(forKey: Keys.showWindowStatusIcons) as? Bool ?? true
         showApplicationNames = defaults.object(forKey: Keys.showApplicationNames) as? Bool ?? true
         previewTitleAlignment = defaults.string(forKey: Keys.previewTitleAlignment).flatMap(PreviewTitleAlignment.init(rawValue:)) ?? .center
         titleTruncationMode = defaults.string(forKey: Keys.titleTruncationMode).flatMap(TitleTruncationMode.init(rawValue:)) ?? .tail

@@ -109,6 +109,7 @@ struct ShortcutOverrideTests {
         ov.titleTruncationMode = .middle
         ov.boldSelectedLabel = false
         ov.showApplicationNames = true
+        ov.showWindowStatusIcons = false
         ov.showUnreadBadges = false
         ov.letterHintsEnabled = true
         #expect(!ov.isEmpty)

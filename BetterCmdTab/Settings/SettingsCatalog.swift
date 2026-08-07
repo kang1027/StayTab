@@ -107,6 +107,7 @@ enum SearchID {
     static let tabPermissions = "switcher.tabPermissions"
     static let letterHints = "switcher.letterHints"
     static let applicationNames = "switcher.applicationNames"
+    static let windowStatusIcons = "switcher.windowStatusIcons"
     static let fuzzy = "switcher.fuzzy"
     static let launcher = "switcher.launcher"
     static let searchMode = "switcher.searchMode"
@@ -384,6 +385,9 @@ enum SettingsCatalog {
         item(SearchID.applicationNames, .appearance, SettingsAnchor.appearanceLabels, String(localized: "Appearance"), String(localized: "Labels"),
              String(localized: "Show application names"),
              ["application names", "app name", "app names", "name", "label", "icon only", "hide name"]),
+        item(SearchID.windowStatusIcons, .appearance, SettingsAnchor.appearanceLabels, String(localized: "Appearance"), String(localized: "Labels"),
+             String(localized: "Show status icons"),
+             ["status icons", "status", "icons", "glyph", "minimized", "hidden", "full-screen", "no window", "dashed square"]),
         // Appearance · Panel
         item(SearchID.theme, .appearance, SettingsAnchor.appearancePanel, String(localized: "Appearance"), String(localized: "Panel"),
              String(localized: "Appearance"), ["theme", "appearance", "light", "dark", "system", "color scheme"]),

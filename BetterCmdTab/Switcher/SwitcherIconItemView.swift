@@ -241,8 +241,11 @@ final class SwitcherIconItemView: NSView, SwitcherItemViewProtocol {
         // Status glyphs ride with the secondary text instead of crowding the icon.
         // Audio is orthogonal, so it shows alongside the window-state glyph (e.g. a
         // windowless app playing sound gets both speaker + no-window). Launch/reopen
-        // rows return their single cue, never a stacked no-window glyph.
-        let indicators = (isDialog || bothHidden) ? [] : Self.indicators(for: row)
+        // rows return their single cue, never a stacked no-window glyph. The
+        // window-state glyphs drop out entirely when the user turns them off (#149) —
+        // pruned in place so the default (glyphs on) path costs no second array.
+        var indicators = (isDialog || bothHidden) ? [] : Self.indicators(for: row)
+        if !effective.showWindowStatusIcons { indicators.removeAll(where: \.isWindowState) }
 
         // The label area stacks the app name over a secondary line (glyphs + window
         // title) only when BOTH labels are shown. Hiding one collapses the tile to a

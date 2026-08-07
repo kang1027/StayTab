@@ -63,6 +63,16 @@ enum SwitcherIndicator: CaseIterable {
         }
     }
 
+    /// True for the glyphs that describe the window's *state*, which the
+    /// "Show status icons" preference hides (#149). Audio, Launch and Reopen
+    /// are excluded: they signal activity and available actions, not state.
+    var isWindowState: Bool {
+        switch self {
+        case .hidden, .minimized, .noWindow, .fullscreen: return true
+        case .audio, .launch, .reopen: return false
+        }
+    }
+
     func makeImage() -> NSImage? {
         NSImage(systemSymbolName: symbolName, accessibilityDescription: accessibilityDescription)
     }

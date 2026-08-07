@@ -18,6 +18,7 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
     private let fontFacePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let windowTitleSwitch = NSSwitch()
     private let appNamesSwitch = NSSwitch()
+    private let statusIconsSwitch = NSSwitch()
     private let boldSelectedSwitch = NSSwitch()
     private let opacitySlider = NSSlider()
     private let opacityValueField = NSTextField()
@@ -134,6 +135,11 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
         addRow(to: labels, title: String(localized: "Show application names"),
                subtitle: String(localized: "Hide the app name in every layout; identify apps by their icon."),
                accessory: appNamesSwitch, searchItemID: SearchID.applicationNames)
+
+        configureSwitch(statusIconsSwitch, action: #selector(toggleStatusIcons(_:)))
+        addRow(to: labels, title: String(localized: "Show status icons"),
+               subtitle: String(localized: "Mark hidden, minimized, full-screen and windowless entries with a small glyph. The audio, Launch and Reopen cues always show."),
+               accessory: statusIconsSwitch, searchItemID: SearchID.windowStatusIcons)
 
         // Panel section — the chrome: translucency, rounding. The selection
         // accent always follows the user's macOS accent color.
@@ -332,6 +338,10 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.appNamesSwitch.state = $0 ? .on : .off }
             .store(in: &cancellables)
+        prefs.$showWindowStatusIcons
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.statusIconsSwitch.state = $0 ? .on : .off }
+            .store(in: &cancellables)
         prefs.$panelOpacity
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.applyOpacity($0) }
@@ -365,6 +375,7 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
         selectFontFace(prefs.fontFace)
         boldSelectedSwitch.state = prefs.boldSelectedLabel ? .on : .off
         appNamesSwitch.state = prefs.showApplicationNames ? .on : .off
+        statusIconsSwitch.state = prefs.showWindowStatusIcons ? .on : .off
         applyOpacity(prefs.panelOpacity)
         applyRadius(prefs.panelCornerRadius)
     }
@@ -444,6 +455,10 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
 
     @objc private func toggleApplicationNames(_ sender: NSSwitch) {
         Preferences.shared.showApplicationNames = (sender.state == .on)
+    }
+
+    @objc private func toggleStatusIcons(_ sender: NSSwitch) {
+        Preferences.shared.showWindowStatusIcons = (sender.state == .on)
     }
 
     @objc private func toggleBoldSelected(_ sender: NSSwitch) {

@@ -699,6 +699,14 @@
             ],
             "type" : "string"
           },
+          "showWindowStatusIcons" : {
+            "description" : "Override: Show the hidden, minimized, full-screen and no-window glyphs on each entry.",
+            "enum" : [
+              "true",
+              "false"
+            ],
+            "type" : "string"
+          },
           "showWindowTitleLabel" : {
             "description" : "Override: Show each window's title, not just its app.",
             "enum" : [
@@ -808,6 +816,10 @@
     },
     "showWindowlessApps" : {
       "description" : "Include running apps that have no open window.",
+      "type" : "boolean"
+    },
+    "showWindowStatusIcons" : {
+      "description" : "Show the hidden, minimized, full-screen and no-window glyphs on each entry.",
       "type" : "boolean"
     },
     "showWindowTitleLabel" : {

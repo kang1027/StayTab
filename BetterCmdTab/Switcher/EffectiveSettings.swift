@@ -27,6 +27,7 @@ struct EffectiveSettings {
     let titleTruncationMode: TitleTruncationMode
     let boldSelectedLabel: Bool
     let showApplicationNames: Bool
+    let showWindowStatusIcons: Bool
     let showUnreadBadges: Bool
     let letterHintsEnabled: Bool
     // Behavioral values applied on the main-actor reveal path (the rest ride
@@ -64,6 +65,7 @@ extension Preferences {
             titleTruncationMode: override.titleTruncationMode ?? titleTruncationMode,
             boldSelectedLabel: override.boldSelectedLabel ?? boldSelectedLabel,
             showApplicationNames: override.showApplicationNames ?? showApplicationNames,
+            showWindowStatusIcons: override.showWindowStatusIcons ?? showWindowStatusIcons,
             showUnreadBadges: override.showUnreadBadges ?? showUnreadBadges,
             letterHintsEnabled: override.letterHintsEnabled ?? letterHintsEnabled,
             applicationsOnly: override.applicationsOnly ?? applicationsOnly,

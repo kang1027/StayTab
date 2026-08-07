@@ -229,12 +229,15 @@ final class SwitcherItemView: NSView, SwitcherItemViewProtocol {
             usesCompactTabIcon = compactTabIcon
             needsLayout = true
         }
-        let showHidden = !isDialog && !row.isPlaceholder && row.isHidden
-        let showMinimized = !isDialog && !row.isPlaceholder && row.isMinimized && !showHidden
+        // Window-state glyphs, all suppressed together when the user turns them
+        // off (#149).
+        let showState = !isDialog && !row.isPlaceholder && effective.showWindowStatusIcons
+        let showHidden = showState && row.isHidden
+        let showMinimized = showState && row.isMinimized && !showHidden
         // No-window applies only to running apps — launch/reopen rows have their
         // own glyph and must not also show the dashed-square.
-        let showNoWindow = !isDialog && !row.isPlaceholder && row.app != nil && row.window == nil && !showHidden && !row.suppressNoWindowGlyph
-        let showFullscreen = !isDialog && !row.isPlaceholder && row.isFullscreen && !showHidden && !showMinimized && !showNoWindow
+        let showNoWindow = showState && row.app != nil && row.window == nil && !showHidden && !row.suppressNoWindowGlyph
+        let showFullscreen = showState && row.isFullscreen && !showHidden && !showMinimized && !showNoWindow
         // Audio is per-app and orthogonal to the window-state icons.
         let showAudio = !isDialog && !row.isPlaceholder && (row.pid.map { AudioActivityMonitor.shared.isPlaying($0) } ?? false)
         let showLaunch = !isDialog && row.isLaunchable
