@@ -100,6 +100,33 @@ A quick tap switches instantly without drawing anything. The panel only appears
 once you have held the shortcut for [`revealDelayMs`](/config-reference#revealDelayMs)
 (100 ms by default) — raise it if the panel flashes during fast tap-switching.
 
+### What the icons mean
+
+A small glyph at the end of a list row (or under a grid tile) says what state the
+entry is in:
+
+| Icon | Meaning |
+| --- | --- |
+| Green speaker | The app is playing audio |
+| Eye with a slash | The app is hidden (`⌘H`) |
+| Minus in a rectangle | The window is minimized |
+| Dashed square | The app is running but has no open window — `Return` opens one |
+| Two diagonal arrows | The window is full-screen |
+| Arrow leaving a square | The app is not running yet — `Return` launches it |
+| Clock with an arrow | Recently closed — `Return` reopens it |
+
+The four window-state glyphs (hidden, minimized, no window, full-screen) can be
+turned off under **Appearance → Labels → Show status icons**
+([`showWindowStatusIcons`](/config-reference#showWindowStatusIcons)). The audio,
+launch and reopen cues always show.
+
+Apps with no open window carry no window recency, so under either recency
+[`sortOrder`](/config-reference#sortOrder) (`mru`, `mruWindows`) they collect at the
+end of the list. Hidden apps do the same while
+[`sinkHiddenApps`](/config-reference#sinkHiddenApps) is on. Switch `sortOrder` to
+`alphabetical` to order every entry by name instead, or pin the apps you want on
+top under **Apps**.
+
 ## 4. Make it yours
 
 Open **Settings** from the menu-bar icon. The panes are General, Profiles, Windows,

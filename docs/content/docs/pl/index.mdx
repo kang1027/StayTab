@@ -103,6 +103,34 @@ się dopiero po przytrzymaniu skrótu przez czas określony w
 [`revealDelayMs`](/config-reference#revealDelayMs) (domyślnie 100 ms) — zwiększ tę
 wartość, jeśli panel miga podczas szybkiego przełączania.
 
+### Znaczenie ikon
+
+Mały symbol na końcu wiersza listy (lub pod kafelkiem siatki) informuje o stanie
+pozycji:
+
+| Ikona | Znaczenie |
+| --- | --- |
+| Zielony głośnik | Aplikacja odtwarza dźwięk |
+| Przekreślone oko | Aplikacja jest ukryta (`⌘H`) |
+| Minus w prostokącie | Okno jest zminimalizowane |
+| Kwadrat z przerywaną ramką | Aplikacja działa, ale nie ma otwartego okna — `Return` je otworzy |
+| Dwie skośne strzałki | Okno jest w trybie pełnoekranowym |
+| Strzałka wychodząca z kwadratu | Aplikacja nie jest uruchomiona — `Return` ją uruchomi |
+| Zegar ze strzałką | Ostatnio zamknięte — `Return` przywróci |
+
+Cztery symbole stanu okna (ukryta, zminimalizowane, brak okna, pełny ekran) można
+wyłączyć w **Wygląd → Etykiety → Pokazuj ikony stanu**
+([`showWindowStatusIcons`](/config-reference#showWindowStatusIcons)). Wskaźniki
+dźwięku, uruchomienia i przywrócenia są zawsze widoczne.
+
+Aplikacje bez otwartego okna nie mają historii użycia okna, więc przy obu
+porządkach według użycia ([`sortOrder`](/config-reference#sortOrder) `mru` i
+`mruWindows`) gromadzą się na końcu listy. Ukryte aplikacje zachowują się tak samo,
+gdy włączone jest
+[`sinkHiddenApps`](/config-reference#sinkHiddenApps). Ustaw `sortOrder` na
+`alphabetical`, aby uporządkować wszystkie pozycje alfabetycznie, albo przypnij
+wybrane aplikacje na górze w sekcji **Aplikacje**.
+
 ## 4. Dostosowanie
 
 Otwórz **Ustawienia** z ikony na pasku menu. Dostępne panele to Ogólne, Profile, Okna,
