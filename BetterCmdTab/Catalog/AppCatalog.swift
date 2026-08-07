@@ -133,7 +133,10 @@ enum AppCatalog {
         // Shares `AppCatalogCache`'s rule (nonisolated, so this off-main cold
         // path can call it) — cold and cached snapshots can't drift apart.
         let sorted = rows.enumerated()
-            .map { (priority: AppCatalogCache.statusPriority($0.element, sinkHiddenApps: resolvedCfg.sinkHiddenApps), offset: $0.offset, row: $0.element) }
+            .map { (priority: AppCatalogCache.statusPriority($0.element,
+                                                             sinkHiddenApps: resolvedCfg.sinkHiddenApps,
+                                                             sinkMinimizedWindows: resolvedCfg.sinkMinimizedWindows),
+                    offset: $0.offset, row: $0.element) }
             .sorted { lhs, rhs in
                 if lhs.priority != rhs.priority { return lhs.priority < rhs.priority }
                 return lhs.offset < rhs.offset

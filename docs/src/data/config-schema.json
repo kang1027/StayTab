@@ -830,6 +830,10 @@
       "description" : "Move hidden apps to the bottom of the list instead of leaving them in place.",
       "type" : "boolean"
     },
+    "sinkMinimizedWindows" : {
+      "description" : "Move minimized windows to the bottom of the list instead of leaving them in their most-recently-used position.",
+      "type" : "boolean"
+    },
     "sortOrder" : {
       "description" : "Order apps and windows are listed in.",
       "enum" : [

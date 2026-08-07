@@ -100,12 +100,20 @@ final class WindowMRUTracker {
     /// Re-orders each contiguous run of same-pid windowed rows by that app's
     /// per-app recency (`sortRows(forPid:)`), leaving run boundaries and every
     /// other row in place. The app-grouped sorts (.mru / alphabetical / launch
-    /// order) apply this so each app's leading row — the one
-    /// `collapseToApplications` elects, the pid selection anchor lands on, and
-    /// a ⌘Tab app commit activates — is the app's most recently used window
-    /// instead of the AX scan order (#83, #30). Runs never span status buckets
-    /// (the catalog orders buckets before any app's rows repeat), so a recently
-    /// focused but since-minimized window can't jump ahead of a visible one.
+    /// order) apply this so each app's leading row — the one the pid selection
+    /// anchor lands on and a ⌘Tab app commit activates — is the app's most
+    /// recently used window instead of the AX scan order (#83, #30). A run breaks
+    /// only on a pid change or a windowless row — never on a status bucket, so the
+    /// leading row can be a minimized one under every sort. Even with "move
+    /// minimized windows to the bottom" on, one app can own both the last bucket-0
+    /// row and the first bucket-1 row, and the run then straddles the boundary
+    /// (apps A-visible, A-minimized, B-minimized sort to priorities 0,1,1 — order
+    /// unchanged, so A's two rows stay adjacent and form one run). Under
+    /// `.alphabetical` / `.launchOrder` the name/pid sort makes an app's rows
+    /// contiguous across buckets outright. Recency alone then decides, and the
+    /// leading row can be minimized (#159) — which is why `collapseToApplications`
+    /// (and the fast-tap `primedAppTargetRow`) elect the run's first *visible*
+    /// window rather than simply its first row while that preference is on.
     func sortRowsWithinAppRuns(_ rows: [SwitcherRow]) -> [SwitcherRow] {
         guard !order.isEmpty, rows.count > 1 else { return rows }
         let ranges = Self.windowRunRanges(

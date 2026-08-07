@@ -301,6 +301,7 @@ enum ConfigSchemaDocs {
         "showMinimizedWindows": ConfigSettingDoc("boolean", "Include minimized windows."),
         "showHiddenApps": ConfigSettingDoc("boolean", "Include apps hidden with ⌘H."),
         "sinkHiddenApps": ConfigSettingDoc("boolean", "Move hidden apps to the bottom of the list instead of leaving them in place."),
+        "sinkMinimizedWindows": ConfigSettingDoc("boolean", "Move minimized windows to the bottom of the list instead of leaving them in their most-recently-used position."),
         "showWindowlessApps": ConfigSettingDoc("boolean", "Include running apps that have no open window."),
         "applicationsOnly": ConfigSettingDoc("boolean", "Show one entry per app instead of one per window."),
         "windowDrillEnabled": ConfigSettingDoc("boolean", "Peek the highlighted app's windows with ↓ while \"applications only\" is on."),
