@@ -225,7 +225,7 @@ final class AboutSettingsViewController: SettingsTabViewController {
     // MARK: - Version line
 
     private func refreshVersionLine() {
-        let text = String(localized: "v\(AppInfo.appVersion)  ·  Build \(AppInfo.appBuildNumber)")
+        let text = String(localized: "v\(AppInfo.appVersion)  ·  Build \(AppInfo.buildLabel)")
         versionInfoLine.configure(
             text: text,
             iconName: copiedVersion ? "checkmark" : "doc.on.doc",
@@ -239,7 +239,7 @@ final class AboutSettingsViewController: SettingsTabViewController {
     }
 
     private func copyVersionInfo() {
-        let versionString = "\(AppInfo.displayName) \(AppInfo.appVersion) (\(AppInfo.appBuildNumber))"
+        let versionString = "\(AppInfo.displayName) \(AppInfo.appVersion) (\(AppInfo.buildLabel))"
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(versionString, forType: .string)
 

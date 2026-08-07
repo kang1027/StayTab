@@ -519,6 +519,10 @@ build_cmd=(
 	OTHER_CODE_SIGN_FLAGS="--timestamp"
 )
 
+# Stamp the commit this build came from so About can show it next to the build
+# number (#158). Local Xcode builds leave $(GIT_COMMIT) empty and show nothing.
+build_cmd+=(GIT_COMMIT="$(git rev-parse --short HEAD)")
+
 # Beta archives ship the -beta.N suffix in CFBundleShortVersionString. Without
 # it the app reports a bare "26.7" and semver puts every "26.7-beta.N" *below*
 # the installed version, so a beta never offers the next beta (#158).
