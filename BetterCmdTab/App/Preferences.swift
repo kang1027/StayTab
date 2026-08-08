@@ -766,7 +766,6 @@ final class Preferences: ObservableObject {
         static let clickOutsideToDismiss = "Switcher.clickOutsideToDismiss"
         static let cycleTileWidths = "Switcher.cycleTileWidths"
         static let experimentalInstantSpaceSwitch = "Switcher.experimentalInstantSpaceSwitch"
-        static let experimentalBrowserTabMRU = "Switcher.experimentalBrowserTabMRU"
         static let experimentalBrowserTabPreviews = "Switcher.experimentalBrowserTabPreviews"
         /// Continuously refresh window-preview thumbnails while the panel is
         /// open, so tiles show live window contents instead of a frame captured
@@ -796,6 +795,12 @@ final class Preferences: ObservableObject {
         /// Badge each expanded browser-tab row's favicon with the source
         /// browser's app icon (#131). Default off — favicon-only stays the look.
         static let showBrowserIconOnTabs = "Switcher.showBrowserIconOnTabs"
+        /// Track each browser tab as its own MRU entry (#39). Default off — it
+        /// needs always-on AX observation of every running browser.
+        static let browserTabMRU = "Switcher.browserTabMRU"
+        /// Pre-graduation key (tab recency used to live behind the Experimental
+        /// tab); read as a fallback so a user's earlier choice carries over.
+        static let legacyBrowserTabMRU = "Switcher.experimentalBrowserTabMRU"
         static let showUnreadBadges = "Switcher.showUnreadBadges"
         /// Pre-graduation key (badges used to live behind the Experimental tab);
         /// read once at launch to carry a user's earlier choice over to the new key.
@@ -1380,10 +1385,15 @@ final class Preferences: ObservableObject {
     /// used tab, not just the previously used window. Requires always-on AX title
     /// observation of running browsers, so it's off by default — opt-in cost on a
     /// hot-path app. See `BrowserTabMRUTracker` / `BrowserTabFocusObserver`.
-    @Published var experimentalBrowserTabMRU: Bool {
+    @Published var browserTabMRU: Bool {
         didSet {
-            guard oldValue != experimentalBrowserTabMRU else { return }
-            UserDefaults.standard.set(experimentalBrowserTabMRU, forKey: Keys.experimentalBrowserTabMRU)
+            guard oldValue != browserTabMRU else { return }
+            let defaults = UserDefaults.standard
+            defaults.set(browserTabMRU, forKey: Keys.browserTabMRU)
+            // Keep the pre-graduation key in step so a downgraded build, or a
+            // second Mac on an older version sharing this config.json, reads
+            // the same value instead of silently losing the opt-in.
+            defaults.set(browserTabMRU, forKey: Keys.legacyBrowserTabMRU)
         }
     }
 
@@ -1923,6 +1933,17 @@ final class Preferences: ObservableObject {
         value <= 0 ? 0 : min(browserTabRowLimitRange.upperBound, max(browserTabRowLimitRange.lowerBound, value))
     }
 
+    /// Tab recency graduated out of the Experimental pane, so honor the new key
+    /// first and fall back to the pre-graduation one — both at launch and on
+    /// every `reloadFromDefaults`, since an imported settings file or a hand-
+    /// written `config.json` can still carry only the old key. `nonisolated` like
+    /// `storedSpaceScope` — it only reads the `defaults` it is handed.
+    nonisolated static func storedBrowserTabMRU(_ defaults: UserDefaults) -> Bool {
+        defaults.object(forKey: Keys.browserTabMRU) as? Bool
+            ?? defaults.object(forKey: Keys.legacyBrowserTabMRU) as? Bool
+            ?? false
+    }
+
     /// Pads/truncates to exactly `directActivationSlotCount` entries.
     static func normalizeBindings(_ value: [String]) -> [String] {
         var out = Array(value.prefix(directActivationSlotCount))
@@ -2045,7 +2066,7 @@ final class Preferences: ObservableObject {
         self.expandBrowserTabsAsWindows = defaults.object(forKey: Keys.expandBrowserTabsAsWindows) as? Bool ?? false
         self.browserTabRowLimit = Self.clampBrowserTabRowLimit(defaults.object(forKey: Keys.browserTabRowLimit) as? Int ?? 0)
         self.showBrowserIconOnTabs = defaults.object(forKey: Keys.showBrowserIconOnTabs) as? Bool ?? false
-        self.experimentalBrowserTabMRU = defaults.object(forKey: Keys.experimentalBrowserTabMRU) as? Bool ?? false
+        self.browserTabMRU = Self.storedBrowserTabMRU(defaults)
         self.experimentalBrowserTabPreviews = defaults.object(forKey: Keys.experimentalBrowserTabPreviews) as? Bool ?? false
         self.experimentalLivePreviews = defaults.object(forKey: Keys.experimentalLivePreviews) as? Bool ?? false
         // Badges graduated out of the Experimental tab and now default on. Honor
@@ -2196,7 +2217,7 @@ final class Preferences: ObservableObject {
         expandBrowserTabsAsWindows = defaults.object(forKey: Keys.expandBrowserTabsAsWindows) as? Bool ?? false
         browserTabRowLimit = defaults.object(forKey: Keys.browserTabRowLimit) as? Int ?? 0
         showBrowserIconOnTabs = defaults.object(forKey: Keys.showBrowserIconOnTabs) as? Bool ?? false
-        experimentalBrowserTabMRU = defaults.object(forKey: Keys.experimentalBrowserTabMRU) as? Bool ?? false
+        browserTabMRU = Self.storedBrowserTabMRU(defaults)
         experimentalBrowserTabPreviews = defaults.object(forKey: Keys.experimentalBrowserTabPreviews) as? Bool ?? false
         experimentalLivePreviews = defaults.object(forKey: Keys.experimentalLivePreviews) as? Bool ?? false
         showUnreadBadges = defaults.object(forKey: Keys.showUnreadBadges) as? Bool ?? true

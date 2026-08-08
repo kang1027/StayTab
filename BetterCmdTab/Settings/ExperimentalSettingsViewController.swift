@@ -15,7 +15,6 @@ final class ExperimentalSettingsViewController: SettingsTabViewController {
     private let sensitivitySlider = NSSlider()
     private let sensitivityValueLabel = NSTextField(labelWithString: "")
     private let instantSpaceSwitch = NSSwitch()
-    private let browserTabMRUSwitch = NSSwitch()
     private let browserTabPreviewSwitch = NSSwitch()
     private let livePreviewSwitch = NSSwitch()
 
@@ -64,13 +63,6 @@ final class ExperimentalSettingsViewController: SettingsTabViewController {
         addRow(to: spaces, title: String(localized: "Switch Spaces without animation"),
                subtitle: String(localized: "Picking an app on another Space or in full screen jumps there instantly, with no slide animation. Applies to keyboard switching too."),
                accessory: instantSpaceSwitch, searchItemID: SearchID.instantSpace)
-
-        // Browser tabs section.
-        let browserTabs = addSection(title: String(localized: "Browser tabs"), anchor: SettingsAnchor.experimentalTabs)
-        configureSwitch(browserTabMRUSwitch, action: #selector(toggleBrowserTabMRU(_:)))
-        addRow(to: browserTabs, title: String(localized: "Track browser tabs in recency"),
-               subtitle: String(localized: "With “Show browser tabs as separate entries” and the “Most recent (windows)” sort order on, ⌘Tab returns to the tab you last used, not just the last window. Needs always-on monitoring of your browsers, so it costs a little energy."),
-               accessory: browserTabMRUSwitch, searchItemID: SearchID.browserTabMRU)
 
         // Previews section (the window-preview layout).
         let previews = addSection(title: String(localized: "Previews"), anchor: SettingsAnchor.experimentalPreviews)
@@ -128,7 +120,6 @@ final class ExperimentalSettingsViewController: SettingsTabViewController {
         commitSwitch.state = prefs.swipeCommitOnRelease ? .on : .off
         applySensitivity(prefs.swipeSensitivity)
         instantSpaceSwitch.state = prefs.experimentalInstantSpaceSwitch ? .on : .off
-        browserTabMRUSwitch.state = prefs.experimentalBrowserTabMRU ? .on : .off
         browserTabPreviewSwitch.state = prefs.experimentalBrowserTabPreviews ? .on : .off
         livePreviewSwitch.state = prefs.experimentalLivePreviews ? .on : .off
         setSwipeSubOptionsEnabled(prefs.experimentalSwipeTrigger)
@@ -167,10 +158,6 @@ final class ExperimentalSettingsViewController: SettingsTabViewController {
 
     @objc private func toggleInstantSpace(_ sender: NSSwitch) {
         Preferences.shared.experimentalInstantSpaceSwitch = (sender.state == .on)
-    }
-
-    @objc private func toggleBrowserTabMRU(_ sender: NSSwitch) {
-        Preferences.shared.experimentalBrowserTabMRU = (sender.state == .on)
     }
 
     @objc private func toggleBrowserTabPreviews(_ sender: NSSwitch) {

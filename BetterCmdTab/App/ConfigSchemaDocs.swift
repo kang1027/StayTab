@@ -346,6 +346,9 @@ enum ConfigSchemaDocs {
             "integer", "Cap on tab entries per browser window. 0 = unlimited; anything else is taken as 2…16.",
             range: 0...Preferences.browserTabRowLimitRange.upperBound),
         "showBrowserIconOnTabs": ConfigSettingDoc("boolean", "Badge each browser-tab entry's favicon with the source browser's icon."),
+        "browserTabMRU": ConfigSettingDoc("boolean", "Track browser tabs in the recency order."),
+        "experimentalBrowserTabMRU": ConfigSettingDoc(
+            "boolean", "Legacy browser-tab recency flag, kept in sync with browserTabMRU for older builds. Edit browserTabMRU instead."),
 
         // Search
         "fuzzySearchEnabled": ConfigSettingDoc("boolean", "Type to filter the switcher."),
@@ -433,7 +436,6 @@ enum ConfigSchemaDocs {
             "integer", "How far fingers must slide to advance one app. Higher = more sensitive.",
             range: Preferences.swipeSensitivityRange),
         "experimentalInstantSpaceSwitch": ConfigSettingDoc("boolean", "Switch Spaces without the macOS animation."),
-        "experimentalBrowserTabMRU": ConfigSettingDoc("boolean", "Track browser tabs in the recency order."),
         "experimentalBrowserTabPreviews": ConfigSettingDoc("boolean", "Show thumbnails for browser tabs."),
         "experimentalLivePreviews": ConfigSettingDoc("boolean", "Keep window previews refreshing while the panel is open. Costs CPU/GPU."),
     ]

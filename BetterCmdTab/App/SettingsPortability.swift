@@ -223,6 +223,14 @@ extension Preferences {
         if values[Preferences.Keys.panelSize] != nil, values[Preferences.Keys.panelScalePercent] == nil {
             defaults.removeObject(forKey: Preferences.Keys.panelScalePercent)
         }
+        // A pre-graduation export carries only the experimental tab-recency key.
+        // Drop this Mac's newer key so the reload's fallback honors the imported
+        // value instead of keeping the local one. Match on a usable bool, not mere
+        // presence: a hand-written `null`/string is skipped by the plist guard
+        // above, so honoring it would drop the local key and read back `false`.
+        if values[Preferences.Keys.legacyBrowserTabMRU] as? Bool != nil, values[Preferences.Keys.browserTabMRU] == nil {
+            defaults.removeObject(forKey: Preferences.Keys.browserTabMRU)
+        }
         reloadFromDefaults()
         // The import may have introduced scoped shortcuts with ids that didn't
         // exist at launch; install their Carbon handlers now (idempotent) so a

@@ -96,6 +96,7 @@ const sections: { title: string; blurb: string; keys: string[] }[] = [
       'expandBrowserTabsAsWindows',
       'browserTabRowLimit',
       'showBrowserIconOnTabs',
+      'browserTabMRU',
     ],
   },
   {
@@ -173,7 +174,6 @@ const sections: { title: string; blurb: string; keys: string[] }[] = [
       'swipeCommitOnRelease',
       'swipeSensitivity',
       'experimentalInstantSpaceSwitch',
-      'experimentalBrowserTabMRU',
       'experimentalBrowserTabPreviews',
       'experimentalLivePreviews',
     ],
@@ -181,12 +181,13 @@ const sections: { title: string; blurb: string; keys: string[] }[] = [
   {
     title: 'Legacy',
     blurb:
-      'Superseded keys — always set the replacement named in the description instead. Only panelSize is migrated and then deleted; currentSpaceOnly and scopedShortcutScopes are still written on every change so older builds reading the same file stay consistent, so expect to see them; excludedBundleIDs and experimentalUnreadBadges are read at most once and never removed.',
+      'Superseded keys — always set the replacement named in the description instead. Only panelSize is migrated and then deleted; currentSpaceOnly, scopedShortcutScopes and experimentalBrowserTabMRU are still written on every change so older builds reading the same file stay consistent, so expect to see them; excludedBundleIDs and experimentalUnreadBadges are read as fallbacks at launch only and are never removed.',
     keys: [
       'panelSize',
       'currentSpaceOnly',
       'excludedBundleIDs',
       'experimentalUnreadBadges',
+      'experimentalBrowserTabMRU',
       'scopedShortcutScopes',
     ],
   },
@@ -218,6 +219,7 @@ const defaults: Record<string, string> = {
   backdropMaterial: '"hud"',
   backtickReversesAppSwitching: 'false',
   boldSelectedLabel: 'true',
+  browserTabMRU: 'false',
   browserTabRowLimit: '0',
   clickOutsideToDismiss: 'true',
   commitSoundName: '"Tink"',
@@ -226,7 +228,6 @@ const defaults: Record<string, string> = {
   displayMode: '"mouseCursor"',
   expandBrowserTabsAsWindows: 'false',
   expandTabsAsWindows: 'false',
-  experimentalBrowserTabMRU: 'false',
   experimentalBrowserTabPreviews: 'false',
   experimentalInstantSpaceSwitch: 'false',
   experimentalLivePreviews: 'false',

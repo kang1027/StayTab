@@ -77,7 +77,7 @@ final class SwitcherController: SwitcherViewDelegate {
     private let spaceSwipeSuppressor = SpaceSwipeSuppressor()
     private let mru = MRUTracker()
     private let windowMRU = WindowMRUTracker()
-    /// Unified tab+window recency for the experimental browser-tab-MRU mode (#39),
+    /// Unified tab+window recency for the browser-tab-MRU mode (#39),
     /// fed by `tabFocusObserver`, `handleFocusChange`, and tab/window commits.
     private let tabMRU = BrowserTabMRUTracker()
     private lazy var tabFocusObserver = BrowserTabFocusObserver(tracker: tabMRU)
@@ -676,11 +676,11 @@ final class SwitcherController: SwitcherViewDelegate {
         cache.onVisibleTitleChanged = { [weak self] in
             self?.scheduleVisibleTitleRefresh()
         }
-        // Experimental browser-tab MRU (#39): the always-on browser title observer
-        // only runs when both the feature and tab-expansion are on. Driven live from
-        // the pref pair; off by default, so a disabled feature costs nothing.
+        // Browser-tab MRU (#39): the always-on browser title observer only runs
+        // when both the feature and tab-expansion are on. Driven live from the
+        // pref pair; off by default, so a disabled feature costs nothing.
         updateBrowserTabMRUObserver()
-        Preferences.shared.$experimentalBrowserTabMRU
+        Preferences.shared.$browserTabMRU
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateBrowserTabMRUObserver() }
             .store(in: &cancellables)
@@ -3401,10 +3401,10 @@ final class SwitcherController: SwitcherViewDelegate {
         return windowMRU.sortRowsWithinAppRuns(rows)
     }
 
-    /// Whether the experimental browser-tab MRU is fully active: the feature on,
-    /// tabs expanded (not collapsed to apps), and the window-recency sort selected
-    /// (the only sort `applyBrowserTabMRU` reorders within). Read live off the main
-    /// actor like the other hot-path pref reads.
+    /// Whether the browser-tab MRU is fully active: the feature on, tabs expanded
+    /// (not collapsed to apps), and the window-recency sort selected (the only sort
+    /// `applyBrowserTabMRU` reorders within). Read live off the main actor like the
+    /// other hot-path pref reads.
     private var browserTabMRUActive: Bool {
         browserTabMRUEnabled
             // `browserTabMRUEnabled` gates the *feed* on the global pref, but a
@@ -3422,7 +3422,7 @@ final class SwitcherController: SwitcherViewDelegate {
     /// selected before that order is *consumed* — feeding under a narrower gate
     /// would leave gaps in the timeline whenever the sort momentarily differs.
     private var browserTabMRUEnabled: Bool {
-        Preferences.shared.experimentalBrowserTabMRU && Preferences.shared.expandBrowserTabsAsWindows
+        Preferences.shared.browserTabMRU && Preferences.shared.expandBrowserTabsAsWindows
     }
 
     /// Start/stop the always-on browser title observer to match the pref pair.
@@ -3436,9 +3436,9 @@ final class SwitcherController: SwitcherViewDelegate {
     /// then re-buckets status and re-pins exactly like the window sort so hidden/
     /// minimized rows still sink and pinned apps stay at the front.
     ///
-    /// When the experimental tab MRU is off, falls back to `sinkInactiveBrowserTabs`
-    /// so a browser window's tabs don't flood the front of the window-recency list
-    /// as one block (worst with single-window browsers like Arc).
+    /// When the tab MRU is off, falls back to `sinkInactiveBrowserTabs` so a browser
+    /// window's tabs don't flood the front of the window-recency list as one block
+    /// (worst with single-window browsers like Arc).
     private func applyBrowserTabMRU(_ rows: [SwitcherRow]) -> [SwitcherRow] {
         guard browserTabMRUActive else { return sinkInactiveBrowserTabs(rows) }
         let ranked = tabMRU.sortRows(rows)
@@ -4227,8 +4227,9 @@ final class SwitcherController: SwitcherViewDelegate {
     }
 
     /// Bump the unified tab+window MRU for a committed row (#39). No-op unless the
-    /// experimental mode is active. A tab row keys by (parent wid, tab title); any
-    /// other windowed row by its CGWindowID.
+    /// tab MRU is *enabled* — the feed gate, not the narrower `browserTabMRUActive`,
+    /// so the order stays warm even while another sort is selected. A tab row keys
+    /// by (parent wid, tab title); any other windowed row by its CGWindowID.
     private func bumpTabMRUIfPossible(for row: SwitcherRow) {
         guard browserTabMRUEnabled, let key = BrowserTabMRUTracker.key(for: row) else { return }
         tabMRU.bump(key)

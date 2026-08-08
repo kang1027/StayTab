@@ -41,7 +41,7 @@
 
 - **Window titles** — show each window's title under its icon in Grid and Previews.
 - **Tab drill-in** — press `\` on a row whose window has tabs to pick a specific tab (Safari, Chrome, Arc, Brave, Edge, Vivaldi, Opera, Dia, Finder, Terminal, iTerm).
-- **Tabs as rows** — optionally surface each native or browser tab as its own row, not just behind the `\` peek — with an experimental most-recently-used tab order and a clear hint when Safari/Chrome need automation permission.
+- **Tabs as rows** — optionally surface each native or browser tab as its own row, not just behind the `\` peek — with a most-recently-used tab order and a clear hint when Safari/Chrome need automation permission.
 - **Quick actions** — quit, close, minimize, maximize, hide inline.
 - **Hover actions** — quick-action buttons appear on hover: close, minimize, zoom, hide, quit, force-quit.
 - **Window management** — tile windows to halves or corners, maximize, or center with `⌃⌘` arrows; press the tile key again to cycle ½ → ⅔ → ⅓ widths.

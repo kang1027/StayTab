@@ -234,6 +234,40 @@ struct SettingsPortabilityTests {
         #expect(prefs.spaceScope == .visibleSpaces)
     }
 
+    @Test("pre-graduation tab-MRU import (legacy key only) applies through the fallback")
+    func legacyBrowserTabMRUImport() throws {
+        let prefs = Preferences.shared
+        let savedRaw = UserDefaults.standard.object(forKey: Preferences.Keys.browserTabMRU)
+        let savedLegacy = UserDefaults.standard.object(forKey: Preferences.Keys.legacyBrowserTabMRU)
+        defer {
+            // Restore both keys to their raw pre-test state — `set(nil:)` removes
+            // one this host never had. This is the only test that writes the
+            // legacy key, and leaving it planted would ride along in every later
+            // export and config.json write-back on the developer's machine.
+            UserDefaults.standard.set(savedRaw, forKey: Preferences.Keys.browserTabMRU)
+            UserDefaults.standard.set(savedLegacy, forKey: Preferences.Keys.legacyBrowserTabMRU)
+            prefs.reloadFromDefaults()
+        }
+
+        // Local state has the graduated key stored…
+        prefs.browserTabMRU = true
+        // …then a pre-graduation export carrying only the experimental key is
+        // imported. The stale local key must not shadow the imported value.
+        try prefs.importSettings(from: flat(["experimentalBrowserTabMRU": false]))
+        #expect(prefs.browserTabMRU == false)
+
+        // Same the other way round: legacy-only import turns it back on.
+        try prefs.importSettings(from: flat(["experimentalBrowserTabMRU": true]))
+        #expect(prefs.browserTabMRU == true)
+
+        // A post-graduation export carries the new key; it wins.
+        try prefs.importSettings(from: flat([
+            "browserTabMRU": false,
+            "experimentalBrowserTabMRU": true,
+        ]))
+        #expect(prefs.browserTabMRU == false)
+    }
+
     @Test("pre-#105 panel preset import replaces a local continuous scale")
     func legacyPanelScaleImport() throws {
         let prefs = Preferences.shared

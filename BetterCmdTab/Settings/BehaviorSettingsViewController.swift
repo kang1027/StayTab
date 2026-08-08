@@ -47,6 +47,7 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
     private let expandBrowserTabsSwitch = NSSwitch()
     private let browserTabLimitField = NSTextField()
     private let browserIconOnTabsSwitch = NSSwitch()
+    private let browserTabMRUSwitch = NSSwitch()
 
     // Search
     private let letterHintsSwitch = NSSwitch()
@@ -205,8 +206,9 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
                accessory: recentlyClosedLimitField, searchItemID: SearchID.recentlyClosedLimit)
 
         // Tabs section — how windows that use native system tabs (Finder,
-        // Terminal, TextEdit, …) are surfaced. Browsers (Safari/Chromium) can't
-        // expand to rows, but the `\` peek still drills their tabs.
+        // Terminal, TextEdit, …) are surfaced, plus the browser-tab rows
+        // (expansion, per-window cap, icon badge, recency) and the Apple Events
+        // consent those need. The `\` peek drills either kind.
         let tabs = addSection(title: String(localized: "Tabs"), anchor: SettingsAnchor.tabs)
         configureSwitch(tabDrillSwitch, action: #selector(toggleTabDrill(_:)))
         addRow(to: tabs, title: String(localized: "Peek tabs with \\"),
@@ -231,6 +233,10 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
         addRow(to: tabs, title: String(localized: "Show browser icon on tab entries"),
                subtitle: String(localized: "Badge each tab entry's favicon with the source browser's app icon, so you can tell which browser a tab belongs to when the same site is open in more than one."),
                accessory: browserIconOnTabsSwitch, searchItemID: SearchID.browserIconOnTabs)
+        configureSwitch(browserTabMRUSwitch, action: #selector(toggleBrowserTabMRU(_:)))
+        addRow(to: tabs, title: String(localized: "Track browser tabs in recency"),
+               subtitle: String(localized: "With “Show browser tabs as separate entries” and the “Most recent (windows)” sort order on, ⌘Tab returns to the tab you last used, not just the last window. Needs always-on monitoring of your browsers, so it costs a little energy."),
+               accessory: browserTabMRUSwitch, searchItemID: SearchID.browserTabMRU)
 
         let grantButton = NSButton(title: String(localized: "Check access…"), target: self, action: #selector(grantBrowserPermissions))
         grantButton.bezelStyle = .rounded
@@ -410,8 +416,9 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
         expandTabsSwitch.state = prefs.expandTabsAsWindows ? .on : .off
         expandBrowserTabsSwitch.state = prefs.expandBrowserTabsAsWindows ? .on : .off
         applyBrowserTabLimit(prefs.browserTabRowLimit)
-        browserTabLimitField.isEnabled = prefs.expandBrowserTabsAsWindows
         browserIconOnTabsSwitch.state = prefs.showBrowserIconOnTabs ? .on : .off
+        browserTabMRUSwitch.state = prefs.browserTabMRU ? .on : .off
+        syncBrowserTabRows()
         letterHintsSwitch.state = prefs.letterHintsEnabled ? .on : .off
         applyLetterTimeout(prefs.letterChainTimeoutMs)
         letterTimeoutSlider.isEnabled = prefs.letterHintsEnabled
@@ -493,6 +500,13 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.applyBrowserTabLimit($0) }
             .store(in: &cancellables)
+        prefs.$expandBrowserTabsAsWindows
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in
+                self?.expandBrowserTabsSwitch.state = $0 ? .on : .off
+                self?.syncBrowserTabRows()
+            }
+            .store(in: &cancellables)
     }
 
     override func viewWillDisappear() {
@@ -565,7 +579,7 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
     @objc private func toggleExpandBrowserTabs(_ sender: NSSwitch) {
         let on = (sender.state == .on)
         Preferences.shared.expandBrowserTabsAsWindows = on
-        browserTabLimitField.isEnabled = on
+        syncBrowserTabRows()
         // Listing browser tabs needs Apple Events consent; opting in while
         // Settings is foreground is the moment TCC can surface the prompt.
         if on { BrowserTabs.requestPermissionForRunningBrowsers() }
@@ -590,6 +604,10 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
 
     @objc private func toggleBrowserIconOnTabs(_ sender: NSSwitch) {
         Preferences.shared.showBrowserIconOnTabs = (sender.state == .on)
+    }
+
+    @objc private func toggleBrowserTabMRU(_ sender: NSSwitch) {
+        Preferences.shared.browserTabMRU = (sender.state == .on)
     }
 
     @objc private func grantBrowserPermissions() {
@@ -821,6 +839,17 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
         sinkHiddenRow?.alphaValue = on ? 1 : 0.45
         sinkHiddenRow?.toolTip = on ? nil
             : String(localized: "Turn on \u{201C}Show hidden apps\u{201D} above first.")
+    }
+
+    /// Both rows below the browser-tab switch are dead without it: the cap has
+    /// no rows to cap, and tab recency only reorders rows the expansion
+    /// produced — its browser observers would burn energy for no visible
+    /// effect. The prerequisite can also flip from outside this pane, so this
+    /// runs from a sink too.
+    private func syncBrowserTabRows() {
+        let on = Preferences.shared.expandBrowserTabsAsWindows
+        browserTabLimitField.isEnabled = on
+        browserTabMRUSwitch.isEnabled = on
     }
 
     /// Same gate for the minimized sink, keyed on its own prerequisite.

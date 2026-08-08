@@ -3,8 +3,8 @@ import AppKit
 import CoreGraphics
 
 /// Always-on AX observation of running browsers' active-tab changes, feeding
-/// `BrowserTabMRUTracker` so the experimental browser-tab-MRU mode can return ⌘Tab
-/// to the previously used *tab*, not just the previous window (#39).
+/// `BrowserTabMRUTracker` so the browser-tab-MRU mode can return ⌘Tab to the
+/// previously used *tab*, not just the previous window (#39).
 ///
 /// A browser tab switch makes the window's AX title flip to the new active tab,
 /// but `AppCatalogCache` deliberately DROPS `kAXTitleChangedNotification` while the

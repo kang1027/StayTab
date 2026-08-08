@@ -70,7 +70,7 @@
       },
       "legacy": {
         "title": "Przestarzałe",
-        "blurb": "Zastąpione klucze — zawsze ustawiaj zamiennik wskazany w opisie. Tylko panelSize jest migrowany, a następnie usuwany; currentSpaceOnly i scopedShortcutScopes nadal są zapisywane przy każdej zmianie, aby starsze wersje korzystające z tego samego pliku zachowały spójność. excludedBundleIDs i experimentalUnreadBadges są odczytywane najwyżej raz i nigdy nie są usuwane."
+        "blurb": "Zastąpione klucze — zawsze ustawiaj zamiennik wskazany w opisie. Tylko panelSize jest migrowany, a następnie usuwany; currentSpaceOnly, scopedShortcutScopes i experimentalBrowserTabMRU nadal są zapisywane przy każdej zmianie, aby starsze wersje korzystające z tego samego pliku zachowały spójność, więc licz się z ich obecnością w pliku. excludedBundleIDs i experimentalUnreadBadges są odczytywane jako wartości zapasowe tylko przy starcie i nigdy nie są usuwane."
       },
       "other": {
         "title": "Inne",

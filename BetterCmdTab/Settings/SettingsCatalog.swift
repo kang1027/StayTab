@@ -57,7 +57,6 @@ enum SettingsAnchor {
     static let experimental = "experimental.features"
     static let experimentalSwipe = "experimental.swipeSection"
     static let experimentalSpaces = "experimental.spaces"
-    static let experimentalTabs = "experimental.browserTabs"
     static let experimentalPreviews = "experimental.windowPreviews"
     // About
     static let about = "about.info"
@@ -104,6 +103,7 @@ enum SearchID {
     static let expandBrowserTabs = "switcher.expandBrowserTabs"
     static let browserTabLimit = "switcher.browserTabLimit"
     static let browserIconOnTabs = "switcher.browserIconOnTabs"
+    static let browserTabMRU = "switcher.browserTabMRU"
     static let tabPermissions = "switcher.tabPermissions"
     static let letterHints = "switcher.letterHints"
     static let applicationNames = "switcher.applicationNames"
@@ -150,7 +150,6 @@ enum SearchID {
     static let switchOnRelease = "experimental.switchOnRelease"
     static let sensitivity = "experimental.sensitivity"
     static let instantSpace = "experimental.instantSpace"
-    static let browserTabMRU = "experimental.browserTabMRU"
     static let browserTabPreviews = "experimental.browserTabPreviews"
     static let livePreviews = "experimental.livePreviews"
 }
@@ -320,6 +319,8 @@ enum SettingsCatalog {
              String(localized: "Browser tabs to show"), ["tabs", "tab", "browser", "limit", "cap", "max", "count", "recent", "clutter"]),
         item(SearchID.browserIconOnTabs, .switcher, SettingsAnchor.tabs, String(localized: "Behavior"), String(localized: "Tabs"),
              String(localized: "Show browser icon on tab entries"), ["tabs", "tab", "browser", "icon", "badge", "favicon", "source", "safari", "chrome", "arc", "brave", "edge"]),
+        item(SearchID.browserTabMRU, .switcher, SettingsAnchor.tabs, String(localized: "Behavior"), String(localized: "Tabs"),
+             String(localized: "Track browser tabs in recency"), ["browser", "tab", "tabs", "recent", "mru", "safari", "chrome"]),
         item(SearchID.tabPermissions, .switcher, SettingsAnchor.tabs, String(localized: "Behavior"), String(localized: "Tabs"),
              String(localized: "Browser tab access"), ["tabs", "apple events", "automation", "permission", "browser", "consent"]),
         // Switcher · Search
@@ -445,9 +446,6 @@ enum SettingsCatalog {
         // Experimental · Spaces
         item(SearchID.instantSpace, .experimental, SettingsAnchor.experimentalSpaces, String(localized: "Experimental"), String(localized: "Spaces"),
              String(localized: "Switch Spaces without animation"), ["spaces", "space", "animation", "instant", "full screen"]),
-        // Experimental · Browser tabs
-        item(SearchID.browserTabMRU, .experimental, SettingsAnchor.experimentalTabs, String(localized: "Experimental"), String(localized: "Browser tabs"),
-             String(localized: "Track browser tabs in recency"), ["browser", "tab", "tabs", "recent", "mru", "safari", "chrome"]),
         // Experimental · Previews
         item(SearchID.browserTabPreviews, .experimental, SettingsAnchor.experimentalPreviews, String(localized: "Experimental"), String(localized: "Previews"),
              String(localized: "Browser tab previews"), ["browser", "tab", "preview", "previews", "thumbnail", "safari", "chrome"]),

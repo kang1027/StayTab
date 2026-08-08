@@ -109,7 +109,7 @@ const featureGroups: Array<{ label: string; rows: Array<[string, string]> }> = [
       ["Tab drill-in", "press \\ to pick a tab from Safari, Chrome, Arc, Finder, Terminal, …"],
       [
         "Tabs as rows",
-        "surface each native or browser tab as its own row, with an experimental most-recently-used order and a hint when Safari/Chrome need automation permission",
+        "surface each native or browser tab as its own row, with a most-recently-used order and a hint when Safari/Chrome need automation permission",
       ],
     ],
   },

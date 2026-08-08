@@ -85,6 +85,10 @@
       "description" : "Show the highlighted entry's title in bold.",
       "type" : "boolean"
     },
+    "browserTabMRU" : {
+      "description" : "Track browser tabs in the recency order.",
+      "type" : "boolean"
+    },
     "browserTabRowLimit" : {
       "description" : "Cap on tab entries per browser window. 0 = unlimited; anything else is taken as 2…16.",
       "maximum" : 16,
@@ -164,7 +168,7 @@
       "type" : "boolean"
     },
     "experimentalBrowserTabMRU" : {
-      "description" : "Track browser tabs in the recency order.",
+      "description" : "Legacy browser-tab recency flag, kept in sync with browserTabMRU for older builds. Edit browserTabMRU instead.",
       "type" : "boolean"
     },
     "experimentalBrowserTabPreviews" : {
