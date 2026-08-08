@@ -427,34 +427,6 @@ enum BrowserTabs {
         for callback in waiting { callback(granted, denied) }
     }
 
-    @discardableResult
-    static func ensurePermission(bundleID: String) -> Bool {
-        guard let cString = bundleID.cString(using: .utf8) else { return false }
-        var targetDesc = AEAddressDesc()
-        let bidLen = bundleID.utf8.count
-        let status = cString.withUnsafeBufferPointer { buf -> OSStatus in
-            guard let base = buf.baseAddress else { return OSStatus(-108) /* memFullErr */ }
-            return OSStatus(AECreateDesc(
-                DescType(typeApplicationBundleID),
-                base,
-                bidLen,
-                &targetDesc
-            ))
-        }
-        guard status == noErr else { return false }
-        defer { AEDisposeDesc(&targetDesc) }
-        let permission = AEDeterminePermissionToAutomateTarget(
-            &targetDesc,
-            DescType(typeWildCard),
-            DescType(typeWildCard),
-            true  // askUserIfNeeded — surfaces the TCC prompt
-        )
-        if permission != noErr {
-            Log.activator.error("BrowserTabs: AEDeterminePermissionToAutomateTarget \(bundleID) → \(permission)")
-        }
-        return permission == noErr
-    }
-
     /// Enumerate the row window's tabs. Returns nil if the app isn't a
     /// supported browser; returns [] if the browser has fewer than 2 tabs
     /// (drill-in is only meaningful past 1). Run off-main.
