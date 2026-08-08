@@ -3769,8 +3769,17 @@ final class SwitcherController: SwitcherViewDelegate {
     private func ensureSearchExpanded() {
         guard !searchExpandedValid else { return }
         searchExpandedRows = expandBrowserTabsCore(collapsedBrowserSource())
-        searchExpandedFolded = searchExpandedRows.map {
-            (FuzzyMatch.fold($0.appName), FuzzyMatch.fold($0.windowTitle))
+        // A browser's tab rows are contiguous and all carry the same app name, so
+        // fold it once per browser instead of once per tab (measured 3.5 ms → 2.2 ms
+        // on the main actor for a browser with 1000 tabs).
+        var lastApp = ""
+        var lastFoldedApp = ""
+        searchExpandedFolded = searchExpandedRows.map { row in
+            if row.appName != lastApp {
+                lastApp = row.appName
+                lastFoldedApp = FuzzyMatch.fold(row.appName)
+            }
+            return (lastFoldedApp, FuzzyMatch.fold(row.windowTitle))
         }
         searchExpandedValid = true
     }
@@ -5533,6 +5542,31 @@ final class SwitcherController: SwitcherViewDelegate {
         baseFoldedValid = true
     }
 
+    /// Pick which matches get the `slots` display slots when the search ran over
+    /// a tab-expanded row set ("Search browser tabs"): every canonical window/app
+    /// match keeps its slot and the transient tab rows share what's left, order
+    /// preserved. Capping the merged list instead would let one browser's tabs
+    /// take every slot — a query matching 40 Chrome tabs would silently drop the
+    /// Slack row further down — since a tab row also carries its browser's app
+    /// name, so ranking doesn't save it either. A query broad enough to match
+    /// every open row leaves tabs only the slots their windows already held,
+    /// which is fine: a query that broad isn't a tab search.
+    nonisolated static func fitSearchSlots(_ matched: [Int], slots: Int, isTabRow: (Int) -> Bool) -> [Int] {
+        guard matched.count > slots else { return matched }
+        var tabBudget = matched.reduce(into: slots) { budget, idx in
+            if !isTabRow(idx) { budget -= 1 }
+        }
+        var out: [Int] = []
+        out.reserveCapacity(slots)
+        for idx in matched {
+            guard isTabRow(idx) else { out.append(idx); continue }
+            guard tabBudget > 0 else { continue }
+            tabBudget -= 1
+            out.append(idx)
+        }
+        return out
+    }
+
     /// Single funnel that derives the displayed `rows`/`labels` from the
     /// canonical `baseRows`, honoring the active mode: fuzzy-search filter,
     /// letter-prefix reorder, or plain pass-through. Selection is restored by
@@ -5566,18 +5600,7 @@ final class SwitcherController: SwitcherViewDelegate {
             // Strip + arrayize the query once per refresh (it's identical for
             // every row) so scoring a whole row set doesn't re-allocate per row.
             let preparedQuery = FuzzyMatch.prepareQuery(foldedQuery)
-            // Tab expansion can produce far more rows than there were windows. Cap
-            // the populated matches to the pre-existing slot count (`baseRows`,
-            // before expansion) so search never balloons the list — the best
-            // matches fill the slots that already existed. Unbounded otherwise.
-            let slotCap = useExpanded ? baseRows.count : Int.max
-            var newRows: [SwitcherRow] = []
-            var newLabels: [String] = []
-            newRows.reserveCapacity(srcRows.count)
-            // Labels are display-suppressed in search mode (see SwitcherView).
-            // The non-expanded path keeps its `baseLabels[idx]` (byte-identical
-            // to before); the expanded path can't index `baseLabels` (its rows
-            // don't map 1:1), so it uses "".
+            var matched: [Int] = []
             if rankBest {
                 // Score every match, then present best-first; ties keep the
                 // original (MRU/catalog) order via the index tie-break.
@@ -5589,18 +5612,31 @@ final class SwitcherController: SwitcherViewDelegate {
                     }
                 }
                 scored.sort { $0.score != $1.score ? $0.score > $1.score : $0.idx < $1.idx }
-                for entry in scored {
-                    if newRows.count >= slotCap { break }
-                    newRows.append(srcRows[entry.idx])
-                    newLabels.append(useExpanded ? "" : baseLabels[entry.idx])
-                }
+                matched = scored.map(\.idx)
             } else {
+                matched.reserveCapacity(srcRows.count)
                 for i in srcRows.indices
                 where FuzzyMatch.matchesFolded(foldedQuery: foldedQuery, foldedAppName: srcFolded[i].app, foldedWindowTitle: srcFolded[i].title) {
-                    if newRows.count >= slotCap { break }
-                    newRows.append(srcRows[i])
-                    newLabels.append(useExpanded ? "" : baseLabels[i])
+                    matched.append(i)
                 }
+            }
+            // Tab expansion can produce far more rows than there were windows, so
+            // the expanded path bounds the result to the slot count that existed
+            // before expansion — see `fitSearchSlots` for who gets those slots.
+            let ordered = useExpanded
+                ? Self.fitSearchSlots(matched, slots: baseRows.count) { srcRows[$0].browserTab != nil }
+                : matched
+            var newRows: [SwitcherRow] = []
+            var newLabels: [String] = []
+            newRows.reserveCapacity(ordered.count)
+            newLabels.reserveCapacity(ordered.count)
+            // Labels are display-suppressed in search mode (see SwitcherView).
+            // The non-expanded path keeps its `baseLabels[idx]` (byte-identical
+            // to before); the expanded path can't index `baseLabels` (its rows
+            // don't map 1:1), so it uses "".
+            for i in ordered {
+                newRows.append(srcRows[i])
+                newLabels.append(useExpanded ? "" : baseLabels[i])
             }
             // Launcher: append matching apps that aren't running yet so the user
             // can launch them from the same search. Labels are inert in search
@@ -5608,21 +5644,24 @@ final class SwitcherController: SwitcherViewDelegate {
             // aligned without affecting display.
             if Preferences.shared.searchIncludesLaunchableApps {
                 let runningBundleIDs = Set(baseRows.compactMap { $0.bundleIdentifier })
+                // `matches` cuts off in scan order, so any pre-scoring limit
+                // drops candidates by alphabet rather than by relevance. Ranking
+                // therefore scores every match and trims to 8 afterwards. A
+                // selective query already scanned the whole index at limit 8, so
+                // the ceiling is unchanged (~0.18 ms for 400 apps, measured);
+                // what this gives up is the early exit on 1–2 character queries.
                 var launchable = InstalledAppsIndex.shared.matches(
                     query: searchQuery,
                     excludingRunning: runningBundleIDs,
-                    limit: 8
+                    limit: rankBest ? Int.max : 8
                 )
                 if rankBest {
-                    // Ranks within the (already capped at 8, scan-order) launchable
-                    // set — a stronger match past the cap can still be dropped, which
-                    // is acceptable since the launcher only augments the search.
                     let scores = launchable.map {
                         FuzzyMatch.scoreFolded(preparedQuery: preparedQuery, foldedAppName: $0.foldedName, foldedWindowTitle: "") ?? Int.min
                     }
                     launchable = launchable.indices.sorted {
                         scores[$0] != scores[$1] ? scores[$0] > scores[$1] : $0 < $1
-                    }.map { launchable[$0] }
+                    }.prefix(8).map { launchable[$0] }
                 }
                 for app in launchable {
                     newRows.append(SwitcherRow(launchable: app))
