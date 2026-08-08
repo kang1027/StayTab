@@ -61,13 +61,11 @@ final class InstalledAppsIndex {
         guard !query.isEmpty else { return [] }
         let foldedQuery = FuzzyMatch.fold(query)
         var result: [InstalledApp] = []
-        var seen = Set<String>()
+        // `scan()` already deduplicates by bundle ID, so this loop doesn't have to.
         for app in apps {
             if runningBundleIDs.contains(app.bundleID) { continue }
-            if seen.contains(app.bundleID) { continue }
             if FuzzyMatch.matchesFolded(foldedQuery: foldedQuery, foldedAppName: app.foldedName, foldedWindowTitle: "") {
                 result.append(app)
-                seen.insert(app.bundleID)
                 if result.count >= limit { break }
             }
         }
