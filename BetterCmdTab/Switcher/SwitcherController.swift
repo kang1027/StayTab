@@ -1384,6 +1384,24 @@ final class SwitcherController: SwitcherViewDelegate {
         (secureInputActive || withinPostSecureWindow) && idle > visibleStrandCeiling
     }
 
+    /// Pure: may `reveal()` skip presenting and commit the primed pick outright
+    /// because the hold modifier already came up? Only for a core ⌘Tab chord open.
+    /// Gesture sessions hold no modifier, so the live flags read would always look
+    /// like a missed release. Scoped profile opens (#130) are excluded because
+    /// `commit()`'s primed branch resolves the pick from the UNSCOPED primed app
+    /// list at index 0 — the frontmost app — so committing there re-activates what
+    /// the user is already on and reads as a dead hotkey. They present instead and
+    /// let the visible release backstop commit the real, scope-filtered row.
+    /// With quick-tap stay-open (#91) a release parks the panel rather than
+    /// committing, so the post-present rescue owns it.
+    nonisolated static func shouldCommitPrimedOnMissedRelease(
+        primedByHeldChord: Bool,
+        scopedChord: Bool,
+        quickReleaseParksSticky: Bool
+    ) -> Bool {
+        primedByHeldChord && !scopedChord && !quickReleaseParksSticky
+    }
+
     /// Live check of `releaseAlreadyMissed` against the current physical modifier
     /// state (`CGEventSource.flagsState` keeps reporting under Secure Event Input).
     private func holdReleaseAlreadyMissed() -> Bool {
@@ -2960,13 +2978,14 @@ final class SwitcherController: SwitcherViewDelegate {
         // Backstop for the dropped-release race (see schedulePrimedReveal): if the
         // hold modifier came up during the primed delay and the tap missed it,
         // commit the primed pick instead of presenting a panel nothing would
-        // dismiss. Cheap — one flags read on the cold reveal path. Chord opens
-        // only: gesture sessions hold no modifier, so the live flags read would
-        // always look like a missed release and commit instantly instead of
-        // presenting their sticky panel.
-        // With quick-tap stay-open (#91) a release landing during reveal()'s
-        // own run falls through to present; the post-present rescue parks it.
-        if primedByHeldChord, holdReleaseAlreadyMissed(), !quickReleaseParksSticky {
+        // dismiss. Cheap — one flags read on the cold reveal path, taken only for
+        // the open kinds that gate allows (see the predicate's doc for why gesture,
+        // scoped and quick-tap-stay-open sessions are excluded).
+        if Self.shouldCommitPrimedOnMissedRelease(
+            primedByHeldChord: primedByHeldChord,
+            scopedChord: scopedHoldModifierMask != nil,
+            quickReleaseParksSticky: quickReleaseParksSticky
+        ), holdReleaseAlreadyMissed() {
             commit()
             return
         }

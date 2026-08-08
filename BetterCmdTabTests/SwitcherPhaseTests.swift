@@ -125,6 +125,24 @@ struct SwitcherScopedModifierReleaseTests {
         #expect(SwitcherController.scopedInitialIndex(firstRowPid: 7, frontPid: 7, count: 1) == 0)
         #expect(SwitcherController.scopedInitialIndex(firstRowPid: nil, frontPid: nil, count: 3) == 0)
     }
+
+    @Test func scopedOpensNeverTakeThePrimedMissedReleaseCommit() {
+        // A core ⌘Tab chord whose ⌘-release was dropped during the primed delay
+        // commits the primed pick outright — that pick is correct there.
+        #expect(SwitcherController.shouldCommitPrimedOnMissedRelease(
+            primedByHeldChord: true, scopedChord: false, quickReleaseParksSticky: false))
+        // A scoped profile chord must NOT (#130): the primed pick comes from the
+        // unscoped app list at index 0 — the frontmost app — so it would re-activate
+        // the app the user is already on and read as a dead hotkey. Present instead
+        // and let the visible release backstop commit the scope-filtered row.
+        #expect(!SwitcherController.shouldCommitPrimedOnMissedRelease(
+            primedByHeldChord: true, scopedChord: true, quickReleaseParksSticky: false))
+        // Gesture opens hold no modifier; quick-tap stay-open parks instead.
+        #expect(!SwitcherController.shouldCommitPrimedOnMissedRelease(
+            primedByHeldChord: false, scopedChord: false, quickReleaseParksSticky: false))
+        #expect(!SwitcherController.shouldCommitPrimedOnMissedRelease(
+            primedByHeldChord: true, scopedChord: false, quickReleaseParksSticky: true))
+    }
 }
 
 /// Pure-logic coverage for the `.visible` release-to-commit liveness backstop —
