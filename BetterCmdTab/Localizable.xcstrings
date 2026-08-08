@@ -9838,36 +9838,36 @@
         }
       }
     },
-    "Searching matches any browser tab by its title, not just each window's active tab. Matching tabs appear as temporary rows while the search field is active and disappear when you leave search. Not needed if you already use “Show browser tabs as separate entries.”" : {
+    "Searching matches any browser tab by its title, not just each window's active tab. Matching tabs appear as temporary rows while the search field is active and disappear when you leave search. Not needed if “Show browser tabs as separate entries” already lists every tab." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Suche findet jeden Browser-Tab über seinen Titel, nicht nur den aktiven Tab jedes Fensters. Passende Tabs erscheinen als vorübergehende Zeilen, solange das Suchfeld aktiv ist, und verschwinden beim Verlassen der Suche. Nicht nötig, wenn „Browser-Tabs als separate Einträge anzeigen“ bereits aktiv ist."
+            "value" : "Die Suche findet jeden Browser-Tab über seinen Titel, nicht nur den aktiven Tab jedes Fensters. Passende Tabs erscheinen als vorübergehende Zeilen, solange das Suchfeld aktiv ist, und verschwinden beim Verlassen der Suche. Nicht nötig, wenn „Browser-Tabs als separate Einträge anzeigen“ bereits alle Tabs auflistet."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La búsqueda encuentra cualquier pestaña del navegador por su título, no solo la pestaña activa de cada ventana. Las pestañas coincidentes aparecen como filas temporales mientras el campo de búsqueda está activo y desaparecen al salir de la búsqueda. No es necesario si ya usas «Mostrar las pestañas del navegador como entradas separadas»."
+            "value" : "La búsqueda encuentra cualquier pestaña del navegador por su título, no solo la pestaña activa de cada ventana. Las pestañas coincidentes aparecen como filas temporales mientras el campo de búsqueda está activo y desaparecen al salir de la búsqueda. No es necesario si «Mostrar las pestañas del navegador como entradas separadas» ya muestra todas las pestañas."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La recherche trouve n’importe quel onglet du navigateur par son titre, pas seulement l’onglet actif de chaque fenêtre. Les onglets correspondants apparaissent comme lignes temporaires tant que le champ de recherche est actif et disparaissent quand vous quittez la recherche. Inutile si vous utilisez déjà « Afficher les onglets du navigateur comme entrées distinctes »."
+            "value" : "La recherche trouve n’importe quel onglet du navigateur par son titre, pas seulement l’onglet actif de chaque fenêtre. Les onglets correspondants apparaissent comme lignes temporaires tant que le champ de recherche est actif et disparaissent quand vous quittez la recherche. Inutile si « Afficher les onglets du navigateur comme entrées distinctes » liste déjà tous les onglets."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Wyszukiwanie dopasowuje każdą kartę przeglądarki po jej tytule, nie tylko aktywną kartę każdego okna. Pasujące karty pojawiają się jako tymczasowe pozycje, gdy pole wyszukiwania jest aktywne, i znikają po wyjściu z wyszukiwania. Zbędne, jeśli używasz już „Pokazuj karty przeglądarki jako osobne pozycje”."
+            "value" : "Wyszukiwanie dopasowuje każdą kartę przeglądarki po jej tytule, nie tylko aktywną kartę każdego okna. Pasujące karty pojawiają się jako tymczasowe pozycje, gdy pole wyszukiwania jest aktywne, i znikają po wyjściu z wyszukiwania. Zbędne, jeśli „Pokazuj karty przeglądarki jako osobne pozycje” wyświetla już wszystkie karty."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "搜索会按标题匹配任意浏览器标签页，而不只是每个窗口的活动标签页。匹配的标签页在搜索框激活期间显示为临时条目，退出搜索后消失。如果已开启“将浏览器标签页显示为单独条目”，则无需此选项。"
+            "value" : "搜索会按标题匹配任意浏览器标签页，而不只是每个窗口的活动标签页。匹配的标签页在搜索框激活期间显示为临时条目，退出搜索后消失。如果“将浏览器标签页显示为单独条目”已列出所有标签页，则无需此选项。"
           }
         }
       }

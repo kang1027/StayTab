@@ -53,7 +53,9 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
     private let letterTimeoutSlider = NSSlider()
     private let letterTimeoutValueField = NSTextField()
     private let fuzzySwitch = NSSwitch()
+    private let rankResultsSwitch = NSSwitch()
     private let launcherSwitch = NSSwitch()
+    private let searchTabsSwitch = NSSwitch()
     private let searchModePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let searchDismissModes: [SearchDismissMode] = SearchDismissMode.allCases
 
@@ -271,10 +273,18 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
         addRow(to: search, title: String(localized: "Type-to-filter search"),
                subtitle: String(localized: "Press / in the switcher to filter by app or window name."),
                accessory: fuzzySwitch, searchItemID: SearchID.fuzzy)
+        configureSwitch(rankResultsSwitch, action: #selector(toggleRankResults(_:)))
+        addRow(to: search, title: String(localized: "Rank search"),
+               subtitle: String(localized: "Order results by how well they match instead of by recent use, so the closest match is selected first."),
+               accessory: rankResultsSwitch, searchItemID: SearchID.rankResults)
         configureSwitch(launcherSwitch, action: #selector(toggleLauncher(_:)))
         addRow(to: search, title: String(localized: "Launch apps from search"),
                subtitle: String(localized: "Also show matching apps that aren't running yet."),
                accessory: launcherSwitch, searchItemID: SearchID.launcher)
+        configureSwitch(searchTabsSwitch, action: #selector(toggleSearchExpandsTabs(_:)))
+        addRow(to: search, title: String(localized: "Search browser tabs"),
+               subtitle: String(localized: "Searching matches any browser tab by its title, not just each window's active tab. Matching tabs appear as temporary rows while the search field is active and disappear when you leave search. Not needed if “Show browser tabs as separate entries” already lists every tab."),
+               accessory: searchTabsSwitch, searchItemID: SearchID.searchExpandsBrowserTabs)
 
         searchModePopup.controlSize = .small
         searchModePopup.translatesAutoresizingMaskIntoConstraints = false
@@ -407,8 +417,11 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
         letterTimeoutSlider.isEnabled = prefs.letterHintsEnabled
         letterTimeoutValueField.isEnabled = prefs.letterHintsEnabled
         fuzzySwitch.state = prefs.fuzzySearchEnabled ? .on : .off
+        rankResultsSwitch.state = prefs.fuzzySearchRankBestMatchFirst ? .on : .off
         launcherSwitch.state = prefs.searchIncludesLaunchableApps ? .on : .off
+        searchTabsSwitch.state = prefs.searchExpandsBrowserTabs ? .on : .off
         selectSearchMode(prefs.searchDismissMode)
+        syncSearchOptionRows()
         stayOpenSwitch.state = prefs.stayOpenOnRelease ? .on : .off
         stayOpenQuickTapSwitch.state = prefs.stayOpenOnQuickTap ? .on : .off
         syncStayOpenQuickTapRow()
@@ -449,6 +462,13 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
             .sink { [weak self] in
                 self?.minimizedSwitch.state = $0 ? .on : .off
                 self?.syncSinkMinimizedRow()
+            }
+            .store(in: &cancellables)
+        prefs.$fuzzySearchEnabled
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in
+                self?.fuzzySwitch.state = $0 ? .on : .off
+                self?.syncSearchOptionRows()
             }
             .store(in: &cancellables)
         // Keep the sliders in sync if the values change underneath us (e.g. a
@@ -645,10 +665,35 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
 
     @objc private func toggleFuzzy(_ sender: NSSwitch) {
         Preferences.shared.fuzzySearchEnabled = (sender.state == .on)
+        syncSearchOptionRows()
+    }
+
+    /// The four rows below "Type-to-filter search" only do anything once a
+    /// search is running, and `enterSearch()` refuses to start one while
+    /// type-to-filter is off — so disable them rather than leave live-looking
+    /// dead controls.
+    private func syncSearchOptionRows() {
+        let on = Preferences.shared.fuzzySearchEnabled
+        rankResultsSwitch.isEnabled = on
+        launcherSwitch.isEnabled = on
+        searchTabsSwitch.isEnabled = on
+        searchModePopup.isEnabled = on
+    }
+
+    @objc private func toggleRankResults(_ sender: NSSwitch) {
+        Preferences.shared.fuzzySearchRankBestMatchFirst = (sender.state == .on)
     }
 
     @objc private func toggleLauncher(_ sender: NSSwitch) {
         Preferences.shared.searchIncludesLaunchableApps = (sender.state == .on)
+    }
+
+    @objc private func toggleSearchExpandsTabs(_ sender: NSSwitch) {
+        let on = (sender.state == .on)
+        Preferences.shared.searchExpandsBrowserTabs = on
+        // Searching tabs needs Apple Events consent; opting in while Settings is
+        // foreground is the moment TCC can surface the prompt.
+        if on { BrowserTabs.requestPermissionForRunningBrowsers() }
     }
 
     @objc private func toggleStayOpen(_ sender: NSSwitch) {

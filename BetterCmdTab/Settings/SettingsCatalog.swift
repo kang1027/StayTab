@@ -57,7 +57,6 @@ enum SettingsAnchor {
     static let experimental = "experimental.features"
     static let experimentalSwipe = "experimental.swipeSection"
     static let experimentalSpaces = "experimental.spaces"
-    static let experimentalSearch = "experimental.search"
     static let experimentalTabs = "experimental.browserTabs"
     static let experimentalPreviews = "experimental.windowPreviews"
     // About
@@ -110,7 +109,9 @@ enum SearchID {
     static let applicationNames = "switcher.applicationNames"
     static let windowStatusIcons = "switcher.windowStatusIcons"
     static let fuzzy = "switcher.fuzzy"
+    static let rankResults = "switcher.rankResults"
     static let launcher = "switcher.launcher"
+    static let searchExpandsBrowserTabs = "switcher.searchExpandsBrowserTabs"
     static let searchMode = "switcher.searchMode"
     static let letterChainTimeout = "switcher.letterChainTimeout"
     static let shiftTapBack = "switcher.shiftTapBack"
@@ -152,8 +153,6 @@ enum SearchID {
     static let browserTabMRU = "experimental.browserTabMRU"
     static let browserTabPreviews = "experimental.browserTabPreviews"
     static let livePreviews = "experimental.livePreviews"
-    static let rankResults = "experimental.rankResults"
-    static let searchExpandsBrowserTabs = "experimental.searchExpandsBrowserTabs"
 }
 
 @MainActor
@@ -330,8 +329,12 @@ enum SettingsCatalog {
              String(localized: "Letter chain timeout"), ["letter", "chain", "timeout", "reset", "jump", "delay", "prefix", "sequence", "expire"]),
         item(SearchID.fuzzy, .switcher, SettingsAnchor.search, String(localized: "Behavior"), String(localized: "Search"),
              String(localized: "Type-to-filter search"), ["search", "filter", "fuzzy", "type"]),
+        item(SearchID.rankResults, .switcher, SettingsAnchor.search, String(localized: "Behavior"), String(localized: "Search"),
+             String(localized: "Rank search"), ["fuzzy", "search", "ranking", "rank", "best match", "sort results", "relevance"]),
         item(SearchID.launcher, .switcher, SettingsAnchor.search, String(localized: "Behavior"), String(localized: "Search"),
              String(localized: "Launch apps from search"), ["launcher", "launch", "open app"]),
+        item(SearchID.searchExpandsBrowserTabs, .switcher, SettingsAnchor.search, String(localized: "Behavior"), String(localized: "Search"),
+             String(localized: "Search browser tabs"), ["search", "browser", "tabs", "tab", "fuzzy", "find tab", "safari", "chrome"]),
         item(SearchID.searchMode, .switcher, SettingsAnchor.search, String(localized: "Behavior"), String(localized: "Search"),
              String(localized: "When searching"), ["search mode", "hold", "stay open", "dismiss"]),
         // Behavior · Keyboard
@@ -442,11 +445,6 @@ enum SettingsCatalog {
         // Experimental · Spaces
         item(SearchID.instantSpace, .experimental, SettingsAnchor.experimentalSpaces, String(localized: "Experimental"), String(localized: "Spaces"),
              String(localized: "Switch Spaces without animation"), ["spaces", "space", "animation", "instant", "full screen"]),
-        // Experimental · Search
-        item(SearchID.rankResults, .experimental, SettingsAnchor.experimentalSearch, String(localized: "Experimental"), String(localized: "Search"),
-             String(localized: "Rank search"), ["fuzzy", "search", "ranking", "rank", "best match", "sort results", "relevance"]),
-        item(SearchID.searchExpandsBrowserTabs, .experimental, SettingsAnchor.experimentalSearch, String(localized: "Experimental"), String(localized: "Search"),
-             String(localized: "Search browser tabs"), ["search", "browser", "tabs", "tab", "fuzzy", "find tab", "safari", "chrome"]),
         // Experimental · Browser tabs
         item(SearchID.browserTabMRU, .experimental, SettingsAnchor.experimentalTabs, String(localized: "Experimental"), String(localized: "Browser tabs"),
              String(localized: "Track browser tabs in recency"), ["browser", "tab", "tabs", "recent", "mru", "safari", "chrome"]),

@@ -18,8 +18,6 @@ final class ExperimentalSettingsViewController: SettingsTabViewController {
     private let browserTabMRUSwitch = NSSwitch()
     private let browserTabPreviewSwitch = NSSwitch()
     private let livePreviewSwitch = NSSwitch()
-    private let rankResultsSwitch = NSSwitch()
-    private let searchTabsSwitch = NSSwitch()
 
     override func setupContent() {
         // Untitled intro card — the unstable warning applies to the whole tab,
@@ -74,17 +72,6 @@ final class ExperimentalSettingsViewController: SettingsTabViewController {
                subtitle: String(localized: "With “Show browser tabs as separate entries” and the “Most recent (windows)” sort order on, ⌘Tab returns to the tab you last used, not just the last window. Needs always-on monitoring of your browsers, so it costs a little energy."),
                accessory: browserTabMRUSwitch, searchItemID: SearchID.browserTabMRU)
 
-        // Search section.
-        let searchSection = addSection(title: String(localized: "Search"), anchor: SettingsAnchor.experimentalSearch)
-        configureSwitch(rankResultsSwitch, action: #selector(toggleRankResults(_:)))
-        addRow(to: searchSection, title: String(localized: "Rank search"),
-               subtitle: String(localized: "Order results by how well they match instead of by recent use, so the closest match is selected first."),
-               accessory: rankResultsSwitch, searchItemID: SearchID.rankResults)
-        configureSwitch(searchTabsSwitch, action: #selector(toggleSearchExpandsTabs(_:)))
-        addRow(to: searchSection, title: String(localized: "Search browser tabs"),
-               subtitle: String(localized: "Searching matches any browser tab by its title, not just each window's active tab. Matching tabs appear as temporary rows while the search field is active and disappear when you leave search. Not needed if you already use “Show browser tabs as separate entries.”"),
-               accessory: searchTabsSwitch, searchItemID: SearchID.searchExpandsBrowserTabs)
-
         // Previews section (the window-preview layout).
         let previews = addSection(title: String(localized: "Previews"), anchor: SettingsAnchor.experimentalPreviews)
         configureSwitch(browserTabPreviewSwitch, action: #selector(toggleBrowserTabPreviews(_:)))
@@ -95,9 +82,6 @@ final class ExperimentalSettingsViewController: SettingsTabViewController {
         addRow(to: previews, title: String(localized: "Live window previews"),
                subtitle: String(localized: "In the Previews layout, thumbnails keep refreshing while the switcher is open, so they show what is happening in each window right now. Uses extra CPU and GPU while the panel is up."),
                accessory: livePreviewSwitch, searchItemID: SearchID.livePreviews)
-        // "Show switcher on" (multi-monitor placement), the `\` tab peek + tab
-        // expansion, and the "Most recent (windows)" sort graduated to the
-        // Behavior tab once stable — see its "Display" and "Contents" sections.
     }
 
     private func configureSwitch(_ toggle: NSSwitch, action: Selector) {
@@ -147,8 +131,6 @@ final class ExperimentalSettingsViewController: SettingsTabViewController {
         browserTabMRUSwitch.state = prefs.experimentalBrowserTabMRU ? .on : .off
         browserTabPreviewSwitch.state = prefs.experimentalBrowserTabPreviews ? .on : .off
         livePreviewSwitch.state = prefs.experimentalLivePreviews ? .on : .off
-        rankResultsSwitch.state = prefs.fuzzySearchRankBestMatchFirst ? .on : .off
-        searchTabsSwitch.state = prefs.searchExpandsBrowserTabs ? .on : .off
         setSwipeSubOptionsEnabled(prefs.experimentalSwipeTrigger)
     }
 
@@ -197,14 +179,6 @@ final class ExperimentalSettingsViewController: SettingsTabViewController {
 
     @objc private func toggleLivePreviews(_ sender: NSSwitch) {
         Preferences.shared.experimentalLivePreviews = (sender.state == .on)
-    }
-
-    @objc private func toggleRankResults(_ sender: NSSwitch) {
-        Preferences.shared.fuzzySearchRankBestMatchFirst = (sender.state == .on)
-    }
-
-    @objc private func toggleSearchExpandsTabs(_ sender: NSSwitch) {
-        Preferences.shared.searchExpandsBrowserTabs = (sender.state == .on)
     }
 
     /// The reverse/commit/sensitivity controls only make sense while the swipe
