@@ -38,6 +38,7 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
     private let recentlyClosedLimitField = NSTextField()
     private let sortOrderPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let sortOrders: [SwitcherSortOrder] = SwitcherSortOrder.allCases
+    private let instantSpaceRowSwitch = NSSwitch()
 
     private let windowDrillSwitch = NSSwitch()
 
@@ -189,6 +190,10 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
         addRow(to: contents, title: String(localized: "Show windows from"),
                subtitle: String(localized: "All Spaces shows everything; Current Space only the Space you're viewing; Visible Spaces what's on screen across all your displays."),
                accessory: spaceScopePopup, searchItemID: SearchID.spaceScope)
+        configureSwitch(instantSpaceRowSwitch, action: #selector(toggleInstantSpace(_:)))
+        addRow(to: contents, title: String(localized: "Switch Spaces without animation"),
+               subtitle: String(localized: "Picking an app on another Space or in full screen jumps there instantly, with no slide animation. Applies to keyboard switching too."),
+               accessory: instantSpaceRowSwitch, searchItemID: SearchID.instantSpace)
         configurePopup(sortOrderPopup, titles: sortOrders.map(\.displayName), action: #selector(sortOrderChanged))
         addRow(to: contents, title: String(localized: "Sort order"),
                subtitle: String(localized: "Most recent keeps the classic ⌘Tab order; Most recent (windows) interleaves windows from all apps by last focus; the others stay put as you switch."),
@@ -419,6 +424,7 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
         browserIconOnTabsSwitch.state = prefs.showBrowserIconOnTabs ? .on : .off
         browserTabMRUSwitch.state = prefs.browserTabMRU ? .on : .off
         syncBrowserTabRows()
+        instantSpaceRowSwitch.state = prefs.instantSpaceSwitch ? .on : .off
         letterHintsSwitch.state = prefs.letterHintsEnabled ? .on : .off
         applyLetterTimeout(prefs.letterChainTimeoutMs)
         letterTimeoutSlider.isEnabled = prefs.letterHintsEnabled
@@ -608,6 +614,10 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
 
     @objc private func toggleBrowserTabMRU(_ sender: NSSwitch) {
         Preferences.shared.browserTabMRU = (sender.state == .on)
+    }
+
+    @objc private func toggleInstantSpace(_ sender: NSSwitch) {
+        Preferences.shared.instantSpaceSwitch = (sender.state == .on)
     }
 
     @objc private func grantBrowserPermissions() {

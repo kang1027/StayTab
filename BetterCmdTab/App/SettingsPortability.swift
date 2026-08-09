@@ -231,6 +231,10 @@ extension Preferences {
         if values[Preferences.Keys.legacyBrowserTabMRU] as? Bool != nil, values[Preferences.Keys.browserTabMRU] == nil {
             defaults.removeObject(forKey: Preferences.Keys.browserTabMRU)
         }
+        // Same for a pre-graduation instant-Space-switch export.
+        if values[Preferences.Keys.legacyInstantSpaceSwitch] as? Bool != nil, values[Preferences.Keys.instantSpaceSwitch] == nil {
+            defaults.removeObject(forKey: Preferences.Keys.instantSpaceSwitch)
+        }
         reloadFromDefaults()
         // The import may have introduced scoped shortcuts with ids that didn't
         // exist at launch; install their Carbon handlers now (idempotent) so a

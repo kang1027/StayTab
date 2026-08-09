@@ -56,7 +56,6 @@ enum SettingsAnchor {
     // Experimental
     static let experimental = "experimental.features"
     static let experimentalSwipe = "experimental.swipeSection"
-    static let experimentalSpaces = "experimental.spaces"
     static let experimentalPreviews = "experimental.windowPreviews"
     // About
     static let about = "about.info"
@@ -94,6 +93,7 @@ enum SearchID {
     static let applicationsOnly = "switcher.applicationsOnly"
     static let showBadges = "switcher.showBadges"
     static let spaceScope = "switcher.spaceScope"
+    static let instantSpace = "switcher.instantSpace"
     static let sortOrder = "switcher.sortOrder"
     static let showRecentlyClosed = "switcher.showRecentlyClosed"
     static let recentlyClosedLimit = "switcher.recentlyClosedLimit"
@@ -149,7 +149,6 @@ enum SearchID {
     static let reverseSwipe = "experimental.reverseSwipe"
     static let switchOnRelease = "experimental.switchOnRelease"
     static let sensitivity = "experimental.sensitivity"
-    static let instantSpace = "experimental.instantSpace"
     static let browserTabPreviews = "experimental.browserTabPreviews"
     static let livePreviews = "experimental.livePreviews"
 }
@@ -425,6 +424,8 @@ enum SettingsCatalog {
              String(localized: "Show unread badges"), ["badge", "unread", "dock badge", "count"]),
         item(SearchID.spaceScope, .switcher, SettingsAnchor.contents, String(localized: "Behavior"), String(localized: "Contents"),
              String(localized: "Show windows from"), ["space", "current space", "visible spaces", "desktop", "display", "monitor", "filter"]),
+        item(SearchID.instantSpace, .switcher, SettingsAnchor.contents, String(localized: "Behavior"), String(localized: "Contents"),
+             String(localized: "Switch Spaces without animation"), ["spaces", "space", "animation", "instant", "full screen"]),
         item(SearchID.sortOrder, .switcher, SettingsAnchor.contents, String(localized: "Behavior"), String(localized: "Contents"),
              String(localized: "Sort order"), ["sort", "order", "mru", "most recent", "alphabetical", "launch order", "windows", "window recency"]),
         item(SearchID.showRecentlyClosed, .switcher, SettingsAnchor.contents, String(localized: "Behavior"), String(localized: "Contents"),
@@ -443,9 +444,6 @@ enum SettingsCatalog {
              String(localized: "Switch on release"), ["release", "commit", "lift"]),
         item(SearchID.sensitivity, .experimental, SettingsAnchor.experimentalSwipe, String(localized: "Experimental"), String(localized: "Trackpad swipe"),
              String(localized: "Swipe sensitivity"), ["sensitivity", "swipe", "distance"]),
-        // Experimental · Spaces
-        item(SearchID.instantSpace, .experimental, SettingsAnchor.experimentalSpaces, String(localized: "Experimental"), String(localized: "Spaces"),
-             String(localized: "Switch Spaces without animation"), ["spaces", "space", "animation", "instant", "full screen"]),
         // Experimental · Previews
         item(SearchID.browserTabPreviews, .experimental, SettingsAnchor.experimentalPreviews, String(localized: "Experimental"), String(localized: "Previews"),
              String(localized: "Browser tab previews"), ["browser", "tab", "preview", "previews", "thumbnail", "safari", "chrome"]),

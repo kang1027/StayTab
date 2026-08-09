@@ -268,6 +268,55 @@ struct SettingsPortabilityTests {
         #expect(prefs.browserTabMRU == false)
     }
 
+    @Test("pre-graduation instant-Space import (legacy key only) applies through the fallback")
+    func legacyInstantSpaceSwitchImport() throws {
+        let prefs = Preferences.shared
+        let savedRaw = UserDefaults.standard.object(forKey: Preferences.Keys.instantSpaceSwitch)
+        let savedLegacy = UserDefaults.standard.object(forKey: Preferences.Keys.legacyInstantSpaceSwitch)
+        defer {
+            // Restore both keys to their raw pre-test state — `set(nil:)` removes
+            // one this host never had. This is the only test that writes the
+            // legacy key, and leaving it planted would ride along in every later
+            // export and config.json write-back on the developer's machine.
+            UserDefaults.standard.set(savedRaw, forKey: Preferences.Keys.instantSpaceSwitch)
+            UserDefaults.standard.set(savedLegacy, forKey: Preferences.Keys.legacyInstantSpaceSwitch)
+            prefs.reloadFromDefaults()
+        }
+
+        // Local state has the graduated key stored… (via a forced transition, so
+        // the mirroring didSet runs even on a host that already had this on).
+        prefs.instantSpaceSwitch = false
+        prefs.instantSpaceSwitch = true
+        // Every change also writes the pre-graduation key, so a downgraded build
+        // sharing this config.json keeps reading the same value.
+        #expect(UserDefaults.standard.object(forKey: Preferences.Keys.legacyInstantSpaceSwitch) as? Bool == true)
+        prefs.instantSpaceSwitch = false
+        #expect(UserDefaults.standard.object(forKey: Preferences.Keys.legacyInstantSpaceSwitch) as? Bool == false)
+        prefs.instantSpaceSwitch = true
+
+        // …then a pre-graduation export carrying only the experimental key is
+        // imported. The stale local key must not shadow the imported value.
+        try prefs.importSettings(from: flat(["experimentalInstantSpaceSwitch": false]))
+        #expect(prefs.instantSpaceSwitch == false)
+
+        try prefs.importSettings(from: flat(["experimentalInstantSpaceSwitch": true]))
+        #expect(prefs.instantSpaceSwitch == true)
+
+        // A post-graduation export carries the new key; it wins.
+        try prefs.importSettings(from: flat([
+            "instantSpaceSwitch": false,
+            "experimentalInstantSpaceSwitch": true,
+        ]))
+        #expect(prefs.instantSpaceSwitch == false)
+
+        // A hand-written legacy value that isn't a bool must not drop the
+        // graduated key: importSettings matches on `as? Bool`, not on mere
+        // presence, so the local opt-in survives instead of reading back false.
+        prefs.instantSpaceSwitch = true
+        try prefs.importSettings(from: flat(["experimentalInstantSpaceSwitch": "yes"]))
+        #expect(prefs.instantSpaceSwitch == true)
+    }
+
     @Test("pre-#105 panel preset import replaces a local continuous scale")
     func legacyPanelScaleImport() throws {
         let prefs = Preferences.shared

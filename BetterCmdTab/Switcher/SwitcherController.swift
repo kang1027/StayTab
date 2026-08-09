@@ -4276,7 +4276,7 @@ final class SwitcherController: SwitcherViewDelegate {
         tabPrefetchTimer?.invalidate()
         tabPrefetchTimer = nil
         let currentPhase = phase
-        let instantSpace = Preferences.shared.experimentalInstantSpaceSwitch
+        let instantSpace = Preferences.shared.instantSpaceSwitch
         revealGeneration &+= 1
         let commitGeneration = revealGeneration
         let finishDismiss: @MainActor @Sendable () -> Void = { [weak self] in
@@ -4918,7 +4918,7 @@ final class SwitcherController: SwitcherViewDelegate {
             commit()
             return
         }
-        let instantSpace = Preferences.shared.experimentalInstantSpaceSwitch
+        let instantSpace = Preferences.shared.instantSpaceSwitch
         if let pid = row.pid { mru.bump(pid) }
         // Window MRU follows the window the user actually lands on: for the
         // window drill that's the chosen strip entry, not the collapsed row.

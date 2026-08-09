@@ -34,7 +34,7 @@
       },
       "contents": {
         "title": "Contents",
-        "blurb": "Which apps and windows the switcher lists, and in what order."
+        "blurb": "Which apps and windows the switcher lists, in what order, and how it jumps to the one you pick."
       },
       "tabs": {
         "title": "Tabs",
@@ -70,7 +70,7 @@
       },
       "legacy": {
         "title": "Legacy",
-        "blurb": "Superseded keys — always set the replacement named in the description instead. Only panelSize is migrated and then deleted; currentSpaceOnly, scopedShortcutScopes and experimentalBrowserTabMRU are still written on every change so older builds reading the same file stay consistent, so expect to see them; excludedBundleIDs and experimentalUnreadBadges are read as fallbacks at launch only and are never removed."
+        "blurb": "Superseded keys — always set the replacement named in the description instead. Only panelSize is migrated and then deleted; currentSpaceOnly, scopedShortcutScopes, experimentalBrowserTabMRU and experimentalInstantSpaceSwitch are still written on every change so older builds reading the same file stay consistent, so expect to see them; excludedBundleIDs and experimentalUnreadBadges are read as fallbacks at launch only and are never removed."
       },
       "other": {
         "title": "Other",

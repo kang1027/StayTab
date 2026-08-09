@@ -14,7 +14,6 @@ final class ExperimentalSettingsViewController: SettingsTabViewController {
     private let commitSwitch = NSSwitch()
     private let sensitivitySlider = NSSlider()
     private let sensitivityValueLabel = NSTextField(labelWithString: "")
-    private let instantSpaceSwitch = NSSwitch()
     private let browserTabPreviewSwitch = NSSwitch()
     private let livePreviewSwitch = NSSwitch()
 
@@ -56,13 +55,6 @@ final class ExperimentalSettingsViewController: SettingsTabViewController {
         addRow(to: swipe, title: String(localized: "Swipe sensitivity"),
                subtitle: String(localized: "How far to slide to move one app. Higher means a shorter slide steps further."),
                accessory: makeSensitivityControl(), searchItemID: SearchID.sensitivity)
-
-        // Spaces section.
-        let spaces = addSection(title: String(localized: "Spaces"), anchor: SettingsAnchor.experimentalSpaces)
-        configureSwitch(instantSpaceSwitch, action: #selector(toggleInstantSpace(_:)))
-        addRow(to: spaces, title: String(localized: "Switch Spaces without animation"),
-               subtitle: String(localized: "Picking an app on another Space or in full screen jumps there instantly, with no slide animation. Applies to keyboard switching too."),
-               accessory: instantSpaceSwitch, searchItemID: SearchID.instantSpace)
 
         // Previews section (the window-preview layout).
         let previews = addSection(title: String(localized: "Previews"), anchor: SettingsAnchor.experimentalPreviews)
@@ -119,7 +111,6 @@ final class ExperimentalSettingsViewController: SettingsTabViewController {
         reverseSwitch.state = prefs.swipeReverseDirection ? .on : .off
         commitSwitch.state = prefs.swipeCommitOnRelease ? .on : .off
         applySensitivity(prefs.swipeSensitivity)
-        instantSpaceSwitch.state = prefs.experimentalInstantSpaceSwitch ? .on : .off
         browserTabPreviewSwitch.state = prefs.experimentalBrowserTabPreviews ? .on : .off
         livePreviewSwitch.state = prefs.experimentalLivePreviews ? .on : .off
         setSwipeSubOptionsEnabled(prefs.experimentalSwipeTrigger)
@@ -154,10 +145,6 @@ final class ExperimentalSettingsViewController: SettingsTabViewController {
     private func applySensitivity(_ level: Int) {
         if sensitivitySlider.integerValue != level { sensitivitySlider.integerValue = level }
         sensitivityValueLabel.stringValue = "\(level)/\(Preferences.swipeSensitivityRange.upperBound)"
-    }
-
-    @objc private func toggleInstantSpace(_ sender: NSSwitch) {
-        Preferences.shared.experimentalInstantSpaceSwitch = (sender.state == .on)
     }
 
     @objc private func toggleBrowserTabPreviews(_ sender: NSSwitch) {

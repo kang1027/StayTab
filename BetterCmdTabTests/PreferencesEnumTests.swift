@@ -76,6 +76,28 @@ struct PreferencesEnumTests {
         #expect(Preferences.storedBrowserTabMRU(defaults) == true)
     }
 
+    @Test("storedInstantSpaceSwitch prefers the graduated key, falls back to the experimental one")
+    func storedInstantSpaceSwitchMigration() throws {
+        let defaults = try #require(UserDefaults(suiteName: "storedInstantSpaceSwitchMigrationTests"))
+        defer { defaults.removePersistentDomain(forName: "storedInstantSpaceSwitchMigrationTests") }
+
+        // Fresh install: neither key → off.
+        #expect(Preferences.storedInstantSpaceSwitch(defaults) == false)
+
+        // Pre-graduation key only — an upgrade, or an import/config.json still
+        // carrying the experimental name: the choice must survive.
+        defaults.set(true, forKey: Preferences.Keys.legacyInstantSpaceSwitch)
+        #expect(Preferences.storedInstantSpaceSwitch(defaults) == true)
+
+        // The graduated key wins over a contradicting legacy one, both ways round.
+        defaults.set(false, forKey: Preferences.Keys.instantSpaceSwitch)
+        #expect(Preferences.storedInstantSpaceSwitch(defaults) == false)
+
+        defaults.set(false, forKey: Preferences.Keys.legacyInstantSpaceSwitch)
+        defaults.set(true, forKey: Preferences.Keys.instantSpaceSwitch)
+        #expect(Preferences.storedInstantSpaceSwitch(defaults) == true)
+    }
+
     @Test("panel scale clamps and migrates every legacy preset")
     func panelScaleMigration() {
         #expect(Preferences.clampPanelScalePercent(1) == 50)

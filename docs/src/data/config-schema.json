@@ -176,7 +176,7 @@
       "type" : "boolean"
     },
     "experimentalInstantSpaceSwitch" : {
-      "description" : "Switch Spaces without the macOS animation.",
+      "description" : "Legacy instant-Space-switch flag, kept in sync with instantSpaceSwitch for older builds. Edit instantSpaceSwitch instead.",
       "type" : "boolean"
     },
     "experimentalLivePreviews" : {
@@ -285,6 +285,10 @@
     },
     "hoverShowQuit" : {
       "description" : "Include \"quit\" among the hover actions.",
+      "type" : "boolean"
+    },
+    "instantSpaceSwitch" : {
+      "description" : "Switch Spaces without the macOS animation.",
       "type" : "boolean"
     },
     "layoutMode" : {

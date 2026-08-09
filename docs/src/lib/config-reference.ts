@@ -69,10 +69,11 @@ const sections: { title: string; blurb: string; keys: string[] }[] = [
   },
   {
     title: 'Contents',
-    blurb: 'Which apps and windows the switcher lists, and in what order.',
+    blurb: 'Which apps and windows the switcher lists, in what order, and how it jumps to the one you pick.',
     keys: [
       'sortOrder',
       'spaceScope',
+      'instantSpaceSwitch',
       'applicationsOnly',
       'windowDrillEnabled',
       'showMinimizedWindows',
@@ -173,7 +174,6 @@ const sections: { title: string; blurb: string; keys: string[] }[] = [
       'swipeReverseDirection',
       'swipeCommitOnRelease',
       'swipeSensitivity',
-      'experimentalInstantSpaceSwitch',
       'experimentalBrowserTabPreviews',
       'experimentalLivePreviews',
     ],
@@ -181,13 +181,14 @@ const sections: { title: string; blurb: string; keys: string[] }[] = [
   {
     title: 'Legacy',
     blurb:
-      'Superseded keys — always set the replacement named in the description instead. Only panelSize is migrated and then deleted; currentSpaceOnly, scopedShortcutScopes and experimentalBrowserTabMRU are still written on every change so older builds reading the same file stay consistent, so expect to see them; excludedBundleIDs and experimentalUnreadBadges are read as fallbacks at launch only and are never removed.',
+      'Superseded keys — always set the replacement named in the description instead. Only panelSize is migrated and then deleted; currentSpaceOnly, scopedShortcutScopes, experimentalBrowserTabMRU and experimentalInstantSpaceSwitch are still written on every change so older builds reading the same file stay consistent, so expect to see them; excludedBundleIDs and experimentalUnreadBadges are read as fallbacks at launch only and are never removed.',
     keys: [
       'panelSize',
       'currentSpaceOnly',
       'excludedBundleIDs',
       'experimentalUnreadBadges',
       'experimentalBrowserTabMRU',
+      'experimentalInstantSpaceSwitch',
       'scopedShortcutScopes',
     ],
   },
@@ -229,7 +230,6 @@ const defaults: Record<string, string> = {
   expandBrowserTabsAsWindows: 'false',
   expandTabsAsWindows: 'false',
   experimentalBrowserTabPreviews: 'false',
-  experimentalInstantSpaceSwitch: 'false',
   experimentalLivePreviews: 'false',
   experimentalSwipeTrigger: 'false',
   fontFace: '"system"',
@@ -248,6 +248,7 @@ const defaults: Record<string, string> = {
   hoverShowMaximize: 'true',
   hoverShowMinimize: 'true',
   hoverShowQuit: 'true',
+  instantSpaceSwitch: 'false',
   layoutMode: '"iconDock"',
   letterChainTimeoutMs: '1000',
   letterHintsEnabled: 'true',

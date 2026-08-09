@@ -765,7 +765,13 @@ final class Preferences: ObservableObject {
         static let scrollReverseDirection = "Switcher.scrollReverseDirection"
         static let clickOutsideToDismiss = "Switcher.clickOutsideToDismiss"
         static let cycleTileWidths = "Switcher.cycleTileWidths"
-        static let experimentalInstantSpaceSwitch = "Switcher.experimentalInstantSpaceSwitch"
+        /// Jump to another Space / full-screen window with no slide animation.
+        /// Default off — it drives the WindowServer through private SkyLight
+        /// gesture events.
+        static let instantSpaceSwitch = "Switcher.instantSpaceSwitch"
+        /// Pre-graduation key (the instant Space switch used to live behind the
+        /// Experimental tab); read as a fallback so an earlier choice carries over.
+        static let legacyInstantSpaceSwitch = "Switcher.experimentalInstantSpaceSwitch"
         static let experimentalBrowserTabPreviews = "Switcher.experimentalBrowserTabPreviews"
         /// Continuously refresh window-preview thumbnails while the panel is
         /// open, so tiles show live window contents instead of a frame captured
@@ -1372,11 +1378,16 @@ final class Preferences: ObservableObject {
 
     /// When true, committing to an app on another Space or in full screen jumps
     /// there instantly with no slide animation (private SkyLight Space APIs).
-    /// Off by default — fragile, undocumented APIs.
-    @Published var experimentalInstantSpaceSwitch: Bool {
+    /// Off by default — the animation is what macOS does out of the box.
+    @Published var instantSpaceSwitch: Bool {
         didSet {
-            guard oldValue != experimentalInstantSpaceSwitch else { return }
-            UserDefaults.standard.set(experimentalInstantSpaceSwitch, forKey: Keys.experimentalInstantSpaceSwitch)
+            guard oldValue != instantSpaceSwitch else { return }
+            let defaults = UserDefaults.standard
+            defaults.set(instantSpaceSwitch, forKey: Keys.instantSpaceSwitch)
+            // Keep the pre-graduation key in step so a downgraded build, or a
+            // second Mac on an older version sharing this config.json, reads
+            // the same value instead of silently losing the opt-in.
+            defaults.set(instantSpaceSwitch, forKey: Keys.legacyInstantSpaceSwitch)
         }
     }
 
@@ -1944,6 +1955,14 @@ final class Preferences: ObservableObject {
             ?? false
     }
 
+    /// Same graduation fallback for the instant Space switch, which moved out of
+    /// the Experimental pane.
+    nonisolated static func storedInstantSpaceSwitch(_ defaults: UserDefaults) -> Bool {
+        defaults.object(forKey: Keys.instantSpaceSwitch) as? Bool
+            ?? defaults.object(forKey: Keys.legacyInstantSpaceSwitch) as? Bool
+            ?? false
+    }
+
     /// Pads/truncates to exactly `directActivationSlotCount` entries.
     static func normalizeBindings(_ value: [String]) -> [String] {
         var out = Array(value.prefix(directActivationSlotCount))
@@ -2059,7 +2078,7 @@ final class Preferences: ObservableObject {
         self.shiftTapStepsBackward = defaults.object(forKey: Keys.shiftTapStepsBackward) as? Bool ?? true
         self.backtickReversesAppSwitching = defaults.object(forKey: Keys.backtickReversesAppSwitching) as? Bool ?? false
         self.cycleTileWidths = defaults.object(forKey: Keys.cycleTileWidths) as? Bool ?? false
-        self.experimentalInstantSpaceSwitch = defaults.object(forKey: Keys.experimentalInstantSpaceSwitch) as? Bool ?? false
+        self.instantSpaceSwitch = Self.storedInstantSpaceSwitch(defaults)
         self.tabDrillEnabled = defaults.object(forKey: Keys.tabDrillEnabled) as? Bool ?? true
         self.windowDrillEnabled = defaults.object(forKey: Keys.windowDrillEnabled) as? Bool ?? true
         self.expandTabsAsWindows = defaults.object(forKey: Keys.expandTabsAsWindows) as? Bool ?? false
@@ -2210,7 +2229,7 @@ final class Preferences: ObservableObject {
         mouseHoverSelectionEnabled = defaults.object(forKey: Keys.mouseHoverSelectionEnabled) as? Bool ?? true
         mouseClickSelectionEnabled = defaults.object(forKey: Keys.mouseClickSelectionEnabled) as? Bool ?? true
         cycleTileWidths = defaults.object(forKey: Keys.cycleTileWidths) as? Bool ?? false
-        experimentalInstantSpaceSwitch = defaults.object(forKey: Keys.experimentalInstantSpaceSwitch) as? Bool ?? false
+        instantSpaceSwitch = Self.storedInstantSpaceSwitch(defaults)
         tabDrillEnabled = defaults.object(forKey: Keys.tabDrillEnabled) as? Bool ?? true
         windowDrillEnabled = defaults.object(forKey: Keys.windowDrillEnabled) as? Bool ?? true
         expandTabsAsWindows = defaults.object(forKey: Keys.expandTabsAsWindows) as? Bool ?? false

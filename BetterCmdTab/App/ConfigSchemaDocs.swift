@@ -298,6 +298,9 @@ enum ConfigSchemaDocs {
             values: ConfigValues(SpaceScope.self, \.displayName)),
         "currentSpaceOnly": ConfigSettingDoc(
             "boolean", "Legacy \"only the current Space\" flag, kept in sync with spaceScope for older builds. Edit spaceScope instead."),
+        "instantSpaceSwitch": ConfigSettingDoc("boolean", "Switch Spaces without the macOS animation."),
+        "experimentalInstantSpaceSwitch": ConfigSettingDoc(
+            "boolean", "Legacy instant-Space-switch flag, kept in sync with instantSpaceSwitch for older builds. Edit instantSpaceSwitch instead."),
         "showMinimizedWindows": ConfigSettingDoc("boolean", "Include minimized windows."),
         "showHiddenApps": ConfigSettingDoc("boolean", "Include apps hidden with ⌘H."),
         "sinkHiddenApps": ConfigSettingDoc("boolean", "Move hidden apps to the bottom of the list instead of leaving them in place."),
@@ -435,7 +438,6 @@ enum ConfigSchemaDocs {
         "swipeSensitivity": ConfigSettingDoc(
             "integer", "How far fingers must slide to advance one app. Higher = more sensitive.",
             range: Preferences.swipeSensitivityRange),
-        "experimentalInstantSpaceSwitch": ConfigSettingDoc("boolean", "Switch Spaces without the macOS animation."),
         "experimentalBrowserTabPreviews": ConfigSettingDoc("boolean", "Show thumbnails for browser tabs."),
         "experimentalLivePreviews": ConfigSettingDoc("boolean", "Keep window previews refreshing while the panel is open. Costs CPU/GPU."),
     ]
