@@ -342,7 +342,7 @@ enum ConfigSchemaDocs {
             item: ConfigItemSchema("string", pattern: bundleIDPattern)),
 
         // Tabs
-        "tabDrillEnabled": ConfigSettingDoc("boolean", "Peek the highlighted window's tabs with \\."),
+        "tabDrillEnabled": ConfigSettingDoc("boolean", "Peek the highlighted window's tabs with the Peek tabs key."),
         "expandTabsAsWindows": ConfigSettingDoc("boolean", "List native system tabs (Finder, Terminal, TextEdit, …) as separate entries."),
         "expandBrowserTabsAsWindows": ConfigSettingDoc("boolean", "List browser tabs (Safari, Chromium) as separate entries."),
         "browserTabRowLimit": ConfigSettingDoc(

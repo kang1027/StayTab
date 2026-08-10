@@ -913,7 +913,7 @@
       "type" : "integer"
     },
     "tabDrillEnabled" : {
-      "description" : "Peek the highlighted window's tabs with \\.",
+      "description" : "Peek the highlighted window's tabs with the Peek tabs key.",
       "type" : "boolean"
     },
     "titleRefreshIntervalMs" : {

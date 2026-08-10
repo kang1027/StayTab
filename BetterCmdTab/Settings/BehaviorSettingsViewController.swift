@@ -1,5 +1,6 @@
 import AppKit
 import BetterSettings
+import BetterShortcuts
 import Combine
 
 /// Behavior pane (tab id stays "switcher" so saved tab selection survives) —
@@ -44,6 +45,8 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
 
     // Tabs
     private let tabDrillSwitch = NSSwitch()
+    /// Kept so `viewWillAppear` can re-render the subtitle after a rebind.
+    private var tabDrillRow: SettingsRowView?
     private let expandTabsSwitch = NSSwitch()
     private let expandBrowserTabsSwitch = NSSwitch()
     private let browserTabLimitField = NSTextField()
@@ -213,19 +216,19 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
         // Tabs section — how windows that use native system tabs (Finder,
         // Terminal, TextEdit, …) are surfaced, plus the browser-tab rows
         // (expansion, per-window cap, icon badge, recency) and the Apple Events
-        // consent those need. The `\` peek drills either kind.
+        // consent those need. The Peek tabs key drills either kind.
         let tabs = addSection(title: String(localized: "Tabs"), anchor: SettingsAnchor.tabs)
         configureSwitch(tabDrillSwitch, action: #selector(toggleTabDrill(_:)))
-        addRow(to: tabs, title: String(localized: "Peek tabs with \\"),
-               subtitle: String(localized: "Press \\ on a window that has tabs to reveal a strip below the switcher and pick a tab. Native tabs use Accessibility; browsers use Apple Events."),
-               accessory: tabDrillSwitch, searchItemID: SearchID.tabDrill)
+        tabDrillRow = addRow(to: tabs, title: String(localized: "Peek tabs"),
+                             subtitle: Self.tabDrillSubtitle(),
+                             accessory: tabDrillSwitch, searchItemID: SearchID.tabDrill)
         configureSwitch(expandTabsSwitch, action: #selector(toggleExpandTabs(_:)))
         addRow(to: tabs, title: String(localized: "Show tabs as separate entries"),
-               subtitle: String(localized: "List each tab of a native-tab window (Finder, Terminal, TextEdit, …) as its own row instead of one collapsed window. Off keeps one row per window — peek its tabs with \\."),
+               subtitle: String(localized: "List each tab of a native-tab window (Finder, Terminal, TextEdit, …) as its own row instead of one collapsed window. Off keeps one row per window — peek its tabs instead."),
                accessory: expandTabsSwitch, searchItemID: SearchID.expandTabs)
         configureSwitch(expandBrowserTabsSwitch, action: #selector(toggleExpandBrowserTabs(_:)))
         addRow(to: tabs, title: String(localized: "Show browser tabs as separate entries"),
-               subtitle: String(localized: "List each tab of a browser window (Safari, Chrome, Arc, Brave, Edge, …) as its own row alongside the other windows, instead of one collapsed window. Needs Apple Events access (below); off keeps one row per window — peek its tabs with \\."),
+               subtitle: String(localized: "List each tab of a browser window (Safari, Chrome, Arc, Brave, Edge, …) as its own row alongside the other windows, instead of one collapsed window. Needs Apple Events access (below); off keeps one row per window — peek its tabs instead."),
                accessory: expandBrowserTabsSwitch, searchItemID: SearchID.expandBrowserTabs)
         let browserTabLimitTitle = String(localized: "Browser tabs to show")
         configureIntegerField(browserTabLimitField,
@@ -417,6 +420,7 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
         applyRecentlyClosedLimit(prefs.recentlyClosedLimit)
         recentlyClosedLimitField.isEnabled = prefs.showRecentlyClosed
         tabDrillSwitch.state = prefs.tabDrillEnabled ? .on : .off
+        tabDrillRow?.update(subtitle: Self.tabDrillSubtitle())
         windowDrillSwitch.state = prefs.windowDrillEnabled ? .on : .off
         expandTabsSwitch.state = prefs.expandTabsAsWindows ? .on : .off
         expandBrowserTabsSwitch.state = prefs.expandBrowserTabsAsWindows ? .on : .off
@@ -568,6 +572,14 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
         if Int(titleRefreshSlider.intValue) != ms { titleRefreshSlider.integerValue = ms }
         let value = String(ms)
         if titleRefreshValueField.stringValue != value { titleRefreshValueField.stringValue = value }
+    }
+
+    /// Names the bound chord so the copy survives a rebind. Every profile has its
+    /// own binding but this row is global, so it shows the ⌘Tab one.
+    private static func tabDrillSubtitle() -> String {
+        let chord = BetterShortcuts.getShortcut(for: .panelTabDrill(for: SwitchTarget.switchApps.storageKey))?.description
+            ?? String(localized: "the Peek tabs key")
+        return String(localized: "Press \(chord) to pick a tab from a strip below the switcher. Native tabs use Accessibility; browsers use Apple Events.")
     }
 
     @objc private func toggleTabDrill(_ sender: NSSwitch) {

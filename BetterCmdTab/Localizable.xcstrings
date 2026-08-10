@@ -6024,70 +6024,70 @@
         }
       }
     },
-    "List each tab of a browser window (Safari, Chrome, Arc, Brave, Edge, …) as its own row alongside the other windows, instead of one collapsed window. Needs Apple Events access (below); off keeps one row per window — peek its tabs with \\." : {
+    "List each tab of a browser window (Safari, Chrome, Arc, Brave, Edge, …) as its own row alongside the other windows, instead of one collapsed window. Needs Apple Events access (below); off keeps one row per window — peek its tabs instead." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Listet jeden Tab eines Browserfensters (Safari, Chrome, Arc, Brave, Edge, …) als eigene Zeile neben den anderen Fenstern auf, statt eines zusammengefassten Fensters. Erfordert Apple-Events-Zugriff (unten); aus zeigt eine Zeile pro Fenster — Tabs mit \\ einblenden."
+            "value" : "Listet jeden Tab eines Browserfensters (Safari, Chrome, Arc, Brave, Edge, …) als eigene Zeile neben den anderen Fenstern auf, statt eines zusammengefassten Fensters. Erfordert Apple-Events-Zugriff (unten); aus zeigt eine Zeile pro Fenster — Tabs stattdessen einblenden."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Muestra cada pestaña de una ventana del navegador (Safari, Chrome, Arc, Brave, Edge, …) como su propia fila junto a las demás ventanas, en lugar de una ventana contraída. Necesita acceso a Apple Events (abajo); desactivado mantiene una fila por ventana — muestra sus pestañas con \\."
+            "value" : "Muestra cada pestaña de una ventana del navegador (Safari, Chrome, Arc, Brave, Edge, …) como su propia fila junto a las demás ventanas, en lugar de una ventana contraída. Necesita acceso a Apple Events (abajo); desactivado mantiene una fila por ventana — muestra sus pestañas en su lugar."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Affiche chaque onglet d’une fenêtre de navigateur (Safari, Chrome, Arc, Brave, Edge, …) sur sa propre ligne, aux côtés des autres fenêtres, au lieu d’une seule fenêtre regroupée. Nécessite l’accès Apple Events (ci-dessous) ; désactivé, garde une ligne par fenêtre — affichez ses onglets avec \\."
+            "value" : "Affiche chaque onglet d’une fenêtre de navigateur (Safari, Chrome, Arc, Brave, Edge, …) sur sa propre ligne, aux côtés des autres fenêtres, au lieu d’une seule fenêtre regroupée. Nécessite l’accès Apple Events (ci-dessous) ; désactivé, garde une ligne par fenêtre — affichez plutôt ses onglets."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pokazuje każdą kartę okna przeglądarki (Safari, Chrome, Arc, Brave, Edge, …) jako osobny wiersz obok pozostałych okien, zamiast jednego zwiniętego okna. Wymaga dostępu Apple Events (poniżej); wyłączone zachowuje jeden wiersz na okno — podejrzyj jego karty klawiszem \\."
+            "value" : "Pokazuje każdą kartę okna przeglądarki (Safari, Chrome, Arc, Brave, Edge, …) jako osobny wiersz obok pozostałych okien, zamiast jednego zwiniętego okna. Wymaga dostępu Apple Events (poniżej); wyłączone zachowuje jeden wiersz na okno — zamiast tego podejrzyj jego karty."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将浏览器窗口（Safari、Chrome、Arc、Brave、Edge…）的每个标签页作为独立行显示，而不是折叠成一个窗口。需要下方的 Apple Events 权限；关闭时每个窗口保留一行 — 可用 \\ 查看其标签页。"
+            "value" : "将浏览器窗口（Safari、Chrome、Arc、Brave、Edge…）的每个标签页作为独立行显示，而不是折叠成一个窗口。需要下方的 Apple Events 权限；关闭时每个窗口保留一行 — 可改为预览其标签页。"
           }
         }
       }
     },
-    "List each tab of a native-tab window (Finder, Terminal, TextEdit, …) as its own row instead of one collapsed window. Off keeps one row per window — peek its tabs with \\." : {
+    "List each tab of a native-tab window (Finder, Terminal, TextEdit, …) as its own row instead of one collapsed window. Off keeps one row per window — peek its tabs instead." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Listet jeden Tab eines Fensters mit nativen Tabs (Finder, Terminal, TextEdit, …) als eigene Zeile auf, statt eines zusammengefassten Fensters. Aus zeigt eine Zeile pro Fenster — Tabs mit \\ einblenden."
+            "value" : "Listet jeden Tab eines Fensters mit nativen Tabs (Finder, Terminal, TextEdit, …) als eigene Zeile auf, statt eines zusammengefassten Fensters. Aus zeigt eine Zeile pro Fenster — Tabs stattdessen einblenden."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Muestra cada pestaña de una ventana con pestañas nativas (Finder, Terminal, TextEdit, …) como su propia fila, en lugar de una ventana contraída. Desactivado mantiene una fila por ventana — muestra sus pestañas con \\."
+            "value" : "Muestra cada pestaña de una ventana con pestañas nativas (Finder, Terminal, TextEdit, …) como su propia fila, en lugar de una ventana contraída. Desactivado mantiene una fila por ventana — muestra sus pestañas en su lugar."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Affiche chaque onglet d’une fenêtre à onglets natifs (Finder, Terminal, TextEdit, …) sur sa propre ligne, au lieu d’une seule fenêtre regroupée. Désactivé, garde une ligne par fenêtre — affichez ses onglets avec \\."
+            "value" : "Affiche chaque onglet d’une fenêtre à onglets natifs (Finder, Terminal, TextEdit, …) sur sa propre ligne, au lieu d’une seule fenêtre regroupée. Désactivé, garde une ligne par fenêtre — affichez plutôt ses onglets."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pokazuje każdą kartę okna z natywnymi kartami (Finder, Terminal, TextEdit, …) jako osobny wiersz, zamiast jednego zwiniętego okna. Wyłączone zachowuje jeden wiersz na okno — podejrzyj jego karty klawiszem \\."
+            "value" : "Pokazuje każdą kartę okna z natywnymi kartami (Finder, Terminal, TextEdit, …) jako osobny wiersz, zamiast jednego zwiniętego okna. Wyłączone zachowuje jeden wiersz na okno — zamiast tego podejrzyj jego karty."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将原生标签页窗口（Finder、终端、文本编辑…）的每个标签页作为独立行显示，而不是折叠成一个窗口。关闭时每个窗口保留一行 — 可用 \\ 查看其标签页。"
+            "value" : "将原生标签页窗口（Finder、终端、文本编辑…）的每个标签页作为独立行显示，而不是折叠成一个窗口。关闭时每个窗口保留一行 — 可改为预览其标签页。"
           }
         }
       }
@@ -7862,40 +7862,6 @@
         }
       }
     },
-    "Peek tabs with \\" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tabs mit \\ einblenden"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ver pestañas con \\"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Afficher les onglets avec \\"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Podejrzyj karty klawiszem \\"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "用 \\ 查看标签页"
-          }
-        }
-      }
-    },
     "Peek windows with ↓" : {
       "localizations" : {
         "de" : {
@@ -8304,6 +8270,40 @@
         }
       }
     },
+    "Press %@ to pick a tab from a strip below the switcher. Native tabs use Accessibility; browsers use Apple Events." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drücke %@, um einen Tab aus der Leiste unter dem Umschalter auszuwählen. Native Tabs nutzen die Bedienungshilfen, Browser nutzen Apple Events."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pulsa %@ para elegir una pestaña en la franja bajo el selector. Las pestañas nativas usan Accesibilidad; los navegadores usan Apple Events."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appuyez sur %@ pour choisir un onglet dans la bande sous le sélecteur. Les onglets natifs utilisent l’Accessibilité ; les navigateurs utilisent Apple Events."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Naciśnij %@, aby wybrać kartę z paska pod przełącznikiem. Natywne karty używają Dostępności, a przeglądarki — Apple Events."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按 %@ 在切换器下方的标签条中选择标签页。原生标签页使用辅助功能；浏览器使用 Apple Events。"
+          }
+        }
+      }
+    },
     "Press / in the switcher to filter by app or window name." : {
       "localizations" : {
         "de" : {
@@ -8368,40 +8368,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "再次按“平铺到左侧/右侧”可让窗口在该侧的 ½ → ⅔ → ⅓ 屏幕宽度之间切换。"
-          }
-        }
-      }
-    },
-    "Press \\ on a window that has tabs to reveal a strip below the switcher and pick a tab. Native tabs use Accessibility; browsers use Apple Events." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Drücke \\ bei einem Fenster mit Tabs, um eine Leiste unter dem Umschalter einzublenden und einen Tab auszuwählen. Native Tabs nutzen die Bedienungshilfen, Browser nutzen Apple Events."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pulsa \\ en una ventana con pestañas para mostrar una franja bajo el selector y elegir una pestaña. Las pestañas nativas usan Accesibilidad; los navegadores usan Apple Events."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Appuyez sur \\ sur une fenêtre comportant des onglets pour afficher une bande sous le sélecteur et choisir un onglet. Les onglets natifs utilisent l’Accessibilité ; les navigateurs utilisent Apple Events."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Naciśnij \\ na oknie z kartami, aby wyświetlić pasek pod przełącznikiem i wybrać kartę. Natywne karty używają Dostępności, a przeglądarki — Apple Events."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在有标签页的窗口上按 \\，会在切换器下方显示标签条并选择标签页。原生标签页使用辅助功能；浏览器使用 Apple Events。"
           }
         }
       }
@@ -13676,6 +13642,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "缩放窗口"
+          }
+        }
+      }
+    },
+    "the Peek tabs key" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "die Taste „Tabs anzeigen“"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "la tecla Ver pestañas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "la touche Aperçu des onglets"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "klawisz Podejrzyj karty"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“预览标签页”快捷键"
           }
         }
       }

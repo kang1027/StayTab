@@ -309,7 +309,7 @@ enum SettingsCatalog {
              String(localized: "Title refresh delay"), ["title", "refresh", "update", "interval", "window title", "live titles", "debounce"]),
         // Switcher · Tabs
         item(SearchID.tabDrill, .switcher, SettingsAnchor.tabs, String(localized: "Behavior"), String(localized: "Tabs"),
-             String(localized: "Peek tabs with \\"), ["tabs", "tab", "drill", "peek", "backslash", "finder tabs", "browser tabs", "safari", "chrome"]),
+             String(localized: "Peek tabs"), ["tabs", "tab", "drill", "peek", "backslash", "finder tabs", "browser tabs", "safari", "chrome"]),
         item(SearchID.expandTabs, .switcher, SettingsAnchor.tabs, String(localized: "Behavior"), String(localized: "Tabs"),
              String(localized: "Show tabs as separate entries"), ["tabs", "tab", "expand", "separate", "rows", "per tab", "finder", "terminal", "native tabs"]),
         item(SearchID.expandBrowserTabs, .switcher, SettingsAnchor.tabs, String(localized: "Behavior"), String(localized: "Tabs"),
