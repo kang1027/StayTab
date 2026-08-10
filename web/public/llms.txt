@@ -1,0 +1,46 @@
+# BetterCmdTab
+
+> A fast, native ⌘Tab replacement for macOS: a window switcher and app launcher with list, grid, and live window-preview layouts, fuzzy search that also launches any installed app, window cycling, browser-tab drill-in, and window tiling. Free forever, open-source (GPL v3), zero telemetry.
+
+- **Platform:** macOS 13.0 or later, Apple Silicon and Intel. The Liquid Glass material lights up on macOS 26.
+- **Kind of app:** native AppKit menu-bar agent — no Dock icon, no Electron, no SwiftUI, no bundled runtime.
+- **Price:** free, no paid tier, no subscription, no paywalled features.
+- **Privacy:** no telemetry, no analytics, no background network. The only network call is an opt-in update check against GitHub Releases.
+- **Permissions:** Accessibility is required (the switcher does not boot without it — that is the usual cause of "⌘Tab does nothing"). Listing *browser* tabs additionally needs Automation consent per browser; native tabs (Finder, Terminal, TextEdit) do not.
+- **Install:** `brew install --cask bettercmdtab` (prereleases: `brew install --cask bettercmdtab@beta`), or the signed and notarized `.dmg` from GitHub Releases.
+- **Author:** rokartur. Source: https://github.com/rokartur/BetterCmdTab
+
+## What it does
+
+- Three layouts: vertical list, grid of icons, and live window previews, with window titles under each entry.
+- Tap ⌘Tab to switch instantly, or hold ⌘ to open the panel; scroll wheel and three-finger trackpad gestures also move the selection.
+- Fuzzy search (`/`) across open windows *and* every installed app, so the switcher doubles as a launcher.
+- Letter-prefix jump, `\` to drill into Safari/Chrome/Arc/Finder/Terminal tabs, `↓` to peek an app's windows.
+- `` ⌘` `` cycles the front app's windows; scoped shortcuts target all windows, the current Space, the current app, or minimized windows.
+- Inline actions on the highlighted entry: close, minimize, hide, maximize, quit, force-quit; plus reopen recently closed apps.
+- Window management: tile to halves and corners, maximize, center, move to the next display.
+- Per-app global hotkeys to focus or launch an app without opening the panel.
+- Pin favorites, hide apps, per-app ⌘Tab rules, sort by recents / alphabetically / launch order.
+- Unread Dock badge counts, audio-playing indicator, current-Space-only filtering, multi-monitor aware (opens under the cursor).
+- Keeps working while a password field holds Secure Event Input, where an event tap alone goes deaf.
+- Hide the switcher from screen sharing and recordings; theming and accent color; export/import the whole setup as a file, or drive it from `~/.config/bettercmdtab/config.json`.
+
+## How it compares
+
+The built-in ⌘Tab only cycles apps — no windows, no search, no previews. AltTab is free at its core but keeps search, extra layouts, and multiple shortcuts behind a paid Pro tier. BetterCmdTab ships all of it free and open-source, with no paywall and no telemetry.
+
+## Docs
+
+- [Quick start](https://bettercmdtab.app/docs/): install, Accessibility and Automation permissions, default keys.
+- [Configuration](https://bettercmdtab.app/docs/configuration/): every setting, the config file, and the settings panes.
+- [Config reference](https://bettercmdtab.app/docs/config-reference/): the full `config.json` key list.
+- [App rules](https://bettercmdtab.app/docs/app-rules/): pins, hidden apps, and per-app ⌘Tab behavior.
+- [Overrides](https://bettercmdtab.app/docs/overrides/): per-app exceptions to the global switcher rules.
+- [Contributing](https://bettercmdtab.app/docs/contributing/): build, test, and release the app.
+- Polish translations live under `https://bettercmdtab.app/docs/pl/…`.
+
+## Optional
+
+- [Full docs as one file](https://bettercmdtab.app/docs/llms-full.txt): every documentation page concatenated as plain text.
+- [Docs index](https://bettercmdtab.app/docs/llms.txt): the same page list, generated from the docs source.
+- [Releases](https://github.com/rokartur/BetterCmdTab/releases): download links and changelogs.
