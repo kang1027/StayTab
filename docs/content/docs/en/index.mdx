@@ -71,13 +71,11 @@ Native tabs (Finder, Terminal, TextEdit) use Accessibility and need nothing extr
 | Commit and switch | Release `⌘` |
 | Switch without showing the panel | Tap `⌘Tab` quickly |
 | Cycle the front app's windows | `` ⌘` `` |
-| Search | `/`, then type |
 | Jump to an entry | Type the letter shown on it |
-| Peek a window's tabs | `\` |
 | Peek an app's windows | `↓` (see below) |
 | Cancel | `Esc` |
 
-These act on the highlighted entry. All of them are rebindable per profile under
+These act while the switcher is open. All of them are rebindable per profile under
 **Settings → Profiles**; the shipped defaults are:
 
 | Action | Keys |
@@ -88,6 +86,11 @@ These act on the highlighted entry. All of them are rebindable per profile under
 | Quit the app | `⌘Q` |
 | Force quit the app | `⌘⌥Q` |
 | Full screen | `⌘F` |
+| Search | `/`, then type |
+| Peek a window's tabs | `\` |
+
+`⌘` is held the whole time the panel is up, so only the key you record matters —
+the modifier is ignored in-panel. Clearing a recorder turns that key off.
 
 `↓` only drills into an app's windows where it would otherwise do nothing useful — the
 grid and window-preview layouts while the panel is a single row. In the list layout,

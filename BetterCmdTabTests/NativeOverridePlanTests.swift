@@ -233,11 +233,12 @@ struct NativeOverridePlanTests {
                                              searchActive: true,
                                              panelActions: Self.panelActions)
         #expect(Self.has(plan, 1, .searchChar))           // S typed into the query
-        #expect(Self.has(plan, 42, .searchChar))          // backslash is a query char in search
         #expect(Self.has(plan, 51, .searchBackspace))     // Delete
-        #expect(Self.has(plan, 44, .toggleSearch))        // ⌘/ exits search
+        #expect(Self.kinds(plan, 44) == [.toggleSearch])  // ⌘/ exits search, never types
         #expect(!plan.carbonChords.contains { $0.kind == .letterJump })
-        #expect(!plan.carbonChords.contains { $0.kind == .enterTabDrill })
+        // The tab-drill key drills in from search too, matching the tap, where the
+        // drill check precedes the search branch — so `\` is never a query char.
+        #expect(Self.kinds(plan, 42) == [.enterTabDrill])
         // No panel-action chords in search (W typed, not "close").
         #expect(!plan.carbonChords.contains { $0.kind == .close })
         // ⌘/ stays toggle-search, never a search char (dedupe / no overlap).
@@ -404,6 +405,67 @@ struct NativeOverridePlanTests {
         #expect(plan.symbolicKeysToDisable == [1, 2, 6])
         #expect(plan.carbonChords.contains(ChordSpec(keyCode: 10, modifiers: Self.cmd, kind: .nextWindow)))
         #expect(plan.carbonChords.contains(ChordSpec(keyCode: 50, modifiers: Self.cmd, kind: .nextWindow)))
+    }
+
+    // MARK: Rebindable search / tab-drill keys (#169)
+
+    @Test func reboundSearchAndDrillKeys_replaceSlashAndBackslash() {
+        // Search on `-` (27), drill on `=` (24): the plan follows the binding and
+        // the shipped `/` and `\` keycodes lose their panel meaning entirely.
+        let plan = computeNativeOverridePlan(trigger: Self.native(), secureInputActive: true,
+                                             panelOpen: true, holdModifierDown: true,
+                                             panelActions: Self.panelActions,
+                                             searchKeyCode: 27, tabDrillKeyCode: 24)
+        #expect(Self.has(plan, 27, .toggleSearch))
+        #expect(Self.has(plan, 24, .enterTabDrill))
+        #expect(Self.kinds(plan, 44).isEmpty)
+        #expect(Self.kinds(plan, 42).isEmpty)
+    }
+
+    @Test func reboundSearchKey_isNeverTypedIntoTheQuery() {
+        // Both replacements sit in `searchPunctuationKeyCodes`; first-wins dedupe
+        // must keep them as mode toggles instead of query characters.
+        let plan = computeNativeOverridePlan(trigger: Self.native(), secureInputActive: true,
+                                             panelOpen: true, holdModifierDown: true,
+                                             searchActive: true,
+                                             panelActions: Self.panelActions,
+                                             searchKeyCode: 27, tabDrillKeyCode: 24)
+        #expect(Self.kinds(plan, 27) == [.toggleSearch])
+        #expect(Self.kinds(plan, 24) == [.enterTabDrill])
+        // The vacated defaults are ordinary query characters again, so a user who
+        // moved search off `/` can type `/` and `\` into the query.
+        #expect(Self.kinds(plan, 42) == [.searchChar])
+        #expect(Self.kinds(plan, 44) == [.searchChar])
+    }
+
+    @Test func reboundDrillKey_exitsTheDrill() {
+        let plan = computeNativeOverridePlan(trigger: Self.native(), secureInputActive: true,
+                                             panelOpen: true, holdModifierDown: true,
+                                             tabDrillActive: true,
+                                             panelActions: Self.panelActions,
+                                             searchKeyCode: 27, tabDrillKeyCode: 24)
+        #expect(Self.has(plan, 24, .exitTabDrill))
+        #expect(Self.has(plan, 53, .exitTabDrill))        // Esc always works
+        #expect(Self.kinds(plan, 42).isEmpty)
+    }
+
+    @Test func clearedRecorders_disableBothKeys() {
+        // A cleared recorder resolves to nil, which must register nothing rather
+        // than falling back to the shipped keycode.
+        let plan = computeNativeOverridePlan(trigger: Self.native(), secureInputActive: true,
+                                             panelOpen: true, holdModifierDown: true,
+                                             panelActions: Self.panelActions,
+                                             searchKeyCode: nil, tabDrillKeyCode: nil)
+        #expect(!plan.carbonChords.contains { $0.kind == .toggleSearch })
+        #expect(!plan.carbonChords.contains { $0.kind == .enterTabDrill })
+        // Esc still leaves a drill even with no drill key bound.
+        let drilled = computeNativeOverridePlan(trigger: Self.native(), secureInputActive: true,
+                                                panelOpen: true, holdModifierDown: true,
+                                                tabDrillActive: true,
+                                                panelActions: Self.panelActions,
+                                                searchKeyCode: nil, tabDrillKeyCode: nil)
+        #expect(Self.has(drilled, 53, .exitTabDrill))
+        #expect(!drilled.carbonChords.contains { $0.keyCode == 42 })
     }
 
     @Test func remappedToOption_onReservedKeycode_freesNothing() {

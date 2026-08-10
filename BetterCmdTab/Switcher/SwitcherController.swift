@@ -394,9 +394,12 @@ final class SwitcherController: SwitcherViewDelegate {
     /// tap. Set per trigger; read by `panelActionSpecs` (secure-input native path).
     /// Defaults to `.switchApps` — the profile the gesture-opened apps switcher uses.
     private var activeTarget: SwitchTarget = .switchApps
-    /// Last keycode→action map pushed to the tap, so an unchanged push (the common
-    /// case) skips the cross-thread lock write.
+    /// Last keycode→action map and search / tab-drill keycodes pushed to the tap,
+    /// so an unchanged push (the common case) skips the cross-thread lock write.
     private var lastPanelKeyMap: [Int64: HotkeyTap.PanelActionKey] = [:]
+    /// `nil` until the launch push, so the first push always reaches the tap even
+    /// when every key resolves to "cleared".
+    private var lastSpecialPanelKeys: HotkeyTap.SpecialPanelKeys?
 
     /// Signatures of windows the user just closed locally. Any cache refresh
     /// completing before the AX close has propagated would otherwise re-add
@@ -1038,9 +1041,25 @@ final class SwitcherController: SwitcherViewDelegate {
             let keyCode = Int64(shortcut.carbonKeyCode)
             if map[keyCode] == nil { map[keyCode] = action }
         }
-        guard map != lastPanelKeyMap else { return }
+        // Search and tab-drill (#169) are pushed alongside but kept out of `map`:
+        // the tap must match them in states that map never reaches (already
+        // drilled, already searching, panel not yet revealed). A cleared recorder
+        // yields `-1`, which disables the key. The tap checks these before the map,
+        // so binding one onto a row action's keycode wins over that action.
+        let special = HotkeyTap.SpecialPanelKeys(
+            search: Self.panelKeyCode(.panelSearch(for: key)).map(Int64.init) ?? -1,
+            tabDrill: Self.panelKeyCode(.panelTabDrill(for: key)).map(Int64.init) ?? -1
+        )
+        guard map != lastPanelKeyMap || special != lastSpecialPanelKeys else { return }
         lastPanelKeyMap = map
-        hotkey.setPanelKeyBindings(map)
+        lastSpecialPanelKeys = special
+        hotkey.setPanelKeyBindings(map, special: special)
+    }
+
+    /// The bound keycode for an in-panel key, or `nil` when the user cleared the
+    /// recorder — which disables that key everywhere it is consulted.
+    private static func panelKeyCode(_ name: BetterShortcuts.Name) -> UInt32? {
+        BetterShortcuts.getShortcut(for: name).map { UInt32($0.carbonKeyCode) }
     }
 
     /// Derive the window-management chord map (#7) from the BetterShortcuts
@@ -1255,7 +1274,9 @@ final class SwitcherController: SwitcherViewDelegate {
             searchActive: searchActive,
             tabDrillActive: tabDrillActive,
             panelActions: panelActionSpecs(),
-            vimNavigationEnabled: Preferences.shared.vimNavigationEnabled
+            vimNavigationEnabled: Preferences.shared.vimNavigationEnabled,
+            searchKeyCode: Self.panelKeyCode(.panelSearch(for: activeTarget.storageKey)),
+            tabDrillKeyCode: Self.panelKeyCode(.panelTabDrill(for: activeTarget.storageKey))
         )
         applyOverridePlan(plan)
     }

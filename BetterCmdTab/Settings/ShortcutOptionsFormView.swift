@@ -108,15 +108,16 @@ final class ShortcutOptionsFormView: NSView {
         addCard(appearance)
 
         // MARK: In-panel keys
-        // This profile's action keys that act on the highlighted window while its
-        // switcher is open (#5). Recorded with BetterShortcuts like the trigger
-        // (per-profile names "<base>@<target>"); each defaults to the shipped key,
-        // so a recorder shows e.g. ⌘W until changed and its clear button restores
-        // that default. Only the keycode is used in-panel (⌘ is held the whole time).
+        // This profile's keys while its switcher is open (#5): the row actions,
+        // plus search and tab drill-in (#169). Recorded with BetterShortcuts like
+        // the trigger (per-profile names "<base>@<target>"); each defaults to the
+        // shipped key, so a recorder shows e.g. ⌘W until changed, and clearing one
+        // disables that key rather than restoring the default. Only the keycode is
+        // used in-panel (⌘ is held the whole time).
         let panelKeys = SettingsSectionView(title: String(localized: "In-panel keys"))
         panelKeys.addContent(SettingsRowView(
             title: String(localized: "Action keys while switching"),
-            subtitle: String(localized: "These act on the highlighted window while the switcher is open. ⌘ is held the whole time, so the modifier you record is ignored in-panel.")
+            subtitle: String(localized: "These act while the switcher is open. ⌘ is held the whole time, so the modifier you record is ignored in-panel. Clearing one turns that key off.")
         ))
         // Allow the same chord across profiles (e.g. ⌘W for Close in each) without
         // the cross-name "already used by …" alert — every profile is an independent

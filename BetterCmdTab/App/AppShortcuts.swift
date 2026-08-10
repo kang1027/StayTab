@@ -71,6 +71,12 @@ extension BetterShortcuts.Name {
     static func panelHide(for key: String) -> Self { Self("panelHide@\(key)", default: .init(.h, modifiers: .command)) }
     static func panelQuit(for key: String) -> Self { Self("panelQuit@\(key)", default: .init(.q, modifiers: .command)) }
     static func panelFullscreen(for key: String) -> Self { Self("panelFullscreen@\(key)", default: .init(.f, modifiers: .command)) }
+    /// Open type-to-filter search / drill into the tab strip (#169). Unlike the
+    /// row actions above these are consulted by the tap even while searching,
+    /// while already drilled, and before the panel is revealed — see
+    /// `HotkeyTap.SpecialPanelKeys`. Clearing either recorder disables that key.
+    static func panelSearch(for key: String) -> Self { Self("panelSearch@\(key)", default: .init(.slash, modifiers: .command)) }
+    static func panelTabDrill(for key: String) -> Self { Self("panelTabDrill@\(key)", default: .init(.backslash, modifiers: .command)) }
 
     /// The per-profile in-panel action-key names for the profile with `storageKey`,
     /// paired with a stable title — drives the recorder rows and the keycode maps.
@@ -81,6 +87,8 @@ extension BetterShortcuts.Name {
             (panelHide(for: storageKey), String(localized: "Hide app")),
             (panelQuit(for: storageKey), String(localized: "Quit app")),
             (panelFullscreen(for: storageKey), String(localized: "Full screen")),
+            (panelSearch(for: storageKey), String(localized: "Open search")),
+            (panelTabDrill(for: storageKey), String(localized: "Peek tabs")),
         ]
     }
 
@@ -181,6 +189,8 @@ extension BetterShortcuts.Name: @retroactive CaseIterable {
                 case "panelHide": return String(localized: "Hide app")
                 case "panelQuit": return String(localized: "Quit app")
                 case "panelFullscreen": return String(localized: "Full screen")
+                case "panelSearch": return String(localized: "Open search")
+                case "panelTabDrill": return String(localized: "Peek tabs")
                 default: break
                 }
             }
@@ -225,7 +235,17 @@ extension BetterShortcuts {
             // The Shift-reverse variant the survivor also registers (prevApp/prevWindow).
             out.append(Shortcut(carbonKeyCode: s.carbonKeyCode, carbonModifiers: s.carbonModifiers | shiftKey))
         }
-        return out
+        // The survivor registers every 10/50 chord under BOTH keycodes (the ISO
+        // `isoTwins` pass in `computeNativeOverridePlan`), because kVK_ISO_Section
+        // and kVK_ANSI_Grave are one physical key that macOS reports either way.
+        // Reserve both, or recording the key above Tab onto another slot passes
+        // the conflict check and then silently loses to the trigger at runtime:
+        // ⌘§ on an ISO keyboard is the ⌘` the window trigger already owns (#169).
+        let isoTwins = out
+            .filter { $0.carbonKeyCode == 10 || $0.carbonKeyCode == 50 }
+            .map { Shortcut(carbonKeyCode: $0.carbonKeyCode == 10 ? 50 : 10,
+                            carbonModifiers: $0.carbonModifiers) }
+        return out + isoTwins
     }
 
     /// Live reserved set, read from the current `switchApps` / `switchWindows`

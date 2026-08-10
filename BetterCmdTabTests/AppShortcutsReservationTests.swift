@@ -20,11 +20,33 @@ struct AppShortcutsReservationTests {
     @Test func defaults_reserveCmdTabBacktickAndShiftReverse() {
         let reserved = BetterShortcuts.reservedTriggerShortcuts(app: Self.cmdTab, window: Self.cmdBacktick)
         // The forward chords plus their Shift-reverse — exactly what the survivor
-        // (`computeNativeOverridePlan`) registers — and nothing else.
+        // (`computeNativeOverridePlan`) registers — plus the ISO twin of ⌘` below.
         #expect(reserved.contains(Self.cmdTab))
         #expect(reserved.contains(Self.cmdBacktick))
         #expect(reserved.contains(withShift(Self.cmdTab)))
         #expect(reserved.contains(withShift(Self.cmdBacktick)))
+        #expect(reserved.count == 6)
+    }
+
+    @Test func backtickTrigger_alsoReservesItsISOTwin() {
+        // kVK_ISO_Section (10) and kVK_ANSI_Grave (50) are the same physical key
+        // above Tab, and the survivor registers both. Recording ⌘§ onto another
+        // slot must therefore report the conflict rather than register a chord
+        // that loses to the trigger at runtime (issue #169).
+        let reserved = BetterShortcuts.reservedTriggerShortcuts(app: Self.cmdTab, window: Self.cmdBacktick)
+        let cmdSection = BetterShortcuts.Shortcut(carbonKeyCode: 10, carbonModifiers: cmdKey)
+        #expect(reserved.contains(cmdSection))
+        #expect(reserved.contains(withShift(cmdSection)))
+        // ⌘Tab has no twin, so the pass only widens the 10/50 chords.
+        #expect(reserved.filter { $0.carbonKeyCode == kVK_Tab }.count == 2)
+    }
+
+    @Test func sectionTrigger_reservesGraveTwin_theOtherDirection() {
+        // Same key recorded on ISO hardware that reports 10 — reserve 50 too.
+        let cmdSection = BetterShortcuts.Shortcut(carbonKeyCode: 10, carbonModifiers: cmdKey)
+        let reserved = BetterShortcuts.reservedTriggerShortcuts(app: nil, window: cmdSection)
+        #expect(reserved.contains(cmdSection))
+        #expect(reserved.contains(Self.cmdBacktick))
         #expect(reserved.count == 4)
     }
 

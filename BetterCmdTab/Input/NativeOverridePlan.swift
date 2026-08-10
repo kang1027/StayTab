@@ -96,10 +96,12 @@ private let alphanumericKeyCodes: [UInt32] = [
 ]
 
 /// Extra printable punctuation keycodes accepted as fuzzy-search input. Excludes
-/// Slash (44, toggles search), Grave (50, the window chord) and Space (49, would
-/// collide with Spotlight's ⌘Space).
+/// Grave (50, the window chord) and Space (49, would collide with Spotlight's
+/// ⌘Space). Slash and Backslash are listed: the search and tab-drill chords are
+/// appended first, so the first-wins dedupe drops them here while they hold their
+/// defaults, and hands them back as ordinary query characters once rebound (#169).
 private let searchPunctuationKeyCodes: [UInt32] = [
-    24, 27, 30, 33, 39, 41, 43, 47, 42, // = - ] [ ' ; , . \
+    24, 27, 30, 33, 39, 41, 43, 47, 42, 44, // = - ] [ ' ; , . \ /
 ]
 
 /// kVK_ISO_Section (10) and kVK_ANSI_Grave (50) are both "the key above Tab":
@@ -150,6 +152,9 @@ private let kcVimK: UInt32 = 40
 ///     whether the letter keys are letter-jump or search input, and whether the
 ///     arrows step the selection or the tab strip.
 ///   - panelActions: the rebindable in-panel action keys (W/M/H/Q/F).
+///   - searchKeyCode / tabDrillKeyCode: the rebindable search and tab-drill keys
+///     (#169), defaulting to the shipped `/` and `\`. `nil` when the user cleared
+///     that recorder, which disables the key here too.
 ///   - vimNavigationEnabled: the opt-in vim h/j/k/l navigation preference. When
 ///     on, h/j/k/l are registered as arrow-motion chords ahead of the panel
 ///     actions and letter-jump so they win the dedupe — mirroring the tap, where
@@ -162,7 +167,9 @@ func computeNativeOverridePlan(
     searchActive: Bool = false,
     tabDrillActive: Bool = false,
     panelActions: [PanelActionSpec] = [],
-    vimNavigationEnabled: Bool = false
+    vimNavigationEnabled: Bool = false,
+    searchKeyCode: UInt32? = kcSlash,
+    tabDrillKeyCode: UInt32? = kcBackslash
 ) -> NativeOverridePlan {
     // Always-armed: disable the native symbolic hotkey and register the Carbon
     // switching chords regardless of the secure-input state, so our switcher wins
@@ -235,7 +242,9 @@ func computeNativeOverridePlan(
             chords.append(ChordSpec(keyCode: kcRight, modifiers: mod, kind: .tabNext))
             chords.append(ChordSpec(keyCode: kcReturn, modifiers: mod, kind: .commitTab))
             chords.append(ChordSpec(keyCode: kcKeypadEnter, modifiers: mod, kind: .commitTab))
-            chords.append(ChordSpec(keyCode: kcBackslash, modifiers: mod, kind: .exitTabDrill))
+            if let tabDrillKeyCode {
+                chords.append(ChordSpec(keyCode: tabDrillKeyCode, modifiers: mod, kind: .exitTabDrill))
+            }
             chords.append(ChordSpec(keyCode: kcEscape, modifiers: mod, kind: .exitTabDrill))
         } else {
             chords.append(ChordSpec(keyCode: kcReturn, modifiers: mod, kind: .commit))
@@ -245,7 +254,16 @@ func computeNativeOverridePlan(
             chords.append(ChordSpec(keyCode: kcDown, modifiers: mod, kind: .navDown))
             chords.append(ChordSpec(keyCode: kcLeft, modifiers: mod, kind: .navLeft))
             chords.append(ChordSpec(keyCode: kcRight, modifiers: mod, kind: .navRight))
-            chords.append(ChordSpec(keyCode: kcSlash, modifiers: mod, kind: .toggleSearch))
+            if let searchKeyCode {
+                chords.append(ChordSpec(keyCode: searchKeyCode, modifiers: mod, kind: .toggleSearch))
+            }
+            // The tab-drill key drills in from both modes — as it does in the tap,
+            // where the drill check precedes the search branch. Appended before the
+            // search-character block so the first-wins dedupe keeps a rebound key
+            // (say `-`) drilling instead of typing itself into the query.
+            if let tabDrillKeyCode {
+                chords.append(ChordSpec(keyCode: tabDrillKeyCode, modifiers: mod, kind: .enterTabDrill))
+            }
 
             if searchActive {
                 chords.append(ChordSpec(keyCode: kcDelete, modifiers: mod, kind: .searchBackspace))
@@ -253,7 +271,6 @@ func computeNativeOverridePlan(
                     chords.append(ChordSpec(keyCode: kc, modifiers: mod, kind: .searchChar))
                 }
             } else {
-                chords.append(ChordSpec(keyCode: kcBackslash, modifiers: mod, kind: .enterTabDrill))
                 // Vim navigation parity with the tap: h/j/k/l mirror the arrows
                 // (h←, l→, k↑, j↓). Appended before the panel actions and the
                 // generic letter-jump loop so the first-wins dedupe makes vim win

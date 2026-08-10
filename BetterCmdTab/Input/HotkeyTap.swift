@@ -270,6 +270,23 @@ final class HotkeyTap: @unchecked Sendable {
     /// truth, including their defaults. Empty until the first push (which runs
     /// synchronously in `start()` before the tap processes any event).
     private let panelKeyMap = OSAllocatedUnfairLock<[Int64: PanelActionKey]>(initialState: [:])
+
+    /// The two in-panel keys that are *not* plain row actions (#169): opening
+    /// type-to-filter search and drilling into the tab strip. They live outside
+    /// `panelKeyMap` because they must fire in places that map never reaches —
+    /// while already drilled, while already searching, and during the `.primed`
+    /// reveal delay before a panel is on screen. `-1` means the user cleared the
+    /// recorder, which disables that key (no keycode is ever negative).
+    struct SpecialPanelKeys: Sendable, Equatable {
+        var search: Int64
+        var tabDrill: Int64
+    }
+    /// Seeded with the shipped ⌘/ and ⌘\ keycodes and overwritten by the launch
+    /// `setPanelKeyBindings` push, exactly like `panelKeyMap`.
+    private let specialKeys = OSAllocatedUnfairLock<SpecialPanelKeys>(
+        initialState: SpecialPanelKeys(search: HotkeyTap.defaultSearchKey,
+                                       tabDrill: HotkeyTap.defaultTabDrillKey)
+    )
     /// Rebindable window-management chords (#7): packed chord key (see
     /// `wmChordKey`) → the arrange `Event`. Checked in the switching branch
     /// before the plain-arrow handling. Derived from BetterShortcuts' `window*`
@@ -374,12 +391,18 @@ final class HotkeyTap: @unchecked Sendable {
     private static let keypadEnterKey: Int64 = 76
     private static let spaceKey: Int64 = 49
     private static let deleteKey: Int64 = 51
-    private static let slashKey: Int64 = 44
-    // W/M/H/Q are no longer hardcoded here — they live in the rebindable
-    // `panelKeyMap` (#5), consulted in the switching branch's default case.
-    /// kVK_ANSI_Backslash. Used to drop into browser tab drill-in on the
-    /// highlighted row when the experimental pref is enabled.
-    private static let backslashKey: Int64 = 42
+    // W/M/H/Q — and, since #169, the search and tab-drill keys — are no longer
+    // hardcoded here: they live in the rebindable `panelKeyMap` / `specialKeys`
+    // pushed from BetterShortcuts.
+    /// kVK_ANSI_Slash / kVK_ANSI_Backslash — the shipped defaults for the search
+    /// and tab-drill keys. Kept only to recognise an *unrebound* binding: while a
+    /// key still sits on its default keycode the tap also matches it by the
+    /// character it types, so `/` and `\` work on layouts that park them behind
+    /// ⇧/⌥ (issue #141). A rebound key was recorded on the user's own layout, so
+    /// its keycode is authoritative and the character fallback would only make
+    /// the replaced key keep firing.
+    private static let defaultSearchKey: Int64 = 44
+    private static let defaultTabDrillKey: Int64 = 42
 
     /// Letters reserved from letter-jump because they drive an in-panel action.
     /// Recomputed from the live `panelKeyMap` bindings (translated to the current
@@ -829,24 +852,30 @@ final class HotkeyTap: @unchecked Sendable {
         config.withLock { $0 = newConfig }
     }
 
-    /// Replace the rebindable in-panel action-key map (keycode → action). Pushed
-    /// from main on launch and on every preference change; read on the tap thread.
+    /// Replace the rebindable in-panel action-key map (keycode → action) and the
+    /// search / tab-drill keycodes. Pushed from main on launch and on every
+    /// preference change; read on the tap thread.
     @MainActor
-    func setPanelKeyBindings(_ map: [Int64: PanelActionKey]) {
+    func setPanelKeyBindings(_ map: [Int64: PanelActionKey], special: SpecialPanelKeys) {
         panelKeyMap.withLock { $0 = map }
+        specialKeys.withLock { $0 = special }
         recomputeReservedLetters()
     }
 
-    /// Re-derive the reserved-letter set from the current `panelKeyMap` (each
-    /// bound keycode — close/minimize/hide/quit/full-screen — translated to the
-    /// active layout), then store it and notify `onReservedLettersChanged`. Called
-    /// on every binding push and whenever the keyboard layout changes, so reserved
-    /// letters always match what the user actually assigned.
+    /// Re-derive the reserved-letter set from the current bindings (each bound
+    /// keycode — close/minimize/hide/quit/full-screen plus search and tab-drill —
+    /// translated to the active layout), then store it and notify
+    /// `onReservedLettersChanged`. Called on every binding push and whenever the
+    /// keyboard layout changes, so reserved letters always match what the user
+    /// actually assigned. The defaults translate to `/` and `\`, which are not
+    /// letters and so reserve nothing; binding search to a letter key does reserve
+    /// it, keeping hint generation from handing out a letter the tap would eat.
     @MainActor
     private func recomputeReservedLetters() {
         let map = panelKeyMap.withLock { $0 }
+        let special = specialKeys.withLock { $0 }
         var collected: Set<Character> = []
-        for keyCode in map.keys {
+        for keyCode in map.keys + [special.search, special.tabDrill] where keyCode >= 0 {
             guard let ch = translate(keyCode: UInt16(keyCode)) else { continue }
             let lower = Character(ch.lowercased())
             if lower.isLetter { collected.insert(lower) }
@@ -1170,12 +1199,14 @@ final class HotkeyTap: @unchecked Sendable {
                 if keyCode == Self.returnKey || keyCode == Self.keypadEnterKey || keyCode == Self.spaceKey {
                     deliver(.commitTab); return nil
                 }
-                // Backslash toggles the strip back off — same key in/out, so
-                // the user can dismiss the drill without reaching for Esc.
-                if keyCode == Self.backslashKey {
+                // The tab-drill key toggles the strip back off — same key in and
+                // out, so the user can dismiss the drill without reaching for Esc.
+                let drillKey = specialKeys.withLock { $0.tabDrill }
+                if keyCode == drillKey {
                     deliver(.exitTabDrill); return nil
                 }
-                if let ch = translate(keyCode: UInt16(keyCode), shift: shiftHeld, option: optionHeld), ch == "\\" {
+                if drillKey == Self.defaultTabDrillKey,
+                   let ch = translate(keyCode: UInt16(keyCode), shift: shiftHeld, option: optionHeld), ch == "\\" {
                     deliver(.exitTabDrill); return nil
                 }
                 // Any other key while drilled is swallowed so it doesn't
@@ -1233,14 +1264,19 @@ final class HotkeyTap: @unchecked Sendable {
                     }
                 }
             }
-            // Drill-in trigger — backslash while the switcher is open.
-            // Controller no-ops if the highlighted row has no tab group or the
-            // experimental pref is off, so this is safe to always emit.
-            if isSwitchingNow() && keyCode == Self.backslashKey {
-                deliver(.enterTabDrill); return nil
-            }
-
             if isSwitchingNow() {
+                // The search and tab-drill keys (#169) are read once here, and
+                // handled outside the `isPanelPresented()` gate below: both must
+                // still fire during the `.primed` reveal delay, or holding ⌘ and
+                // immediately hitting `/` would leak the keystroke to the app the
+                // user is switching away from.
+                let special = specialKeys.withLock { $0 }
+                // Drill-in trigger. The controller no-ops if the highlighted row
+                // has no tab group or the experimental pref is off, so this is
+                // safe to always emit.
+                if keyCode == special.tabDrill {
+                    deliver(.enterTabDrill); return nil
+                }
                 if isSearchingNow() {
                     // Navigation/commit/escape still work; everything printable
                     // (incl. space and w/m/h/q) feeds the query, Delete is
@@ -1260,19 +1296,24 @@ final class HotkeyTap: @unchecked Sendable {
                         deliver(.escape); return nil
                     case Self.deleteKey:
                         deliver(.searchBackspace); return nil
-                    case Self.slashKey:
+                    case special.search:
                         deliver(.toggleSearch); return nil
                     default:
                         // Modifier-aware translation, so a character that needs
                         // ⇧/⌥ on the active layout (digits on French AZERTY, a
                         // shifted `/`) types what the user actually pressed —
                         // and `/`/`\` keep their panel meaning wherever they
-                        // live (issue #141).
+                        // live, as long as they are still the bound keys
+                        // (issues #141, #169).
                         if let ch = translate(keyCode: UInt16(keyCode), shift: shiftHeld, option: optionHeld),
                            let scalar = ch.unicodeScalars.first,
                            scalar.value >= 0x20, scalar.value != 0x7F {
-                            if ch == "/" { deliver(.toggleSearch); return nil }
-                            if ch == "\\" { deliver(.enterTabDrill); return nil }
+                            if ch == "/", special.search == Self.defaultSearchKey {
+                                deliver(.toggleSearch); return nil
+                            }
+                            if ch == "\\", special.tabDrill == Self.defaultTabDrillKey {
+                                deliver(.enterTabDrill); return nil
+                            }
                             deliver(.searchInput(ch))
                             return nil
                         }
@@ -1309,7 +1350,7 @@ final class HotkeyTap: @unchecked Sendable {
                         deliver(.commit); return nil
                     case Self.escKey:
                         deliver(.escape); return nil
-                    case Self.slashKey:
+                    case special.search:
                         deliver(.toggleSearch); return nil
                     default:
                         // Rebindable in-panel action keys (#5). Checked before the
@@ -1410,11 +1451,16 @@ final class HotkeyTap: @unchecked Sendable {
                             // `/` is ⇧:, `\` is ⌥⇧), match the character the
                             // held chord actually types (issue #141). Bare-key
                             // layouts are covered by the keycode cases above
-                            // and the bare-translate check below.
+                            // and the bare-translate check below. Only while the
+                            // key is unrebound — see `defaultSearchKey`.
                             if shiftHeld || optionHeld,
                                let ch = translate(keyCode: UInt16(keyCode), shift: shiftHeld, option: optionHeld) {
-                                if ch == "/" { deliver(.toggleSearch); return nil }
-                                if ch == "\\" { deliver(.enterTabDrill); return nil }
+                                if ch == "/", special.search == Self.defaultSearchKey {
+                                    deliver(.toggleSearch); return nil
+                                }
+                                if ch == "\\", special.tabDrill == Self.defaultTabDrillKey {
+                                    deliver(.enterTabDrill); return nil
+                                }
                             }
                             // Type-to-search opener: route every unbound letter and
                             // digit into the query instead of letter-jump, so a
@@ -1436,12 +1482,14 @@ final class HotkeyTap: @unchecked Sendable {
                                 // Layout-agnostic drill-in / search triggers:
                                 // regardless of where `\` and `/` live on the
                                 // physical keyboard (US, Polish, ISO/JIS), any
-                                // key that types them fires the panel action.
-                                if letter == "\\" {
+                                // key that types them fires the panel action —
+                                // while that action is still on its default
+                                // keycode (see `defaultSearchKey`).
+                                if letter == "\\", special.tabDrill == Self.defaultTabDrillKey {
                                     deliver(.enterTabDrill)
                                     return nil
                                 }
-                                if letter == "/" {
+                                if letter == "/", special.search == Self.defaultSearchKey {
                                     deliver(.toggleSearch)
                                     return nil
                                 }

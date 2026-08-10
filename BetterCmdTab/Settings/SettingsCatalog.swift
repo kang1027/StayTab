@@ -287,7 +287,7 @@ enum SettingsCatalog {
         item(SearchID.scopedSwitch, .shortcuts, SettingsAnchor.switching, String(localized: "Profiles"), String(localized: "Switcher shortcuts"),
              String(localized: "Scoped shortcuts"), ["scope", "scoped", "all windows", "current app", "minimized", "this space", "filtered switcher"]),
         item(SearchID.panelKeys, .shortcuts, SettingsAnchor.switching, String(localized: "Profiles"), String(localized: "In-panel keys"),
-             String(localized: "Action keys while switching"), ["panel keys", "rebind", "close", "minimize", "hide", "quit", "wmhq", "in-panel"]),
+             String(localized: "Action keys while switching"), ["panel keys", "rebind", "close", "minimize", "hide", "quit", "wmhq", "in-panel", "search key", "slash", "tab drill", "peek tabs", "backslash"]),
         item(SearchID.windowMgmt, .windows, SettingsAnchor.windowArrange, String(localized: "Windows"), String(localized: "Arrange window"),
              String(localized: "Arrange the highlighted window"), ["window management", "tile", "maximize", "center", "snap", "halves", "arrange", "rebind"]),
 

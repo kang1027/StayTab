@@ -7556,6 +7556,40 @@
         }
       }
     },
+    "Open search" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suche öffnen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir búsqueda"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir la recherche"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otwórz wyszukiwanie"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开搜索"
+          }
+        }
+      }
+    },
     "Open switcher" : {
       "localizations" : {
         "de" : {
@@ -7790,6 +7824,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "将 ⌘Tab 传递给应用，而不是打开切换器 — 适用于拥有自身窗口切换的应用（虚拟机、远程桌面、部分游戏）。"
+          }
+        }
+      }
+    },
+    "Peek tabs" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tabs anzeigen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ver pestañas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aperçu des onglets"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Podejrzyj karty"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "预览标签页"
           }
         }
       }
@@ -11946,36 +12014,36 @@
         }
       }
     },
-    "These act on the highlighted window while the switcher is open. ⌘ is held the whole time, so the modifier you record is ignored in-panel." : {
+    "These act while the switcher is open. ⌘ is held the whole time, so the modifier you record is ignored in-panel. Clearing one turns that key off." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Diese wirken auf das markierte Fenster, während der Umschalter geöffnet ist. ⌘ wird die ganze Zeit gedrückt gehalten, daher wird die von dir aufgezeichnete Sondertaste im Bedienfeld ignoriert."
+            "value" : "Diese wirken, während der Umschalter geöffnet ist. ⌘ wird die ganze Zeit gedrückt gehalten, daher wird die von dir aufgezeichnete Sondertaste im Bedienfeld ignoriert. Wird eine gelöscht, ist diese Taste deaktiviert."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Estas actúan sobre la ventana resaltada mientras el selector está abierto. ⌘ se mantiene pulsado todo el tiempo, por lo que el modificador que registres se ignora dentro del panel."
+            "value" : "Estas actúan mientras el selector está abierto. ⌘ se mantiene pulsado todo el tiempo, por lo que el modificador que registres se ignora dentro del panel. Si borras una, esa tecla queda desactivada."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Elles agissent sur la fenêtre en surbrillance lorsque le sélecteur est ouvert. ⌘ est maintenu en permanence, donc le modificateur que vous enregistrez est ignoré dans le panneau."
+            "value" : "Elles agissent lorsque le sélecteur est ouvert. ⌘ est maintenu en permanence, donc le modificateur que vous enregistrez est ignoré dans le panneau. En effacer une désactive cette touche."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Działają one na podświetlone okno, gdy przełącznik jest otwarty. ⌘ jest przytrzymywany przez cały czas, więc zarejestrowany modyfikator jest ignorowany w panelu."
+            "value" : "Działają, gdy przełącznik jest otwarty. ⌘ jest przytrzymywany przez cały czas, więc zarejestrowany modyfikator jest ignorowany w panelu. Wyczyszczenie któregoś wyłącza ten klawisz."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "切换器打开时，这些操作会作用于高亮窗口。⌘ 会全程保持按下，因此你录制的修饰键会在面板内被忽略。"
+            "value" : "切换器打开时这些键生效。⌘ 会全程保持按下，因此你录制的修饰键会在面板内被忽略。清除某一项即可关闭该按键。"
           }
         }
       }
