@@ -241,8 +241,6 @@ struct NativeOverridePlanTests {
         #expect(Self.kinds(plan, 42) == [.enterTabDrill])
         // No panel-action chords in search (W typed, not "close").
         #expect(!plan.carbonChords.contains { $0.kind == .close })
-        // ⌘/ stays toggle-search, never a search char (dedupe / no overlap).
-        #expect(Self.kinds(plan, 44) == [.toggleSearch])
     }
 
     // MARK: In-panel — tab drill mode
@@ -420,6 +418,18 @@ struct NativeOverridePlanTests {
         #expect(Self.has(plan, 24, .enterTabDrill))
         #expect(Self.kinds(plan, 44).isEmpty)
         #expect(Self.kinds(plan, 42).isEmpty)
+    }
+
+    @Test func searchAndDrillOnTheSameKey_drills_matchingTheTap() {
+        // Nothing stops a user recording both onto one key — the in-panel
+        // recorders allow duplicates. The tap checks drill first, so the plan
+        // must too, or the key would drill normally and toggle search the
+        // moment a password field takes secure input.
+        let plan = computeNativeOverridePlan(trigger: Self.native(), secureInputActive: true,
+                                             panelOpen: true, holdModifierDown: true,
+                                             panelActions: Self.panelActions,
+                                             searchKeyCode: 27, tabDrillKeyCode: 27)
+        #expect(Self.kinds(plan, 27) == [.enterTabDrill])
     }
 
     @Test func reboundSearchKey_isNeverTypedIntoTheQuery() {

@@ -32,10 +32,8 @@ struct PanelKeyBindingTests {
         // old key.
         let search = BetterShortcuts.Name.panelSearch(for: "apps").defaultShortcut
         let drill = BetterShortcuts.Name.panelTabDrill(for: "apps").defaultShortcut
-        #expect(search?.carbonKeyCode == kVK_ANSI_Slash)
-        #expect(search?.carbonKeyCode == 44)
-        #expect(drill?.carbonKeyCode == kVK_ANSI_Backslash)
-        #expect(drill?.carbonKeyCode == 42)
+        #expect(search?.carbonKeyCode == kVK_ANSI_Slash)      // 44
+        #expect(drill?.carbonKeyCode == kVK_ANSI_Backslash)  // 42
         // ⌘ is held the whole time the panel is up; the recorded modifier is
         // ignored in-panel but still shows in the recorder.
         #expect(search?.carbonModifiers == cmdKey)

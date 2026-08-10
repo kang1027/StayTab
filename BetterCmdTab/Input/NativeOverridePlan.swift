@@ -254,15 +254,15 @@ func computeNativeOverridePlan(
             chords.append(ChordSpec(keyCode: kcDown, modifiers: mod, kind: .navDown))
             chords.append(ChordSpec(keyCode: kcLeft, modifiers: mod, kind: .navLeft))
             chords.append(ChordSpec(keyCode: kcRight, modifiers: mod, kind: .navRight))
-            if let searchKeyCode {
-                chords.append(ChordSpec(keyCode: searchKeyCode, modifiers: mod, kind: .toggleSearch))
-            }
-            // The tab-drill key drills in from both modes — as it does in the tap,
-            // where the drill check precedes the search branch. Appended before the
-            // search-character block so the first-wins dedupe keeps a rebound key
-            // (say `-`) drilling instead of typing itself into the query.
+            // The tab-drill key drills in from both modes, and it is checked
+            // before the search key here for the same reason the tap checks it
+            // first: whatever a rebound drill key collides with — the search key
+            // or a search character — first-wins dedupe must leave it drilling.
             if let tabDrillKeyCode {
                 chords.append(ChordSpec(keyCode: tabDrillKeyCode, modifiers: mod, kind: .enterTabDrill))
+            }
+            if let searchKeyCode {
+                chords.append(ChordSpec(keyCode: searchKeyCode, modifiers: mod, kind: .toggleSearch))
             }
 
             if searchActive {

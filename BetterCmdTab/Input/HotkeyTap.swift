@@ -405,13 +405,14 @@ final class HotkeyTap: @unchecked Sendable {
     private static let defaultTabDrillKey: Int64 = 42
 
     /// Letters reserved from letter-jump because they drive an in-panel action.
-    /// Recomputed from the live `panelKeyMap` bindings (translated to the current
-    /// layout) plus the fixed ⌘F full-screen key — so it tracks whatever the user
-    /// assigns in the in-panel keys section instead of a hardcoded W/M/H/Q. The
-    /// same set is mirrored to `RowLabels` via `onReservedLettersChanged` so hint
-    /// generation and letter-jump stay in agreement. Read on the tap thread,
-    /// written on main / the layout-change observer. Defaults to the shipped
-    /// bindings (w/m/h/q) + f until the first push.
+    /// Recomputed from the live `panelKeyMap` bindings plus the search and
+    /// tab-drill keys, all translated to the current layout — so it tracks
+    /// whatever the user assigns in the in-panel keys section instead of a
+    /// hardcoded W/M/H/Q. The same set is mirrored to `RowLabels` via
+    /// `onReservedLettersChanged` so hint generation and letter-jump stay in
+    /// agreement. Read on the tap thread, written on main / the layout-change
+    /// observer. Defaults to the shipped bindings (w/m/h/q) + f until the
+    /// first push.
     private let reservedLetters = OSAllocatedUnfairLock<Set<Character>>(
         initialState: ["w", "m", "h", "q", "f"]
     )
