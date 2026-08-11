@@ -1946,7 +1946,7 @@ final class Preferences: ObservableObject {
 
     /// Old default (#105…#170), and the neutral point every stored percentage was
     /// picked relative to before 100 % came to mean the native Cmd+Tab size.
-    private static let preNativeDefaultPercent = 120.0
+    private nonisolated static let preNativeDefaultPercent = 120.0
 
     /// Re-base a percentage stored before #170. Those numbers were relative to a
     /// 120 % default that rendered *smaller* than today's 100 %, so carrying them
