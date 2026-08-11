@@ -4035,12 +4035,10 @@ final class SwitcherController: SwitcherViewDelegate {
             WindowThumbnailCache.shared.setActiveBrowserTab(nil)
             return
         }
-        let tab = cached.tabs[activeIndex]
         WindowThumbnailCache.shared.setActiveBrowserTab(BrowserTabPreviewKey(
             pid: pid,
             windowID: row.cgWindowID,
-            index: activeIndex,
-            pageIdentity: BrowserFaviconCache.normalizedURL(tab.url) ?? tab.title
+            index: activeIndex
         ))
     }
 
@@ -4075,12 +4073,10 @@ final class SwitcherController: SwitcherViewDelegate {
               let activeIndex = syncFocusedBrowserTabIndex(),
               let cached = browserTabsCache[AXRef(element: focused)],
               cached.tabs.indices.contains(activeIndex) else { return }
-        let tab = cached.tabs[activeIndex]
         let key = BrowserTabPreviewKey(
             pid: app.processIdentifier,
             windowID: row.cgWindowID,
-            index: activeIndex,
-            pageIdentity: BrowserFaviconCache.normalizedURL(tab.url) ?? tab.title
+            index: activeIndex
         )
         browserTabPreviewRequested = true
         let scale = panel.backingScaleFactor

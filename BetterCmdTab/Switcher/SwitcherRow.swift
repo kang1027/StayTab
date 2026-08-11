@@ -1,30 +1,30 @@
 import AppKit
 import ApplicationServices
 
-/// Identifies one tab within a browser window for an inline browser-tab row.
-/// `index` is the tab's 0-based position; `parentTitle` is the parent window's
-/// AX title, used to resolve the AppleScript `window N` on commit without a
-/// raise (matching `BrowserTabs.tabTitles`/`activateTab`'s name-match path).
+/// Cache identity of one browser tab's preview frame; `index` is the tab's
+/// 0-based position within its window. Deliberately excludes the tab's page identity (URL/title): only the active
+/// tab is ever captured, and its frame is by definition whatever the window
+/// shows right now, so freshness is `WindowThumbnailCache.refreshTTL`'s job.
+/// Keying on the page made the tile wait for the AppleScript tab scan, which
+/// painted the previous page for as long as that scan took (#145).
 struct BrowserTabPreviewKey: Hashable, Sendable {
     let pid: pid_t
     let windowID: CGWindowID
     let index: Int
-    let pageIdentity: String
 }
 
+/// One tab of a browser window, backing an inline browser-tab row.
+/// `parentTitle` is the parent window's AX title, used to resolve the
+/// AppleScript `window N` on commit without a raise (matching
+/// `BrowserTabs.tabTitles`/`activateTab`'s name-match path).
 struct BrowserTabRef {
     let index: Int
     let parentTitle: String
     let url: String
     let isActive: Bool
 
-    func previewKey(pid: pid_t, windowID: CGWindowID, title: String) -> BrowserTabPreviewKey {
-        BrowserTabPreviewKey(
-            pid: pid,
-            windowID: windowID,
-            index: index,
-            pageIdentity: BrowserFaviconCache.normalizedURL(url) ?? title
-        )
+    func previewKey(pid: pid_t, windowID: CGWindowID) -> BrowserTabPreviewKey {
+        BrowserTabPreviewKey(pid: pid, windowID: windowID, index: index)
     }
 }
 
@@ -227,7 +227,7 @@ struct SwitcherRow {
 
     var browserTabPreviewKey: BrowserTabPreviewKey? {
         guard let browserTab, let pid else { return nil }
-        return browserTab.previewKey(pid: pid, windowID: cgWindowID, title: windowTitle)
+        return browserTab.previewKey(pid: pid, windowID: cgWindowID)
     }
 
     /// Collapse a browser-tab row back to its parent-window row — the inverse of

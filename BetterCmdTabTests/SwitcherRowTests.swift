@@ -229,7 +229,7 @@ struct SwitcherRowTests {
         #expect(rows.allSatisfy { $0.window != nil })
     }
 
-    @Test("browser tab rows carry URL, active state, and page-stable preview keys")
+    @Test("browser tab rows carry URL, active state, and index-stable preview keys")
     func browserTabIdentity() {
         let parent = browserWindowRow(title: "Browser Window")
         let rows = parent.browserTabRows(tabs: [
@@ -239,15 +239,16 @@ struct SwitcherRowTests {
 
         #expect(rows[0].browserTab?.url == "https://example.test/a#one")
         #expect(rows.map(\.browserTab?.isActive) == [false, true])
-        #expect(rows[0].browserTabPreviewKey?.pageIdentity == "https://example.test/a")
-        #expect(rows[0].browserTabPreviewKey != rows[1].browserTabPreviewKey)
+        #expect(rows[0].browserTabPreviewKey != rows[1].browserTabPreviewKey) // index is part of identity
 
-        let reordered = parent.browserTabRows(tabs: [
+        // Navigating a tab must NOT move its preview key: only the active tab is
+        // ever captured and its frame is whatever the window shows right now, so
+        // a URL-derived key only stalled the tile behind the tab scan (#145).
+        let navigated = parent.browserTabRows(tabs: [
+            BrowserTabInfo(title: "Elsewhere", url: "https://other.test/"),
             BrowserTabInfo(title: "Duplicate", url: "https://example.test/b"),
-            BrowserTabInfo(title: "Duplicate", url: "https://example.test/a#two"),
-        ], activeIndex: 0)
-        #expect(rows[0].browserTabPreviewKey != reordered[0].browserTabPreviewKey)
-        #expect(rows[0].browserTabPreviewKey != reordered[1].browserTabPreviewKey) // index is part of identity
+        ], activeIndex: 1)
+        #expect(rows[0].browserTabPreviewKey == navigated[0].browserTabPreviewKey)
     }
 
     @Test("a single tab expands into a tab row; an empty window stays collapsed")
