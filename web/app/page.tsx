@@ -410,10 +410,10 @@ function Showcase() {
           type="button"
           onClick={() => setZoomed(true)}
           aria-label={`Enlarge: ${shot.caption}`}
-          // The intrinsic 2000×1299 ratio, so the whole screenshot shows
+          // The intrinsic 2000×1043 ratio, so the whole screenshot shows
           // instead of being cropped, and the box reserves its height before
           // the image lands.
-          className="relative block aspect-[2000/1299] w-full cursor-zoom-in overflow-hidden rounded-[10px] border border-line bg-[#111111]"
+          className="relative block aspect-[2000/1043] w-full cursor-zoom-in overflow-hidden rounded-[10px] border border-line bg-[#111111]"
         >
           {layouts.map((l, i) =>
             opened.includes(i) ? (

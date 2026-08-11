@@ -22,14 +22,14 @@
   "screenshots": [
     {
       "src": "/screenshots/list.jpg",
-      "sizes": "2000x1299",
+      "sizes": "2000x1043",
       "type": "image/jpeg",
       "form_factor": "wide",
       "label": "Classic vertical list layout"
     },
     {
       "src": "/screenshots/grid.jpg",
-      "sizes": "2000x1299",
+      "sizes": "2000x1043",
       "type": "image/jpeg",
       "form_factor": "wide",
       "label": "Grid of app icons layout"
