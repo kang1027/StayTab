@@ -3913,10 +3913,6 @@ final class SwitcherController: SwitcherViewDelegate {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             var fetched: [AXRef: (tabs: [BrowserTabInfo], active: Int)] = [:]
             var faviconRequests: [BrowserFaviconCache.Request] = []
-            // Browsers whose scan hit a script error (Automation denied / timeout)
-            // rather than genuinely having no tabs — surface the permission hint and
-            // skip negative-caching so a grant + re-open retries at once (#39).
-            var failedApps: [NSRunningApplication] = []
             // Active-tab index per resolved window, so the panel can land a
             // window-MRU step on the tab the user left on rather than tab 1 (#39).
             for entry in apps {
@@ -3927,7 +3923,14 @@ final class SwitcherController: SwitcherViewDelegate {
                 // window title, then fall back to a direct 1:1 map for a single
                 // window. Titles that aren't unique are left collapsed (cached []).
                 let result = BrowserTabs.allWindowTabs(for: entry.app)
-                if result.failed { failedApps.append(entry.app); continue }
+                // A scan that hit a script error (Automation denied / timeout) rather
+                // than genuinely having no tabs skips negative-caching, so a grant +
+                // re-open retries at once (#39). It stays silent: this scan runs on a
+                // timer while the panel is open, and a transient hint here would grow
+                // and shrink the tab-strip band under the user every few seconds
+                // (#171). Settings ▸ Switcher ▸ Tabs ▸ "Browser tab access" is where
+                // the missing consent is surfaced and granted.
+                if result.failed { continue }
                 let perWindow = result.windows
                 if let bundleID = entry.app.bundleIdentifier {
                     faviconRequests.append(contentsOf: perWindow.flatMap(\.tabs).map {
@@ -3989,7 +3992,6 @@ final class SwitcherController: SwitcherViewDelegate {
                     )
                 }
                 self.syncActiveBrowserTabPreviewKeys()
-                if let failed = failedApps.first { self.showTabDrillHint(forApp: failed) }
                 onDone?()
                 self.prewarmActiveBrowserTabPreview()
             }
