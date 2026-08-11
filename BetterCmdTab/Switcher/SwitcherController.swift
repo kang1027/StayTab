@@ -1126,23 +1126,46 @@ final class SwitcherController: SwitcherViewDelegate {
         syncNativeHotkeyOverride()
     }
 
-    /// Push the current "Ignore shortcuts" decision for the frontmost app to the
-    /// tap. Cheap and only runs on frontmost/Space changes, so the per-keystroke
-    /// path stays a single lock read.
     /// Drops a stale async fullscreen probe when the frontmost app (or the
     /// pref) changed while it was in flight.
     private var triggerSuppressionGen: UInt64 = 0
+    /// The live "Ignore shortcuts" verdict for the user's frontmost app.
+    private var triggerSuppressed = false
 
+    /// Push the decision to both consumers. The tap stops swallowing the chord,
+    /// and the override plan drops the Carbon switching chords — without the
+    /// second half the survivor hot key catches the passed-through chord and
+    /// opens the panel the rule just asked us to stay out of (#172).
+    private func setTriggerSuppressed(_ value: Bool) {
+        guard value != triggerSuppressed else { return }
+        // While the panel is up we are frontmost ourselves — `panel.present()` took
+        // focus, so any verdict computed now describes *us*, not the user's app, and
+        // applying it would re-register the Carbon chords (which transiently disable
+        // the tap) with ⌘ still held and weld the panel open (#16). Keeping the
+        // pre-reveal verdict is right: it is the one for the app under the panel,
+        // and closing restores that app, whose activation recomputes from scratch.
+        guard phase == .idle else { return }
+        triggerSuppressed = value
+        // Chords first: the tap must not start passing the chord through while a
+        // registered survivor hot key is still there to catch it (#172).
+        syncNativeHotkeyOverride()
+        hotkey.setSuppressTrigger(value)
+        Log.hotkey.debug("trigger suppression \(value ? "on" : "off", privacy: .public)")
+    }
+
+    /// Recompute the current "Ignore shortcuts" decision for the frontmost app.
+    /// Cheap and only runs on frontmost/Space/exception changes, so the
+    /// per-keystroke path stays a single lock read.
     private func updateTriggerSuppression() {
         let front = NSWorkspace.shared.frontmostApplication
         triggerSuppressionGen &+= 1
         guard let bid = front?.bundleIdentifier else {
-            hotkey.setSuppressTrigger(false)
+            setTriggerSuppressed(false)
             return
         }
         switch Preferences.shared.ignoreMode(for: bid) {
-        case .never: hotkey.setSuppressTrigger(false)
-        case .always: hotkey.setSuppressTrigger(true)
+        case .never: setTriggerSuppressed(false)
+        case .always: setTriggerSuppressed(true)
         case .whenFullscreen:
             // Cross-process AX read (up to 2 × 0.25 s against a wedged app) —
             // resolve off-main and apply late. The tap tolerates a few-ms-late
@@ -1155,7 +1178,7 @@ final class SwitcherController: SwitcherViewDelegate {
                 let fullscreen = Self.focusedWindowIsFullscreen(pid: pid)
                 DispatchQueue.main.async { [weak self] in
                     guard let self, gen == self.triggerSuppressionGen else { return }
-                    self.hotkey.setSuppressTrigger(fullscreen)
+                    self.setTriggerSuppressed(fullscreen)
                 }
             }
         }
@@ -1269,6 +1292,7 @@ final class SwitcherController: SwitcherViewDelegate {
         let plan = computeNativeOverridePlan(
             trigger: spec,
             secureInputActive: secureInputActive,
+            triggerSuppressed: triggerSuppressed,
             panelOpen: panelOpen,
             holdModifierDown: holdMonitor.isHeld,
             searchActive: searchActive,

@@ -69,6 +69,28 @@ struct NativeOverridePlanTests {
         #expect(plan.carbonChords.contains(ChordSpec(keyCode: 48, modifiers: Self.opt, kind: .nextApp)))
     }
 
+    // MARK: Ignore-shortcuts rule (#172 — the tap passes the chord through, so
+    // the survivor hot key must not catch it and open the panel anyway)
+
+    @Test func triggerSuppressed_dropsSwitchingChordsRegardlessOfPanelState() {
+        let idle = computeNativeOverridePlan(trigger: Self.native(), secureInputActive: false,
+                                             triggerSuppressed: true,
+                                             panelOpen: false, holdModifierDown: false)
+        #expect(idle.carbonChords.isEmpty)
+        // Symbolic stays disabled: re-enabling it would hand ⌘Tab to the *native*
+        // switcher instead of the app the rule exists to feed.
+        #expect(idle.symbolicKeysToDisable == [1, 2, 6])
+        // A suppression flip landing while the panel is open must not re-arm them:
+        // the close edge doesn't necessarily re-sync, so they'd stay registered.
+        let open = computeNativeOverridePlan(trigger: Self.native(), secureInputActive: true,
+                                             triggerSuppressed: true,
+                                             panelOpen: true, holdModifierDown: true)
+        #expect(!Self.has(open, 48, .nextApp))
+        #expect(!Self.has(open, 50, .nextWindow))
+        // In-panel navigation under secure input is untouched by the rule.
+        #expect(Self.has(open, 126, .navUp))
+    }
+
     // MARK: Secure input disables only the reserved chord
 
     @Test func secureInputOn_native_panelClosed_disablesCmdTabAndCmdBacktick() {

@@ -18,7 +18,9 @@ import Carbon.HIToolbox
 /// the symbolic-hotkey disable outlives the process, so a crash / force-quit
 /// leaves the system ⌘Tab disabled until the next launch (auto-healed via
 /// `healStaleSymbolicHotkeyDisable`), the Privacy-pane Restore button, or
-/// re-login.
+/// re-login. The one exception is `triggerSuppressed` (an "Ignore shortcuts"
+/// rule): the Carbon chords come off so the chord the tap passes through really
+/// reaches the frontmost app.
 ///
 /// Under Secure Event Input the tap is fully deaf, so the *only* keys that reach
 /// the app are ⌘-qualified Carbon hot keys (plus the mouse). To make every
@@ -142,6 +144,14 @@ private let kcVimK: UInt32 = 40
 ///     Secure Event Input, so the tap is deaf and the Carbon fallback must drive.
 ///     Only gates the *in-panel parity* chords; the switching chords + symbolic
 ///     disable are armed regardless (see the always-armed note above).
+///   - triggerSuppressed: the frontmost app has an "Ignore shortcuts" rule in
+///     effect, so the tap deliberately passes the chord through to that app. The
+///     switching chords must come off with it — a registered Carbon hot key
+///     claims the passed-through chord and opens the panel anyway (#172). The
+///     symbolic disable stays, or the *native* switcher would take the chord
+///     instead of the app the rule is meant to feed. Independent of `panelOpen`
+///     on purpose: a suppression flip landing mid-panel must not be able to
+///     strand the chords registered once the panel closes.
 ///   - panelOpen: the switcher panel is showing (`phase != .idle`).
 ///   - holdModifierDown: the trigger's hold modifier is physically down right
 ///     now. The in-panel chords are registered only then — a ⌘-qualified chord
@@ -162,6 +172,7 @@ private let kcVimK: UInt32 = 40
 func computeNativeOverridePlan(
     trigger: TriggerSpec,
     secureInputActive: Bool,
+    triggerSuppressed: Bool = false,
     panelOpen: Bool,
     holdModifierDown: Bool,
     searchActive: Bool = false,
@@ -207,17 +218,18 @@ func computeNativeOverridePlan(
     // as the live tap config: forward + Shift-reverse for the app chord, and the
     // same for the window chord only when it differs (a duplicate chord would be
     // rejected by RegisterEventHotKey). Always registered so the panel can be
-    // *opened* the instant the tap goes deaf.
+    // *opened* the instant the tap goes deaf — except while an Ignore-shortcuts
+    // rule suppresses the trigger, which takes them off unconditionally.
     let shift = UInt32(shiftKey)
     var chords: [ChordSpec] = []
-    if trigger.appEnabled {
+    if !triggerSuppressed && trigger.appEnabled {
         chords.append(ChordSpec(keyCode: trigger.appKeyCode, modifiers: trigger.appCarbonModifiers, kind: .nextApp))
         chords.append(ChordSpec(keyCode: trigger.appKeyCode, modifiers: trigger.appCarbonModifiers | shift, kind: .prevApp))
     }
     // Register the window chord when it's enabled and isn't a duplicate of the
     // app chord (RegisterEventHotKey rejects duplicates). With the app chord
     // disabled there's nothing to duplicate, so the window chord always stands.
-    if trigger.windowEnabled
+    if !triggerSuppressed && trigger.windowEnabled
         && (!trigger.appEnabled
             || trigger.windowKeyCode != trigger.appKeyCode
             || trigger.windowCarbonModifiers != trigger.appCarbonModifiers) {

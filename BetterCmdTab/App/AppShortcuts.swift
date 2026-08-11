@@ -220,8 +220,10 @@ extension BetterShortcuts {
 
     /// The chords the switcher's secure-input survivor (`CarbonHotkeyTrigger`) holds
     /// for the whole run — `switchApps` / `switchWindows` and their Shift-reverse,
-    /// exactly the set `computeNativeOverridePlan` registers. Pure so it is unit
-    /// testable; the live overload reads the current bindings.
+    /// the set `computeNativeOverridePlan` registers. Pure so it is unit testable;
+    /// the live overload reads the current bindings. Stays conservative while an
+    /// "Ignore shortcuts" rule has the plan drop those chords (#172): the slot
+    /// could still never fire, since the rule follows the frontmost app.
     ///
     /// A user-assignable GLOBAL slot (direct-activation / scoped-switch / window-
     /// management) bound to one of these collides in-process with that registration:
