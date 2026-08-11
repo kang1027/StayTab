@@ -1,0 +1,135 @@
+<!doctype html>
+<!--
+  Source of web/public/og.jpeg (1200x630 Open Graph / ads image).
+  Not part of the Next build - web/og/ is outside public/, so it never ships.
+
+  It is the homepage hero, scaled up: same left-aligned stack, same mono type,
+  same tokens as web/app/globals.css (bg #0a0a0a, text #ededed, dim #8a8a8a,
+  muted #6b6b6b, line #222, accent #3b82f6). Keep the two in sync - if the hero
+  headline or subtitle changes, change it here and re-render.
+
+  Render (any Chromium; renders at 2x, then downscale so the mono text stays crisp):
+
+    /Applications/Helium.app/Contents/MacOS/Helium --headless --disable-gpu \
+      --force-device-scale-factor=2 --window-size=1200,630 \
+      --allow-file-access-from-files \
+      --screenshot=/tmp/og@2x.png web/og/og.html
+    sips -z 630 1200 -s format jpeg -s formatOptions 90 /tmp/og@2x.png \
+      --out web/public/og.jpeg
+-->
+<meta charset="utf-8" />
+<title>BetterCmdTab OG</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    width: 1200px;
+    height: 630px;
+    background: #0a0a0a;
+    overflow: hidden;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    padding: 76px 88px 72px;
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Monaco, monospace;
+    color: #ededed;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* The hero block sits optically centred; only the footer is pinned. */
+  .hero {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .wordmark {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+  }
+
+  .wordmark img {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+  }
+
+  .wordmark span {
+    font-size: 19px;
+    letter-spacing: 0.02em;
+    color: #6b6b6b;
+  }
+
+  h1 {
+    margin-top: 34px;
+    font-size: 62px;
+    font-weight: 600;
+    line-height: 1.18;
+    letter-spacing: -0.02em;
+  }
+
+  h1 .accent {
+    color: #3b82f6;
+  }
+
+  /* The hero caret, frozen on (it blinks on the site, an image can't). */
+  h1 .caret {
+    display: inline-block;
+    width: 16px;
+    height: 0.9em;
+    margin-left: 9px;
+    border-radius: 2px;
+    background: #3b82f6;
+    vertical-align: -0.06em;
+  }
+
+  p {
+    margin-top: 28px;
+    max-width: 44ch;
+    font-size: 23px;
+    line-height: 1.5;
+    color: #6b6b6b;
+  }
+
+  .foot {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 18px;
+    color: #8a8a8a;
+  }
+
+  .foot .site {
+    color: #ededed;
+  }
+
+  .foot .sep {
+    color: #222;
+  }
+</style>
+
+<div class="hero">
+  <div class="wordmark">
+    <img src="../public/icon-56.png" alt="" />
+    <span>BetterCmdTab</span>
+  </div>
+
+  <h1>The <span class="accent">Cmd+Tab</span> macOS deserves.<span class="caret"></span></h1>
+
+  <p>A fast, native window switcher and app launcher. Free forever, zero telemetry, no subscription.</p>
+</div>
+
+<div class="foot">
+  <span class="site">bettercmdtab.app</span>
+  <span class="sep">/</span>
+  <span>macOS 13+</span>
+</div>

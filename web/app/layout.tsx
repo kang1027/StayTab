@@ -64,9 +64,9 @@ export const metadata: Metadata = {
     locale: "en_US",
     images: [
       {
-        url: "/og.png",
-        secureUrl: `${SITE}/og.png`,
-        type: "image/png",
+        url: "/og.jpeg",
+        secureUrl: `${SITE}/og.jpeg`,
+        type: "image/jpeg",
         width: 1200,
         height: 630,
         alt: IMAGE_ALT,
@@ -77,7 +77,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: TITLE,
     description: SOCIAL_DESCRIPTION,
-    images: [{ url: "/og.png", alt: IMAGE_ALT }],
+    images: [{ url: "/og.jpeg", alt: IMAGE_ALT }],
   },
 };
 
@@ -115,7 +115,7 @@ const jsonLd = {
       installUrl: "https://github.com/rokartur/BetterCmdTab/releases/latest",
       softwareHelp: "https://github.com/rokartur/BetterCmdTab",
       license: "https://github.com/rokartur/BetterCmdTab/blob/main/LICENSE",
-      image: `${SITE}/og.png`,
+      image: `${SITE}/og.jpeg`,
       screenshot: [`${SITE}/screenshots/list.jpg`, `${SITE}/screenshots/grid.jpg`],
       featureList: [
         "List, grid-of-icons, and live window-preview layouts",
