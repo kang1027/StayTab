@@ -796,7 +796,9 @@ final class SwitcherView: NSView, TabStripDelegate {
         let letterHints = base.tileLetterArea > 0
         let userCap = effective.gridMaxColumns
 
-        func fits(_ m: SwitcherMetrics) -> Bool {
+        /// `allowWrap: false` also rejects a grid that needs a second row, so the
+        /// shrink loop can look for a scale that keeps everything on one.
+        func fits(_ m: SwitcherMetrics, allowWrap: Bool = true) -> Bool {
             let reservedSearch = m.reservedSearchHeight(active: searchActive)
             let reservedTab = tabActive ? TabStripView.stripHeight + m.outerPadding : 0
             let maxW = frame.width * maxScreenWidthFraction - m.outerPadding * 2
@@ -824,15 +826,27 @@ final class SwitcherView: NSView, TabStripDelegate {
             }
             let fit = Self.gridFit(count: count, tileW: tileW, itemH: itemH, gap: gap,
                                    maxListWidth: maxW, maxListHeight: maxH, userCap: userCap)
+            if !allowWrap && fit.rowsCount > 1 { return false }
             return fit.listHeight <= maxH
         }
 
-        if fits(base) { return base }
+        // The macOS switcher never opens a second row: past a screenful of apps
+        // it shrinks the icons until they all fit on one. The grid does the same
+        // while a single row is still reachable above the scale floor. A user
+        // column cap asks for rows, and the list and preview layouts wrap by
+        // design, so both keep wrapping.
+        let noWrap = base.layoutMode == .gridView && userCap == 0
+
+        if fits(base, allowWrap: !noWrap) { return base }
         // Shrink in small steps until it fits or we hit the floor (half the base
         // scale, and never below 0.5) — past that the clamp handles the residual.
         let minScale = max(0.5, base.scale * 0.5)
         var scale = base.scale
         var candidate = base
+        // Biggest scale that fits only by wrapping. Kept so a count that can't be
+        // squeezed onto one row even at the floor falls back to the largest tiles
+        // that fit rather than to the smallest ones the loop tried.
+        var wrapping: SwitcherMetrics? = noWrap && fits(base) ? base : nil
         while scale > minScale + 0.001 {
             scale = max(minScale, scale - 0.05)
             // Preserve a tab-only preview label band already present in `base`.
@@ -841,9 +855,10 @@ final class SwitcherView: NSView, TabStripDelegate {
             let reserveBand = base.previewLabelArea > 0
                 && !effective.showWindowTitleLabel
             candidate = SwitcherMetrics.forScale(scale, layoutMode: base.layoutMode, fontScale: effective.fontScale.multiplier, letterHints: letterHints, showAppNames: effective.showApplicationNames, showWindowTitles: effective.showWindowTitleLabel, hoverActionCount: Preferences.shared.enabledHoverActionCount, browserTabsExpanded: reserveBand)
-            if fits(candidate) { return candidate }
+            if fits(candidate, allowWrap: !noWrap) { return candidate }
+            if noWrap, wrapping == nil, fits(candidate) { wrapping = candidate }
         }
-        return candidate
+        return wrapping ?? candidate
     }
 
     private func computeLayout() -> ListLayout {
