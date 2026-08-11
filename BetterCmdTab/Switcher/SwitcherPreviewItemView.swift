@@ -276,7 +276,7 @@ final class SwitcherPreviewItemView: NSView, SwitcherItemViewProtocol {
         if let browserKey = row.browserTabPreviewKey {
             thumbnailKey = .browserTab(browserKey)
             isActiveBrowserTab = row.browserTab?.isActive == true
-            browserTabPreviewEnabled = Preferences.shared.experimentalBrowserTabPreviews
+            browserTabPreviewEnabled = Preferences.shared.browserTabPreviews
             imageView.image = browserTabPreviewEnabled
                 ? WindowThumbnailCache.shared.image(for: .browserTab(browserKey)) ?? icon
                 : icon

@@ -346,6 +346,84 @@ struct SettingsPortabilityTests {
         #expect(prefs.instantSpaceSwitch == true)
     }
 
+    @Test("pre-graduation Previews-capture import (legacy keys only) applies through the fallback")
+    func legacyPreviewCaptureImport() throws {
+        let prefs = Preferences.shared
+        let saved = [
+            Preferences.Keys.browserTabPreviews, Preferences.Keys.legacyBrowserTabPreviews,
+            Preferences.Keys.livePreviews, Preferences.Keys.legacyLivePreviews,
+        ].map { ($0, UserDefaults.standard.object(forKey: $0)) }
+        defer {
+            // Restore all four keys to their raw pre-test state — `set(nil:)`
+            // removes one this host never had. Leaving a legacy key planted would
+            // ride along in every later export and config.json write-back on the
+            // developer's machine. Restoring twice is deliberate: reloading in
+            // between resyncs the published properties, but its mirroring didSet
+            // re-plants both keys whenever that resync flips a value.
+            for (key, value) in saved { UserDefaults.standard.set(value, forKey: key) }
+            prefs.reloadFromDefaults()
+            for (key, value) in saved { UserDefaults.standard.set(value, forKey: key) }
+        }
+
+        // Local state has the graduated keys stored… (forced transition, so the
+        // mirroring didSet runs even on a host that already had these on).
+        prefs.browserTabPreviews = false
+        prefs.livePreviews = false
+        prefs.browserTabPreviews = true
+        prefs.livePreviews = true
+        // Every change also writes the pre-graduation key, so a downgraded build
+        // sharing this config.json keeps reading the same value.
+        #expect(UserDefaults.standard.object(forKey: Preferences.Keys.legacyBrowserTabPreviews) as? Bool == true)
+        #expect(UserDefaults.standard.object(forKey: Preferences.Keys.legacyLivePreviews) as? Bool == true)
+        // Opting back out has to mirror too: a legacy key stuck on `true` would
+        // leave a downgraded build still capturing after the user turned it off.
+        prefs.browserTabPreviews = false
+        prefs.livePreviews = false
+        #expect(UserDefaults.standard.object(forKey: Preferences.Keys.legacyBrowserTabPreviews) as? Bool == false)
+        #expect(UserDefaults.standard.object(forKey: Preferences.Keys.legacyLivePreviews) as? Bool == false)
+        prefs.browserTabPreviews = true
+        prefs.livePreviews = true
+
+        // …then a pre-graduation export carrying only the experimental keys is
+        // imported. The stale local keys must not shadow the imported values.
+        try prefs.importSettings(from: flat([
+            "experimentalBrowserTabPreviews": false,
+            "experimentalLivePreviews": false,
+        ]))
+        #expect(prefs.browserTabPreviews == false)
+        #expect(prefs.livePreviews == false)
+
+        // Same the other way round: legacy-only import turns them back on.
+        try prefs.importSettings(from: flat([
+            "experimentalBrowserTabPreviews": true,
+            "experimentalLivePreviews": true,
+        ]))
+        #expect(prefs.browserTabPreviews == true)
+        #expect(prefs.livePreviews == true)
+
+        // A post-graduation export carries both keys; the graduated one wins.
+        try prefs.importSettings(from: flat([
+            "browserTabPreviews": false,
+            "experimentalBrowserTabPreviews": true,
+            "livePreviews": false,
+            "experimentalLivePreviews": true,
+        ]))
+        #expect(prefs.browserTabPreviews == false)
+        #expect(prefs.livePreviews == false)
+
+        // A hand-written legacy value that isn't a bool must not drop the
+        // graduated key: importSettings matches on `as? Bool`, not on mere
+        // presence, so the local opt-in survives instead of reading back false.
+        prefs.browserTabPreviews = true
+        prefs.livePreviews = true
+        try prefs.importSettings(from: flat([
+            "experimentalBrowserTabPreviews": "yes",
+            "experimentalLivePreviews": "yes",
+        ]))
+        #expect(prefs.browserTabPreviews == true)
+        #expect(prefs.livePreviews == true)
+    }
+
     @Test("pre-#105 panel preset import replaces a local continuous scale")
     func legacyPanelScaleImport() throws {
         let prefs = Preferences.shared

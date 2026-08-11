@@ -258,6 +258,13 @@ enum ConfigSchemaDocs {
             range: Preferences.gridMaxColumnsRange),
         "gridSingleRow": ConfigSettingDoc(
             "boolean", "Keep the grid on one row, shrinking the icons to fit, instead of wrapping. Ignored while gridMaxColumns caps the columns."),
+        "browserTabPreviews": ConfigSettingDoc("boolean", "Show thumbnails for browser tabs in the Previews layout."),
+        "experimentalBrowserTabPreviews": ConfigSettingDoc(
+            "boolean", "Legacy browser-tab-preview flag, kept in sync with browserTabPreviews for older builds. Edit browserTabPreviews instead."),
+        "livePreviews": ConfigSettingDoc(
+            "boolean", "Keep window previews refreshing while the panel is open. Costs CPU/GPU; needs macOS 14 or later."),
+        "experimentalLivePreviews": ConfigSettingDoc(
+            "boolean", "Legacy live-preview flag, kept in sync with livePreviews for older builds. Edit livePreviews instead."),
         "panelAppearance": ConfigSettingDoc(
             "string", "Light or dark switcher, independent of the rest of macOS.",
             values: ConfigValues(PanelAppearance.self, \.displayName)),
@@ -440,7 +447,5 @@ enum ConfigSchemaDocs {
         "swipeSensitivity": ConfigSettingDoc(
             "integer", "How far fingers must slide to advance one app. Higher = more sensitive.",
             range: Preferences.swipeSensitivityRange),
-        "experimentalBrowserTabPreviews": ConfigSettingDoc("boolean", "Show thumbnails for browser tabs."),
-        "experimentalLivePreviews": ConfigSettingDoc("boolean", "Keep window previews refreshing while the panel is open. Costs CPU/GPU."),
     ]
 }

@@ -89,6 +89,10 @@
       "description" : "Track browser tabs in the recency order.",
       "type" : "boolean"
     },
+    "browserTabPreviews" : {
+      "description" : "Show thumbnails for browser tabs in the Previews layout.",
+      "type" : "boolean"
+    },
     "browserTabRowLimit" : {
       "description" : "Cap on tab entries per browser window. 0 = unlimited; anything else is taken as 2…16.",
       "maximum" : 16,
@@ -172,7 +176,7 @@
       "type" : "boolean"
     },
     "experimentalBrowserTabPreviews" : {
-      "description" : "Show thumbnails for browser tabs.",
+      "description" : "Legacy browser-tab-preview flag, kept in sync with browserTabPreviews for older builds. Edit browserTabPreviews instead.",
       "type" : "boolean"
     },
     "experimentalInstantSpaceSwitch" : {
@@ -180,7 +184,7 @@
       "type" : "boolean"
     },
     "experimentalLivePreviews" : {
-      "description" : "Keep window previews refreshing while the panel is open. Costs CPU\/GPU.",
+      "description" : "Legacy live-preview flag, kept in sync with livePreviews for older builds. Edit livePreviews instead.",
       "type" : "boolean"
     },
     "experimentalSwipeTrigger" : {
@@ -324,6 +328,10 @@
       "maximum" : 100,
       "minimum" : 30,
       "type" : "integer"
+    },
+    "livePreviews" : {
+      "description" : "Keep window previews refreshing while the panel is open. Costs CPU\/GPU; needs macOS 14 or later.",
+      "type" : "boolean"
     },
     "mouseClickSelectionEnabled" : {
       "description" : "Click an entry to switch to it.",

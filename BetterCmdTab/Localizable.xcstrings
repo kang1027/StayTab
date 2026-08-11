@@ -9156,6 +9156,40 @@
         }
       }
     },
+    "Requires macOS 14 or later. Thumbnails are captured once each time the switcher opens." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erfordert macOS 14 oder neuer. Miniaturen werden bei jedem \u00d6ffnen des Umschalters einmal aufgenommen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requiere macOS 14 o posterior. Las miniaturas se capturan una vez cada vez que se abre el conmutador."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "N\u00e9cessite macOS 14 ou version ult\u00e9rieure. Les miniatures sont captur\u00e9es une fois \u00e0 chaque ouverture du s\u00e9lecteur."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wymaga macOS 14 lub nowszego. Miniatury s\u0105 przechwytywane raz przy ka\u017cdym otwarciu prze\u0142\u0105cznika."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\u9700\u8981 macOS 14 \u6216\u66f4\u9ad8\u7248\u672c\u3002\u6bcf\u6b21\u6253\u5f00\u5207\u6362\u5668\u65f6\u7f29\u7565\u56fe\u53ea\u6355\u83b7\u4e00\u6b21\u3002"
+          }
+        }
+      }
+    },
     "Restart to Update" : {
       "localizations" : {
         "de" : {

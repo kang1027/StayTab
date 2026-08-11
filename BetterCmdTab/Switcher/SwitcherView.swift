@@ -305,7 +305,7 @@ final class SwitcherView: NSView, TabStripDelegate {
     /// between the old 2 fps behavior and the cost of continuously recapturing
     /// every visible window.
     private func syncLivePreviewTimer() {
-        guard #available(macOS 14.0, *), Preferences.shared.experimentalLivePreviews else {
+        guard #available(macOS 14.0, *), Preferences.shared.livePreviews else {
             stopLivePreviewTimer()
             return
         }
@@ -338,7 +338,7 @@ final class SwitcherView: NSView, TabStripDelegate {
             case .window(let wid):
                 WindowThumbnailCache.shared.requestLiveFrame(wid: wid, pixelHeight: pixelHeight)
             case .browserTab(let tab) where preview.isActiveBrowserTab
-                && Preferences.shared.experimentalBrowserTabPreviews:
+                && Preferences.shared.browserTabPreviews:
                 WindowThumbnailCache.shared.requestBrowserTab(tab, pixelHeight: pixelHeight, isLive: true)
             case .browserTab:
                 break

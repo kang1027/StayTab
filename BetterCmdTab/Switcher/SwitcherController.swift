@@ -4036,7 +4036,7 @@ final class SwitcherController: SwitcherViewDelegate {
     /// At most one non-blocking browser-tab capture per switcher trigger.
     private func prewarmActiveBrowserTabPreview() {
         guard !browserTabPreviewRequested,
-              Preferences.shared.experimentalBrowserTabPreviews,
+              Preferences.shared.browserTabPreviews,
               effective.layoutMode == .windowPreview,
               phase == .primed || phase == .visible,
               let app = previousFrontmostApp,

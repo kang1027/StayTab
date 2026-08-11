@@ -98,6 +98,37 @@ struct PreferencesEnumTests {
         #expect(Preferences.storedInstantSpaceSwitch(defaults) == true)
     }
 
+    @Test("the Previews capture toggles prefer the graduated key, falling back to the experimental one")
+    func storedPreviewCaptureMigration() throws {
+        let suite = "storedPreviewCaptureMigrationTests"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        // Fresh install: neither key → off, both stay opt-in.
+        #expect(Preferences.storedBrowserTabPreviews(defaults) == false)
+        #expect(Preferences.storedLivePreviews(defaults) == false)
+
+        // Pre-graduation key only — an upgrade, or an import/config.json still
+        // carrying the experimental name: the choice must survive.
+        defaults.set(true, forKey: Preferences.Keys.legacyBrowserTabPreviews)
+        defaults.set(true, forKey: Preferences.Keys.legacyLivePreviews)
+        #expect(Preferences.storedBrowserTabPreviews(defaults) == true)
+        #expect(Preferences.storedLivePreviews(defaults) == true)
+
+        // The graduated key wins over a contradicting legacy one, both ways round.
+        defaults.set(false, forKey: Preferences.Keys.browserTabPreviews)
+        defaults.set(false, forKey: Preferences.Keys.livePreviews)
+        #expect(Preferences.storedBrowserTabPreviews(defaults) == false)
+        #expect(Preferences.storedLivePreviews(defaults) == false)
+
+        defaults.set(false, forKey: Preferences.Keys.legacyBrowserTabPreviews)
+        defaults.set(false, forKey: Preferences.Keys.legacyLivePreviews)
+        defaults.set(true, forKey: Preferences.Keys.browserTabPreviews)
+        defaults.set(true, forKey: Preferences.Keys.livePreviews)
+        #expect(Preferences.storedBrowserTabPreviews(defaults) == true)
+        #expect(Preferences.storedLivePreviews(defaults) == true)
+    }
+
     @Test("panel scale clamps and migrates every legacy preset")
     func panelScaleMigration() {
         // Floor dropped to 35 in #170: a percentage now buys 1.5x what it used to,

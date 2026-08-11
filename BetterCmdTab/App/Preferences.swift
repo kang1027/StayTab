@@ -784,12 +784,21 @@ final class Preferences: ObservableObject {
         /// Pre-graduation key (the instant Space switch used to live behind the
         /// Experimental tab); read as a fallback so an earlier choice carries over.
         static let legacyInstantSpaceSwitch = "Switcher.experimentalInstantSpaceSwitch"
-        static let experimentalBrowserTabPreviews = "Switcher.experimentalBrowserTabPreviews"
+        /// Capture the active browser tab for the Previews layout. Default off —
+        /// it adds a per-trigger screen capture on top of the window shots.
+        static let browserTabPreviews = "Switcher.browserTabPreviews"
+        /// Pre-graduation key (tab previews used to live behind the Experimental
+        /// tab); read as a fallback so a user's earlier choice carries over.
+        static let legacyBrowserTabPreviews = "Switcher.experimentalBrowserTabPreviews"
         /// Continuously refresh window-preview thumbnails while the panel is
         /// open, so tiles show live window contents instead of a frame captured
         /// on reveal. Default off — recurring captures cost CPU/GPU on an
-        /// otherwise idle open panel.
-        static let experimentalLivePreviews = "Switcher.experimentalLivePreviews"
+        /// otherwise idle open panel. Needs macOS 14 (ScreenCaptureKit still
+        /// image API); on macOS 13 the flag is inert.
+        static let livePreviews = "Switcher.livePreviews"
+        /// Pre-graduation key (live previews used to live behind the Experimental
+        /// tab); read as a fallback so a user's earlier choice carries over.
+        static let legacyLivePreviews = "Switcher.experimentalLivePreviews"
         /// `\` tab drill-in (peek the highlighted window's tabs in a strip).
         /// Graduated out of the Experimental tab in 26.x and flipped to default
         /// ON (intentional — the `\` peek is now the standard way to reach tabs).
@@ -1432,10 +1441,15 @@ final class Preferences: ObservableObject {
 
     /// Capture the active browser tab once per switcher trigger for the
     /// Previews layout. Off by default because it requires screen capture work.
-    @Published var experimentalBrowserTabPreviews: Bool {
+    @Published var browserTabPreviews: Bool {
         didSet {
-            guard oldValue != experimentalBrowserTabPreviews else { return }
-            UserDefaults.standard.set(experimentalBrowserTabPreviews, forKey: Keys.experimentalBrowserTabPreviews)
+            guard oldValue != browserTabPreviews else { return }
+            let defaults = UserDefaults.standard
+            defaults.set(browserTabPreviews, forKey: Keys.browserTabPreviews)
+            // Keep the pre-graduation key in step so a downgraded build, or a
+            // second Mac on an older version sharing this config.json, reads
+            // the same value instead of silently losing the opt-in.
+            defaults.set(browserTabPreviews, forKey: Keys.legacyBrowserTabPreviews)
         }
     }
 
@@ -1444,10 +1458,15 @@ final class Preferences: ObservableObject {
     /// reveal-time still without using persistent streams, whose system sharing
     /// indicators would be shown on every captured window. Off by default because
     /// each visible window adds capture work while the panel is up.
-    @Published var experimentalLivePreviews: Bool {
+    @Published var livePreviews: Bool {
         didSet {
-            guard oldValue != experimentalLivePreviews else { return }
-            UserDefaults.standard.set(experimentalLivePreviews, forKey: Keys.experimentalLivePreviews)
+            guard oldValue != livePreviews else { return }
+            let defaults = UserDefaults.standard
+            defaults.set(livePreviews, forKey: Keys.livePreviews)
+            // Keep the pre-graduation key in step so a downgraded build, or a
+            // second Mac on an older version sharing this config.json, reads
+            // the same value instead of silently losing the opt-in.
+            defaults.set(livePreviews, forKey: Keys.legacyLivePreviews)
         }
     }
 
@@ -2066,6 +2085,20 @@ final class Preferences: ObservableObject {
             ?? false
     }
 
+    /// Same graduation fallback for the two Previews-layout capture toggles,
+    /// which moved out of the Experimental pane.
+    nonisolated static func storedBrowserTabPreviews(_ defaults: UserDefaults) -> Bool {
+        defaults.object(forKey: Keys.browserTabPreviews) as? Bool
+            ?? defaults.object(forKey: Keys.legacyBrowserTabPreviews) as? Bool
+            ?? false
+    }
+
+    nonisolated static func storedLivePreviews(_ defaults: UserDefaults) -> Bool {
+        defaults.object(forKey: Keys.livePreviews) as? Bool
+            ?? defaults.object(forKey: Keys.legacyLivePreviews) as? Bool
+            ?? false
+    }
+
     /// Pads/truncates to exactly `directActivationSlotCount` entries.
     static func normalizeBindings(_ value: [String]) -> [String] {
         var out = Array(value.prefix(directActivationSlotCount))
@@ -2194,8 +2227,8 @@ final class Preferences: ObservableObject {
         self.browserTabRowLimit = Self.clampBrowserTabRowLimit(defaults.object(forKey: Keys.browserTabRowLimit) as? Int ?? 0)
         self.showBrowserIconOnTabs = defaults.object(forKey: Keys.showBrowserIconOnTabs) as? Bool ?? false
         self.browserTabMRU = Self.storedBrowserTabMRU(defaults)
-        self.experimentalBrowserTabPreviews = defaults.object(forKey: Keys.experimentalBrowserTabPreviews) as? Bool ?? false
-        self.experimentalLivePreviews = defaults.object(forKey: Keys.experimentalLivePreviews) as? Bool ?? false
+        self.browserTabPreviews = Self.storedBrowserTabPreviews(defaults)
+        self.livePreviews = Self.storedLivePreviews(defaults)
         // Badges graduated out of the Experimental tab and now default on. Honor
         // the new key if present, otherwise carry over a choice made under the
         // old experimental key, otherwise default to on.
@@ -2346,8 +2379,8 @@ final class Preferences: ObservableObject {
         browserTabRowLimit = defaults.object(forKey: Keys.browserTabRowLimit) as? Int ?? 0
         showBrowserIconOnTabs = defaults.object(forKey: Keys.showBrowserIconOnTabs) as? Bool ?? false
         browserTabMRU = Self.storedBrowserTabMRU(defaults)
-        experimentalBrowserTabPreviews = defaults.object(forKey: Keys.experimentalBrowserTabPreviews) as? Bool ?? false
-        experimentalLivePreviews = defaults.object(forKey: Keys.experimentalLivePreviews) as? Bool ?? false
+        browserTabPreviews = Self.storedBrowserTabPreviews(defaults)
+        livePreviews = Self.storedLivePreviews(defaults)
         showUnreadBadges = defaults.object(forKey: Keys.showUnreadBadges) as? Bool ?? true
 
         showWindowTitleLabel = defaults.object(forKey: Keys.showWindowTitleLabel) as? Bool ?? true

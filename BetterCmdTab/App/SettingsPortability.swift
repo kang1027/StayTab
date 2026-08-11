@@ -270,6 +270,13 @@ extension Preferences {
         if values[Preferences.Keys.legacyInstantSpaceSwitch] as? Bool != nil, values[Preferences.Keys.instantSpaceSwitch] == nil {
             defaults.removeObject(forKey: Preferences.Keys.instantSpaceSwitch)
         }
+        // Same for the two pre-graduation Previews-layout capture exports.
+        if values[Preferences.Keys.legacyBrowserTabPreviews] as? Bool != nil, values[Preferences.Keys.browserTabPreviews] == nil {
+            defaults.removeObject(forKey: Preferences.Keys.browserTabPreviews)
+        }
+        if values[Preferences.Keys.legacyLivePreviews] as? Bool != nil, values[Preferences.Keys.livePreviews] == nil {
+            defaults.removeObject(forKey: Preferences.Keys.livePreviews)
+        }
         reloadFromDefaults()
         // The import may have introduced scoped shortcuts with ids that didn't
         // exist at launch; install their Carbon handlers now (idempotent) so a

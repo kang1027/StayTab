@@ -51,12 +51,12 @@ enum SettingsAnchor {
     static let pinned = "apps.pinned"
     // Appearance
     static let appearanceLayout = "appearance.layoutSection"
+    static let appearancePreviews = "appearance.previews"
     static let appearanceLabels = "appearance.labels"
     static let appearancePanel = "appearance.panel"
     // Experimental
     static let experimental = "experimental.features"
     static let experimentalSwipe = "experimental.swipeSection"
-    static let experimentalPreviews = "experimental.windowPreviews"
     // About
     static let about = "about.info"
 }
@@ -144,14 +144,14 @@ enum SearchID {
     static let opacity = "appearance.opacity"
     static let cornerRadius = "appearance.cornerRadius"
     static let preview = "appearance.preview"
+    static let browserTabPreviews = "appearance.browserTabPreviews"
+    static let livePreviews = "appearance.livePreviews"
     // Experimental
     static let swipe = "experimental.swipe"
     static let swipeMode = "experimental.swipeMode"
     static let reverseSwipe = "experimental.reverseSwipe"
     static let switchOnRelease = "experimental.switchOnRelease"
     static let sensitivity = "experimental.sensitivity"
-    static let browserTabPreviews = "experimental.browserTabPreviews"
-    static let livePreviews = "experimental.livePreviews"
 }
 
 @MainActor
@@ -376,6 +376,11 @@ enum SettingsCatalog {
              String(localized: "Grid columns"), ["grid", "columns"]),
         item(SearchID.gridSingleRow, .appearance, SettingsAnchor.appearanceLayout, String(localized: "Appearance"), String(localized: "Layout"),
              String(localized: "Single row"), ["grid", "single row", "one row", "rows", "wrap", "shrink"]),
+        // Appearance · Previews
+        item(SearchID.browserTabPreviews, .appearance, SettingsAnchor.appearancePreviews, String(localized: "Appearance"), String(localized: "Previews"),
+             String(localized: "Browser tab previews"), ["browser", "tab", "preview", "previews", "thumbnail", "safari", "chrome"]),
+        item(SearchID.livePreviews, .appearance, SettingsAnchor.appearancePreviews, String(localized: "Appearance"), String(localized: "Previews"),
+             String(localized: "Live window previews"), ["live", "preview", "previews", "thumbnail", "thumbnails", "refresh", "video"]),
         // Appearance · Labels
         item(SearchID.textSize, .appearance, SettingsAnchor.appearanceLabels, String(localized: "Appearance"), String(localized: "Labels"),
              String(localized: "Text size"), ["text size", "font size", "smaller", "larger", "text", "scale"]),
@@ -447,11 +452,6 @@ enum SettingsCatalog {
              String(localized: "Switch on release"), ["release", "commit", "lift"]),
         item(SearchID.sensitivity, .experimental, SettingsAnchor.experimentalSwipe, String(localized: "Experimental"), String(localized: "Trackpad swipe"),
              String(localized: "Swipe sensitivity"), ["sensitivity", "swipe", "distance"]),
-        // Experimental · Previews
-        item(SearchID.browserTabPreviews, .experimental, SettingsAnchor.experimentalPreviews, String(localized: "Experimental"), String(localized: "Previews"),
-             String(localized: "Browser tab previews"), ["browser", "tab", "preview", "previews", "thumbnail", "safari", "chrome"]),
-        item(SearchID.livePreviews, .experimental, SettingsAnchor.experimentalPreviews, String(localized: "Experimental"), String(localized: "Previews"),
-             String(localized: "Live window previews"), ["live", "preview", "previews", "thumbnail", "thumbnails", "refresh", "video"]),
     ]
 
     private static func item(

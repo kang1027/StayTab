@@ -38,20 +38,17 @@ export type SchemaFragment = {
 const properties = schema.properties as Record<string, SchemaFragment>;
 
 /** Ordered sections, mirroring how the settings window groups the same options. */
-const sections: { title: string; blurb: string; keys: string[] }[] = [
+const sections: { title: string; keys: string[] }[] = [
   {
     title: 'Display & timing',
-    blurb: 'Where the panel opens and how quickly it reacts.',
     keys: ['displayMode', 'revealDelayMs', 'titleRefreshIntervalMs'],
   },
   {
     title: 'Layout',
-    blurb: 'Which layout the switcher uses and how big it is.',
     keys: ['layoutMode', 'panelScalePercent', 'listWidthPercent', 'gridMaxColumns', 'gridSingleRow'],
   },
   {
     title: 'Appearance',
-    blurb: 'Colour, blur, corners and typography of the panel.',
     keys: [
       'panelAppearance',
       'panelOpacity',
@@ -65,11 +62,12 @@ const sections: { title: string; blurb: string; keys: string[] }[] = [
       'showWindowTitleLabel',
       'previewTitleAlignment',
       'titleTruncationMode',
+      'browserTabPreviews',
+      'livePreviews',
     ],
   },
   {
     title: 'Contents',
-    blurb: 'Which apps and windows the switcher lists, in what order, and how it jumps to the one you pick.',
     keys: [
       'sortOrder',
       'spaceScope',
@@ -90,7 +88,6 @@ const sections: { title: string; blurb: string; keys: string[] }[] = [
   },
   {
     title: 'Tabs',
-    blurb: 'How browser and native tabs appear in the list.',
     keys: [
       'tabDrillEnabled',
       'expandTabsAsWindows',
@@ -102,7 +99,6 @@ const sections: { title: string; blurb: string; keys: string[] }[] = [
   },
   {
     title: 'Search',
-    blurb: 'Type-to-filter and letter-jump behaviour.',
     keys: [
       'fuzzySearchEnabled',
       'fuzzySearchRankBestMatchFirst',
@@ -115,7 +111,6 @@ const sections: { title: string; blurb: string; keys: string[] }[] = [
   },
   {
     title: 'Keyboard',
-    blurb: 'What happens while the shortcut is held, and how stepping works.',
     keys: [
       'stayOpenOnRelease',
       'stayOpenOnQuickTap',
@@ -126,7 +121,6 @@ const sections: { title: string; blurb: string; keys: string[] }[] = [
   },
   {
     title: 'Mouse & hover',
-    blurb: 'Pointer selection and the inline action buttons.',
     keys: [
       'scrollToSwitch',
       'scrollReverseDirection',
@@ -144,18 +138,14 @@ const sections: { title: string; blurb: string; keys: string[] }[] = [
   },
   {
     title: 'Window management',
-    blurb: 'Behaviour of the tiling shortcuts.',
     keys: ['cycleTileWidths'],
   },
   {
     title: 'Shortcuts',
-    blurb:
-      'The key combinations themselves are recorded outside this file. Scoped shortcuts and per-shortcut overrides are documented on their own pages.',
     keys: ['directActivationBindings', 'nextScopedShortcutID'],
   },
   {
     title: 'Feedback & menu bar',
-    blurb: 'Sound, haptics, the menu-bar icon and screen-sharing privacy.',
     keys: [
       'hideMenuBarIcon',
       'hapticOnCommit',
@@ -166,22 +156,16 @@ const sections: { title: string; blurb: string; keys: string[] }[] = [
   },
   {
     title: 'Experimental',
-    blurb:
-      'Off by default and matching the Experimental settings pane. These can change or disappear between releases.',
     keys: [
       'experimentalSwipeTrigger',
       'swipeMode',
       'swipeReverseDirection',
       'swipeCommitOnRelease',
       'swipeSensitivity',
-      'experimentalBrowserTabPreviews',
-      'experimentalLivePreviews',
     ],
   },
   {
     title: 'Legacy',
-    blurb:
-      'Superseded keys — always set the replacement named in the description instead. Only panelSize is migrated and then deleted; currentSpaceOnly, scopedShortcutScopes, experimentalBrowserTabMRU and experimentalInstantSpaceSwitch are still written on every change so older builds reading the same file stay consistent, so expect to see them; excludedBundleIDs and experimentalUnreadBadges are read as fallbacks at launch only and are never removed.',
     keys: [
       'panelSize',
       'currentSpaceOnly',
@@ -189,6 +173,8 @@ const sections: { title: string; blurb: string; keys: string[] }[] = [
       'experimentalUnreadBadges',
       'experimentalBrowserTabMRU',
       'experimentalInstantSpaceSwitch',
+      'experimentalBrowserTabPreviews',
+      'experimentalLivePreviews',
       'scopedShortcutScopes',
     ],
   },
@@ -221,6 +207,7 @@ const defaults: Record<string, string> = {
   backtickReversesAppSwitching: 'false',
   boldSelectedLabel: 'true',
   browserTabMRU: 'false',
+  browserTabPreviews: 'false',
   browserTabRowLimit: '0',
   clickOutsideToDismiss: 'true',
   commitSoundName: '"Tink"',
@@ -229,8 +216,6 @@ const defaults: Record<string, string> = {
   displayMode: '"mouseCursor"',
   expandBrowserTabsAsWindows: 'false',
   expandTabsAsWindows: 'false',
-  experimentalBrowserTabPreviews: 'false',
-  experimentalLivePreviews: 'false',
   experimentalSwipeTrigger: 'false',
   fontFace: '"system"',
   fontScale: '"standard"',
@@ -254,6 +239,7 @@ const defaults: Record<string, string> = {
   letterChainTimeoutMs: '1000',
   letterHintsEnabled: 'true',
   listWidthPercent: '100',
+  livePreviews: 'false',
   mouseClickSelectionEnabled: 'true',
   mouseHoverSelectionEnabled: 'true',
   panelAppearance: '"system"',
@@ -306,7 +292,6 @@ export type ConfigKey = {
 export type ConfigSection = {
   title: string;
   translationKey: string;
-  blurb: string;
   keys: ConfigKey[];
 };
 
@@ -361,7 +346,6 @@ export function configSections(): ConfigSection[] {
     grouped.push({
       title: 'Other',
       translationKey: 'other',
-      blurb: 'Present in the schema but not yet grouped in these docs.',
       keys: orphans.map(key),
     });
   }

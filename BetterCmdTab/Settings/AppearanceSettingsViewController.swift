@@ -17,6 +17,8 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
     private let fontSizePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let fontFacePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let gridSingleRowSwitch = NSSwitch()
+    private let browserTabPreviewSwitch = NSSwitch()
+    private let livePreviewSwitch = NSSwitch()
     private let windowTitleSwitch = NSSwitch()
     private let appNamesSwitch = NSSwitch()
     private let statusIconsSwitch = NSSwitch()
@@ -105,6 +107,25 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
         addRow(to: layout, title: String(localized: "Single row"),
                subtitle: String(localized: "Shrink the icons to keep every window on one line instead of starting a second row."),
                accessory: gridSingleRowSwitch, searchItemID: SearchID.gridSingleRow)
+
+        // Previews section — what the Previews layout puts inside each tile.
+        let previews = addSection(title: String(localized: "Previews"), anchor: SettingsAnchor.appearancePreviews)
+
+        configureSwitch(browserTabPreviewSwitch, action: #selector(toggleBrowserTabPreviews(_:)))
+        addRow(to: previews, title: String(localized: "Browser tab previews"),
+               subtitle: String(localized: "Capture the active browser tab for the Previews layout. Background tabs use an earlier cached image or their favicon."),
+               accessory: browserTabPreviewSwitch, searchItemID: SearchID.browserTabPreviews)
+
+        configureSwitch(livePreviewSwitch, action: #selector(toggleLivePreviews(_:)))
+        // Live refresh rides on the macOS 14 ScreenCaptureKit still-image API;
+        // on macOS 13 the toggle would be inert, so say why it is unavailable.
+        let liveAvailable = if #available(macOS 14.0, *) { true } else { false }
+        addRow(to: previews, title: String(localized: "Live window previews"),
+               subtitle: liveAvailable
+                   ? String(localized: "In the Previews layout, thumbnails keep refreshing while the switcher is open, so they show what is happening in each window right now. Uses extra CPU and GPU while the panel is up.")
+                   : String(localized: "Requires macOS 14 or later. Thumbnails are captured once each time the switcher opens."),
+               accessory: livePreviewSwitch, searchItemID: SearchID.livePreviews)
+        livePreviewSwitch.isEnabled = liveAvailable
 
         // Labels section — the text on each row/tile.
         let labels = addSection(title: String(localized: "Labels"), anchor: SettingsAnchor.appearanceLabels)
@@ -322,6 +343,14 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.gridSingleRowSwitch.state = $0 ? .on : .off }
             .store(in: &cancellables)
+        prefs.$browserTabPreviews
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.browserTabPreviewSwitch.state = $0 ? .on : .off }
+            .store(in: &cancellables)
+        prefs.$livePreviews
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.livePreviewSwitch.state = $0 ? .on : .off }
+            .store(in: &cancellables)
         prefs.$showWindowTitleLabel
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.windowTitleSwitch.state = $0 ? .on : .off }
@@ -380,6 +409,8 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
         selectAppearance(prefs.panelAppearance)
         selectGrid(prefs.gridMaxColumns)
         gridSingleRowSwitch.state = prefs.gridSingleRow ? .on : .off
+        browserTabPreviewSwitch.state = prefs.browserTabPreviews ? .on : .off
+        livePreviewSwitch.state = prefs.livePreviews ? .on : .off
         applyListWidth(prefs.listWidthPercent)
         windowTitleSwitch.state = prefs.showWindowTitleLabel ? .on : .off
         selectTitleAlignment(prefs.previewTitleAlignment)
@@ -468,6 +499,14 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
 
     @objc private func toggleGridSingleRow(_ sender: NSSwitch) {
         Preferences.shared.gridSingleRow = (sender.state == .on)
+    }
+
+    @objc private func toggleBrowserTabPreviews(_ sender: NSSwitch) {
+        Preferences.shared.browserTabPreviews = (sender.state == .on)
+    }
+
+    @objc private func toggleLivePreviews(_ sender: NSSwitch) {
+        Preferences.shared.livePreviews = (sender.state == .on)
     }
 
     @objc private func toggleWindowTitle(_ sender: NSSwitch) {

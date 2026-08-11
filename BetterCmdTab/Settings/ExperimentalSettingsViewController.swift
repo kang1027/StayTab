@@ -14,8 +14,6 @@ final class ExperimentalSettingsViewController: SettingsTabViewController {
     private let commitSwitch = NSSwitch()
     private let sensitivitySlider = NSSlider()
     private let sensitivityValueLabel = NSTextField(labelWithString: "")
-    private let browserTabPreviewSwitch = NSSwitch()
-    private let livePreviewSwitch = NSSwitch()
 
     override func setupContent() {
         // Untitled intro card — the unstable warning applies to the whole tab,
@@ -55,17 +53,6 @@ final class ExperimentalSettingsViewController: SettingsTabViewController {
         addRow(to: swipe, title: String(localized: "Swipe sensitivity"),
                subtitle: String(localized: "How far to slide to move one app. Higher means a shorter slide steps further."),
                accessory: makeSensitivityControl(), searchItemID: SearchID.sensitivity)
-
-        // Previews section (the window-preview layout).
-        let previews = addSection(title: String(localized: "Previews"), anchor: SettingsAnchor.experimentalPreviews)
-        configureSwitch(browserTabPreviewSwitch, action: #selector(toggleBrowserTabPreviews(_:)))
-        addRow(to: previews, title: String(localized: "Browser tab previews"),
-               subtitle: String(localized: "Capture the active browser tab for the Previews layout. Background tabs use an earlier cached image or their favicon."),
-               accessory: browserTabPreviewSwitch, searchItemID: SearchID.browserTabPreviews)
-        configureSwitch(livePreviewSwitch, action: #selector(toggleLivePreviews(_:)))
-        addRow(to: previews, title: String(localized: "Live window previews"),
-               subtitle: String(localized: "In the Previews layout, thumbnails keep refreshing while the switcher is open, so they show what is happening in each window right now. Uses extra CPU and GPU while the panel is up."),
-               accessory: livePreviewSwitch, searchItemID: SearchID.livePreviews)
     }
 
     private func configureSwitch(_ toggle: NSSwitch, action: Selector) {
@@ -111,8 +98,6 @@ final class ExperimentalSettingsViewController: SettingsTabViewController {
         reverseSwitch.state = prefs.swipeReverseDirection ? .on : .off
         commitSwitch.state = prefs.swipeCommitOnRelease ? .on : .off
         applySensitivity(prefs.swipeSensitivity)
-        browserTabPreviewSwitch.state = prefs.experimentalBrowserTabPreviews ? .on : .off
-        livePreviewSwitch.state = prefs.experimentalLivePreviews ? .on : .off
         setSwipeSubOptionsEnabled(prefs.experimentalSwipeTrigger)
     }
 
@@ -145,14 +130,6 @@ final class ExperimentalSettingsViewController: SettingsTabViewController {
     private func applySensitivity(_ level: Int) {
         if sensitivitySlider.integerValue != level { sensitivitySlider.integerValue = level }
         sensitivityValueLabel.stringValue = "\(level)/\(Preferences.swipeSensitivityRange.upperBound)"
-    }
-
-    @objc private func toggleBrowserTabPreviews(_ sender: NSSwitch) {
-        Preferences.shared.experimentalBrowserTabPreviews = (sender.state == .on)
-    }
-
-    @objc private func toggleLivePreviews(_ sender: NSSwitch) {
-        Preferences.shared.experimentalLivePreviews = (sender.state == .on)
     }
 
     /// The reverse/commit/sensitivity controls only make sense while the swipe
