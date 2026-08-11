@@ -3,3 +3,6 @@ xcuserdata/
 build/
 .DS_Store
 buildServer.json
+
+# Subagent run artifacts
+.pi-subagents/
