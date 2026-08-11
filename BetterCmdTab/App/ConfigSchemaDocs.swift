@@ -248,7 +248,7 @@ enum ConfigSchemaDocs {
             "string", "Switcher layout: list rows, an icon grid, or window previews.",
             values: ConfigValues(SwitcherLayoutMode.self, \.displayName)),
         "panelScalePercent": ConfigSettingDoc(
-            "integer", "Overall size of the switcher panel, in percent.",
+            "integer", "Overall size of the switcher panel, in percent. 100% matches the macOS switcher.",
             range: Preferences.panelScalePercentRange),
         "listWidthPercent": ConfigSettingDoc(
             "integer", "Width of list rows as a percentage of the automatic, screen-scaled width.",

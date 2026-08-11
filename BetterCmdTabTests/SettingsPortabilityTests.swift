@@ -138,7 +138,7 @@ struct SettingsPortabilityTests {
         // Pre-#105: only the preset string, local continuous value must yield.
         prefs.panelScalePercent = 73
         try prefs.importSettings(from: flat(["panelSize": "standard"]))
-        #expect(prefs.panelScalePercent == 120)
+        #expect(prefs.panelScalePercent == 100)
     }
 
     @Test("a flat file with a null value skips the key, applies the rest")
@@ -327,15 +327,160 @@ struct SettingsPortabilityTests {
         try prefs.importSettings(from: envelope([
             Preferences.Keys.panelSize: "standard"
         ]))
-        #expect(prefs.panelScalePercent == 120)
+        #expect(prefs.panelScalePercent == 100)
         #expect(UserDefaults.standard.object(forKey: Preferences.Keys.panelSize) == nil)
-        #expect(UserDefaults.standard.integer(forKey: Preferences.Keys.panelScalePercent) == 120)
+        #expect(UserDefaults.standard.integer(forKey: Preferences.Keys.panelScalePercent) == 100)
 
         try prefs.importSettings(from: envelope([
             Preferences.Keys.panelSize: "small",
             Preferences.Keys.panelScalePercent: 61,
         ]))
         #expect(prefs.panelScalePercent == 61)
+    }
+
+    /// `config.json` written before #170 carries percentages that meant something 1.5x
+    /// smaller, and it is re-imported a moment *after* launch already migrated the
+    /// defaults — so left alone, the config-file user writes those numbers straight
+    /// back over the finished migration and keeps the oversized panel #170 is about.
+    /// What the launch migrated *from* is the only version signal a settings file has.
+    @Test("the config that was migrated from is re-based once; anything else is verbatim")
+    func panelScaleRebaseOnImport() throws {
+        let prefs = Preferences.shared
+        let defaults = UserDefaults.standard
+        let saved = prefs.panelScalePercent
+        let savedFlag = defaults.object(forKey: Preferences.Keys.panelScaleRebased)
+        let savedToken = Preferences.preRebasePanelScales
+        let savedOverrides = defaults.object(forKey: Preferences.Keys.shortcutOverrides)
+        defer {
+            Preferences.preRebasePanelScales = savedToken
+            prefs.panelScalePercent = saved
+            if let savedFlag { defaults.set(savedFlag, forKey: Preferences.Keys.panelScaleRebased) }
+            else { defaults.removeObject(forKey: Preferences.Keys.panelScaleRebased) }
+            if let savedOverrides { defaults.set(savedOverrides, forKey: Preferences.Keys.shortcutOverrides) }
+            else { defaults.removeObject(forKey: Preferences.Keys.shortcutOverrides) }
+            prefs.reloadFromDefaults()
+        }
+        let oldOverrides = [["target": "switchWindows", "panelScalePercent": "150"]]
+
+        // The upgrade sequence, in order: launch migrates this Mac's stored values,
+        // then the config file's deferred import lands still carrying the old ones.
+        Preferences.preRebasePanelScales = nil
+        defaults.set(120, forKey: Preferences.Keys.panelScalePercent)
+        defaults.set(oldOverrides, forKey: Preferences.Keys.shortcutOverrides)
+        defaults.removeObject(forKey: Preferences.Keys.panelScaleRebased)
+        Preferences.rebasePanelScalesIfNeeded(defaults)
+        prefs.reloadFromDefaults()
+        #expect(prefs.panelScalePercent == 100)
+        #expect(prefs.override(for: .switchWindows).panelScalePercent == 125)
+
+        try prefs.importSettings(from: flat(["panelScalePercent": 120, "shortcutOverrides": oldOverrides]),
+                                 mayPredateNativeSizing: true)
+        #expect(prefs.panelScalePercent == 100)
+        #expect(prefs.override(for: .switchWindows).panelScalePercent == 125)
+
+        // That dates one read, not the whole launch. A second read carrying the same
+        // number is ambiguous — either the write-back failed and this is the old file
+        // again, or the user has since typed that number meaning the new scale — and
+        // honoring it is the safer half: an oversized panel is visible and fixable in
+        // Settings, whereas re-basing silently shrinks what they typed and persists it.
+        try prefs.importSettings(from: flat(["panelScalePercent": 120]), mayPredateNativeSizing: true)
+        #expect(prefs.panelScalePercent == 120)
+
+        // A config already re-based on another Mac and synced here carries numbers this
+        // migration never produced, so it is honored instead of being shrunk twice —
+        // as is a hand-written or templated one, which is the documented dotfiles use.
+        Preferences.preRebasePanelScales = (percent: 120, overrides: ["switchWindows": 150])
+        try prefs.importSettings(
+            from: flat(["panelScalePercent": 100,
+                        "shortcutOverrides": [["target": "switchWindows", "panelScalePercent": "125"]]]),
+            mayPredateNativeSizing: true
+        )
+        #expect(prefs.panelScalePercent == 100)
+        #expect(prefs.override(for: .switchWindows).panelScalePercent == 125)
+
+        // The import panel never re-bases, not even mid-migration: a file the user
+        // picked is applied as written, and an export of the running build round-trips.
+        Preferences.preRebasePanelScales = (percent: 140, overrides: [:])
+        prefs.panelScalePercent = 140
+        try prefs.importSettings(from: Preferences.exportedJSONData())
+        #expect(prefs.panelScalePercent == 140)
+    }
+
+    /// The arithmetic of `rebasedPanelScalePercent` is covered in PreferencesEnumTests;
+    /// this drives the *gate* through the real `UserDefaults` path, which is what
+    /// decides whether an upgrading user's panel changes size.
+    @Test("the panel-scale re-base runs exactly once")
+    func panelScaleRebaseIsOneShot() {
+        let defaults = UserDefaults.standard
+        let prefs = Preferences.shared
+        let saved = prefs.panelScalePercent
+        let savedFlag = defaults.object(forKey: Preferences.Keys.panelScaleRebased)
+        let savedPreset = defaults.object(forKey: Preferences.Keys.panelSize)
+        let savedToken = Preferences.preRebasePanelScales
+        defer {
+            Preferences.preRebasePanelScales = savedToken
+            prefs.panelScalePercent = saved
+            if let savedFlag { defaults.set(savedFlag, forKey: Preferences.Keys.panelScaleRebased) }
+            else { defaults.removeObject(forKey: Preferences.Keys.panelScaleRebased) }
+            if let savedPreset { defaults.set(savedPreset, forKey: Preferences.Keys.panelSize) }
+            else { defaults.removeObject(forKey: Preferences.Keys.panelSize) }
+        }
+
+        // (a) An upgrading user: the old default, no flag yet.
+        defaults.set(120, forKey: Preferences.Keys.panelScalePercent)
+        defaults.removeObject(forKey: Preferences.Keys.panelScaleRebased)
+        Preferences.rebasePanelScalesIfNeeded(defaults)
+        prefs.reloadFromDefaults()
+        #expect(prefs.panelScalePercent == 100)
+        #expect(defaults.bool(forKey: Preferences.Keys.panelScaleRebased))
+
+        // (b) Idempotent: a second launch must not re-base 100 down to 83.
+        Preferences.rebasePanelScalesIfNeeded(defaults)
+        prefs.reloadFromDefaults()
+        #expect(prefs.panelScalePercent == 100)
+        #expect(defaults.integer(forKey: Preferences.Keys.panelScalePercent) == 100)
+
+        // (c) `legacyPanelScalePercent` already returns post-#170 numbers, so a user
+        // still on the pre-#105 preset must not be re-based on top of that.
+        defaults.removeObject(forKey: Preferences.Keys.panelScalePercent)
+        defaults.removeObject(forKey: Preferences.Keys.panelScaleRebased)
+        defaults.set("standard", forKey: Preferences.Keys.panelSize)
+        Preferences.rebasePanelScalesIfNeeded(defaults)
+        prefs.reloadFromDefaults()
+        #expect(prefs.panelScalePercent == 100)
+    }
+
+    /// A per-shortcut override carries its own percentage, under the same old
+    /// baseline, so that shortcut would keep opening an oversized panel.
+    @Test("per-shortcut override percentages are re-based by the same one-shot")
+    func panelScaleRebaseCoversOverrides() {
+        let defaults = UserDefaults.standard
+        let prefs = Preferences.shared
+        let savedOverrides = defaults.object(forKey: Preferences.Keys.shortcutOverrides)
+        let savedFlag = defaults.object(forKey: Preferences.Keys.panelScaleRebased)
+        let savedScale = prefs.panelScalePercent
+        let savedToken = Preferences.preRebasePanelScales
+        defer {
+            Preferences.preRebasePanelScales = savedToken
+            if let savedOverrides { defaults.set(savedOverrides, forKey: Preferences.Keys.shortcutOverrides) }
+            else { defaults.removeObject(forKey: Preferences.Keys.shortcutOverrides) }
+            if let savedFlag { defaults.set(savedFlag, forKey: Preferences.Keys.panelScaleRebased) }
+            else { defaults.removeObject(forKey: Preferences.Keys.panelScaleRebased) }
+            prefs.panelScalePercent = savedScale
+            prefs.reloadFromDefaults()
+        }
+
+        defaults.set([["target": "switchWindows", "panelScalePercent": "150"]],
+                     forKey: Preferences.Keys.shortcutOverrides)
+        defaults.removeObject(forKey: Preferences.Keys.panelScaleRebased)
+        Preferences.rebasePanelScalesIfNeeded(defaults)
+        prefs.reloadFromDefaults()
+        #expect(prefs.override(for: .switchWindows).panelScalePercent == 125)
+
+        // Idempotent here too: a second launch must not shrink it again.
+        Preferences.rebasePanelScalesIfNeeded(defaults)
+        prefs.reloadFromDefaults()
+        #expect(prefs.override(for: .switchWindows).panelScalePercent == 125)
     }
 
     @Test("round-trip: switcherDisplayMode survives export/import")

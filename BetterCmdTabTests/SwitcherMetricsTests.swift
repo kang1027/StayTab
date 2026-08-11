@@ -145,18 +145,75 @@ struct SwitcherMetricsTests {
         #expect(grid.tileLabelArea == 0)
     }
 
-    @Test("scale clamps high values to 1.8")
-    func upperClamp() {
-        // forScreen with a 4K screen would normally raise scale beyond 1.8;
-        // clamp must protect against giant rows.
-        let m = SwitcherMetrics.forScale(2.5)
-        // forScale doesn't clamp; only forScreen does. Verify forScreen behavior separately.
-        #expect(m.scale == 2.5)
+    @Test("forScale takes the requested scale verbatim — no clamping")
+    func noClamp() {
+        // The screen-derived multiplier and its 1.0…1.8 clamp are gone (#170);
+        // panelScalePercent is the only input, already bounded by its own range.
+        #expect(SwitcherMetrics.forScale(2.5).scale == 2.5)
+        #expect(SwitcherMetrics.forScale(0.5).scale == 0.5)
     }
 
-    @Test("forScreen with nil falls back to reference width → scale 1.0")
-    func nilScreenScale() {
-        let m = SwitcherMetrics.forScreen(nil)
+    @Test("Size 100% is the native macOS Cmd+Tab geometry (#170)")
+    func hundredPercentIsNativeSize() {
+        // Measured off the native switcher on a 2x display: tile pitch 134pt against our
+        // baseTileSize + baseTileGap = 90, which gives 1.5. Icon and plate are compared as
+        // drawn, not as raw constants: the plate is the tile minus the selection inset on
+        // both sides, and the icon is the visible artwork rather than the canvas it is
+        // drawn into — those differ by the transparent margin Apple bakes into app icons.
+        // Same for the two distances a user actually sees: icon to icon, and icon to the
+        // panel edge. Both fall out of the artwork, so they are checked, not assumed.
+        #expect(SwitcherMetrics.scale(forPercent: 100) == SwitcherMetrics.nativeScale)
+        let grid = SwitcherMetrics.forScale(SwitcherMetrics.scale(forPercent: 100), layoutMode: .gridView)
+        let plate = grid.tileSize - 2 * grid.tileSelectionInset
+        #expect(abs((grid.tileSize + grid.tileGap) - 134) <= 2)   // native pitch
+        #expect(abs(plate - 120) <= 2)                            // native selection plate
+        let artwork = grid.tileIconSize * SwitcherMetrics.iconArtworkRatio
+        #expect(abs(artwork - 104) <= 2)                          // native artwork
+        #expect(abs((grid.tileSize + grid.tileGap - artwork) - 30) <= 2)   // native icon-to-icon gap
+        // Icon to panel edge: the tile's own margin around the artwork plus the padding.
+        #expect(abs((grid.outerPadding + (grid.tileSize - artwork) / 2) - 36) <= 2)
+        // Shipping default is the native size, and it is inside the slider range.
+        #expect(Preferences.defaultPanelScalePercent == 100)
+        #expect(Preferences.panelScalePercentRange.contains(Preferences.defaultPanelScalePercent))
+    }
+
+    @Test("every panelScalePercent maps proportionally onto the base geometry")
+    func panelScalePercentRangeIsHonored() {
+        // Absolute expectations on purpose: re-deriving these as
+        // `nativeScale * percent / 100` would restate the implementation and keep
+        // passing if `nativeScale` itself regressed, which is the number #170 turns on.
+        let expected: [Int: CGFloat] = [35: 0.525, 75: 1.125, 100: 1.5, 125: 1.875, 150: 2.25]
+        for (percent, scale) in expected {
+            #expect(SwitcherMetrics.scale(forPercent: percent) == scale)
+            let m = SwitcherMetrics.forScale(scale)
+            #expect(m.scale == scale)
+            #expect(m.iconSize == (SwitcherMetrics.baseIconSize * scale).rounded())
+        }
+        // The slider's ends are the ends of that table, so a range change lands here.
+        #expect(Preferences.panelScalePercentRange.lowerBound == 35)
+        #expect(Preferences.panelScalePercentRange.upperBound == 150)
+        // The old 50 % floor is still reachable: it was 0.50 effective, 35 % is 0.525.
+        #expect(SwitcherMetrics.scale(forPercent: 35) < 0.55)
+    }
+
+    @Test("the selection plate's corner radius never exceeds half the plate")
+    func selectionCornerRadiusFitsPlate() {
+        // Beyond half the side a `.continuous` rounded rect stops being a squircle and
+        // starts clipping; the radius is derived from two constants that have already
+        // moved twice, so pin the invariant rather than the number.
+        for percent in [Preferences.panelScalePercentRange.lowerBound, 100,
+                        Preferences.panelScalePercentRange.upperBound] {
+            let grid = SwitcherMetrics.forScale(SwitcherMetrics.scale(forPercent: percent),
+                                                layoutMode: .gridView)
+            let plate = grid.tileSize - 2 * grid.tileSelectionInset
+            #expect(grid.tileSelectionCornerRadius <= plate / 2)
+            #expect(grid.tileSelectionCornerRadius > 0)
+        }
+    }
+
+    @Test("default scale 1.0 is the untouched base geometry")
+    func baseScale() {
+        let m = SwitcherMetrics.forScale(1.0)
         #expect(m.scale == 1.0)
         #expect(m.rowHeight == SwitcherMetrics.baseRowHeight)
     }
@@ -182,18 +239,16 @@ struct SwitcherMetricsTests {
         #expect(SwitcherMetrics.forScale(1.2) != SwitcherMetrics.forScale(1.3))
     }
 
-    @Test("userScale below 1.0 shrinks past the screen-adaptive floor")
-    func userScaleSmall() {
-        // nil screen → adaptive scale 1.0; userScale 0.85 must apply on top,
-        // proving the multiply happens after the max(1.0, …) clamp.
-        let m = SwitcherMetrics.forScreen(nil, userScale: 0.85)
+    @Test("scale below 1.0 shrinks the panel")
+    func panelScaleSmall() {
+        let m = SwitcherMetrics.forScale(0.85)
         #expect(m.scale == 0.85)
         #expect(m.iconSize == (SwitcherMetrics.baseIconSize * 0.85).rounded())
     }
 
-    @Test("minimum user scale proportionally shrinks panel geometry")
-    func userScaleMinimum() {
-        let m = SwitcherMetrics.forScreen(nil, userScale: 0.5)
+    @Test("minimum panel scale proportionally shrinks panel geometry")
+    func panelScaleMinimum() {
+        let m = SwitcherMetrics.forScale(0.5)
         #expect(m.scale == 0.5)
         #expect(m.iconSize == (SwitcherMetrics.baseIconSize * 0.5).rounded())
         #expect(m.outerPadding == (SwitcherMetrics.baseOuterPadding * 0.5).rounded())
@@ -201,16 +256,54 @@ struct SwitcherMetricsTests {
         #expect(m.fontSize == SwitcherMetrics.baseFontSize * 0.5)
     }
 
-    @Test("userScale above 1.0 enlarges the panel")
-    func userScaleLarge() {
-        let m = SwitcherMetrics.forScreen(nil, userScale: 1.2)
+    @Test("panel scale above 1.0 enlarges the panel")
+    func panelScaleLarge() {
+        let m = SwitcherMetrics.forScale(1.2)
         #expect(m.scale == 1.2)
-        #expect(m.tileIconSize == (SwitcherMetrics.baseTileIconSize * 1.2).rounded())
+        #expect(m.tileIconSize < m.tileSize)
     }
 
-    @Test("userScale defaults to 1.0 (no behavior change)")
-    func userScaleDefault() {
-        #expect(SwitcherMetrics.forScreen(nil) == SwitcherMetrics.forScreen(nil, userScale: 1.0))
+    /// Grid selection on macOS 26 is a fill with no border, so it only exists where it
+    /// shows *around* the artwork: the plate has to stay wider than the artwork at every
+    /// slider position, including the small end where both round independently. (The
+    /// canvas may overhang the plate — that part of the icon is transparent margin. Older
+    /// systems, which can hand back artwork drawn edge to edge, keep a hairline border.)
+    @Test("the selection plate leaves a visible ring at every slider position")
+    func iconCanvasFitsSelectionPlate() {
+        for percent in Preferences.panelScalePercentRange {
+            let grid = SwitcherMetrics.forScale(SwitcherMetrics.scale(forPercent: percent), layoutMode: .gridView)
+            let plate = grid.tileSize - 2 * grid.tileSelectionInset
+            #expect(grid.tileIconSize * SwitcherMetrics.iconArtworkRatio <= plate - 4)
+        }
+    }
+
+    /// A preview tile fills its box — thumbnail across the width, window title under it —
+    /// so it needs a wider margin than the grid, whose tile is mostly air around a centred
+    /// plate. Sharing the grid's padding put window titles on the panel edge.
+    @Test("window previews keep a wider panel margin than the grid")
+    func previewPanelMarginClearsTitles() {
+        let grid = SwitcherMetrics.forScale(1.5, layoutMode: .gridView)
+        let previews = SwitcherMetrics.forScale(1.5, layoutMode: .windowPreview)
+        #expect(previews.outerPadding > grid.outerPadding)
+        #expect(previews.cornerRadius != grid.cornerRadius)
+    }
+
+    /// The unread badge is measured against the native ⌘Tab panel, where it is just under
+    /// half the icon it hangs off. It used to be a base length scaled by the *label font*
+    /// preference, so it drifted off the icon at every size but the default.
+    @Test("the badge keeps its share of the icon at every slider position and font size")
+    func badgeTracksTheIcon() {
+        for percent in Preferences.panelScalePercentRange {
+            for fontScale in [0.8, 1.0, 1.4] {
+                let grid = SwitcherMetrics.forScale(
+                    SwitcherMetrics.scale(forPercent: percent),
+                    layoutMode: .gridView,
+                    fontScale: fontScale
+                )
+                let artwork = grid.tileIconSize * SwitcherMetrics.iconArtworkRatio
+                #expect(abs(grid.tileBadgeSize / artwork - SwitcherMetrics.badgeIconRatio) < 0.02)
+            }
+        }
     }
 
     @Test("corner-radius pref: 0 = automatic, -1 = square, > 0 = explicit points")
@@ -221,7 +314,8 @@ struct SwitcherMetricsTests {
         #expect(m.resolvedCornerRadius(pref: 17) == 17)
         // Grid derives a different automatic radius; square must still win.
         let grid = SwitcherMetrics.forScale(1.0, layoutMode: .gridView)
-        #expect(grid.resolvedCornerRadius(pref: 0) == SwitcherMetrics.baseTileCornerRadius)
+        #expect(grid.resolvedCornerRadius(pref: 0) == grid.cornerRadius)
+        #expect(grid.cornerRadius != m.cornerRadius)
         #expect(grid.resolvedCornerRadius(pref: -1) == 0)
     }
 
@@ -256,7 +350,7 @@ struct SwitcherMetricsTests {
     @Test("fontScale defaults to 1.0 (no behavior change)")
     func fontScaleDefaultIdentity() {
         #expect(SwitcherMetrics.forScale(1.2) == SwitcherMetrics.forScale(1.2, fontScale: 1.0))
-        #expect(SwitcherMetrics.forScreen(nil) == SwitcherMetrics.forScreen(nil, fontScale: 1.0))
+        #expect(SwitcherMetrics.forScale(1.0) == SwitcherMetrics.forScale(1.0, fontScale: 1.0))
     }
 
     @Test("fontScale multiplies every font size (#62)")
@@ -294,9 +388,9 @@ struct SwitcherMetricsTests {
         #expect(big.rowHeight == round(SwitcherMetrics.baseRowHeight * 1.3))
     }
 
-    @Test("forScreen passes fontScale through to the fonts")
-    func forScreenPassesFontScale() {
-        let m = SwitcherMetrics.forScreen(nil, userScale: 1.0, fontScale: 0.85)
+    @Test("forScale passes fontScale through to the fonts")
+    func forScalePassesFontScale() {
+        let m = SwitcherMetrics.forScale(1.0, fontScale: 0.85)
         #expect(m.fontSize == SwitcherMetrics.baseFontSize * 0.85)
         #expect(m.fontScale == 0.85)
     }
@@ -356,5 +450,36 @@ struct SwitcherFitColumnsTests {
                                      maxListWidth: 540, maxListHeight: 250, userCap: 0)
         #expect(f.cols == 5)
         #expect(f.rowsCount == 20)
+    }
+
+    @Test("listFit never lets a single column outrun the screen width (#170)")
+    func listFitClampsSingleColumn() {
+        // A 1280pt-wide MacBook Air at the top of the Size slider: the base row is
+        // wider than the screen allows and there is no second column to divide it
+        // across, so the single column must clamp instead of hanging off both edges.
+        let scale = SwitcherMetrics.scale(forPercent: Preferences.panelScalePercentRange.upperBound)
+        let metrics = SwitcherMetrics.forScale(scale)
+        let maxW: CGFloat = 1280 * 0.92 - metrics.outerPadding * 2
+        let maxH: CGFloat = 800 * 0.85 - metrics.outerPadding * 2
+        let fit = SwitcherView.listFit(count: 3, rowH: metrics.rowHeight,
+                                       baseRowW: metrics.rowWidth, scale: scale,
+                                       maxListWidth: maxW, maxListHeight: maxH)
+        #expect(fit.cols == 1)
+        #expect(metrics.rowWidth > maxW)      // the case that used to overflow
+        #expect(fit.listWidth <= maxW)
+    }
+
+    @Test("listFit reports the overflow that the fit-shrink then resolves")
+    func listFitReportsHeightOverflow() {
+        // 40 apps at a large scale on a short screen: columns cap out on width, so
+        // the packing overflows the height and configure()'s shrink loop takes over.
+        let over = SwitcherView.listFit(count: 40, rowH: 63, baseRowW: 1620, scale: 2.25,
+                                        maxListWidth: 1170, maxListHeight: 650)
+        #expect(over.listHeight > 650)
+        // Half the scale fits within both bounds — so the shrink loop terminates.
+        let ok = SwitcherView.listFit(count: 40, rowH: 31.5, baseRowW: 810, scale: 1.125,
+                                      maxListWidth: 1170, maxListHeight: 650)
+        #expect(ok.listHeight <= 650)
+        #expect(ok.listWidth <= 1170)
     }
 }

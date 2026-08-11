@@ -35,6 +35,40 @@
         }
       }
     },
+    "100% matches the size of the macOS switcher, on every display." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "100 % entspricht der Größe des macOS-Umschalters – auf jedem Display."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El 100 % coincide con el tamaño del conmutador de macOS, en cualquier pantalla."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "100 % correspond à la taille du sélecteur de macOS, sur tous les écrans."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "100% odpowiada rozmiarowi przełącznika macOS — na każdym ekranie."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "100% 与 macOS 切换器的尺寸一致，在任何显示器上都是如此。"
+          }
+        }
+      }
+    },
     "A tap when you pick an app. Force Touch trackpads only." : {
       "localizations" : {
         "de" : {

@@ -91,6 +91,13 @@ final class ConfigFile: @unchecked Sendable {
                 // launch even if no setting is touched this session.
                 syncSchemaLocked()
                 scheduleReloadLocked()
+            } else {
+                // No file for this launch to date, so the re-base token has
+                // nothing left to explain: a config written into the watched
+                // directory later in the session means the sizes it spells.
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated { Preferences.preRebasePanelScales = nil }
+                }
             }
         }
     }
@@ -104,6 +111,9 @@ final class ConfigFile: @unchecked Sendable {
             at: Self.url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let data = try Self.configData()
         try data.write(to: Self.url.resolvingSymlinksInPath(), options: .atomic)
+        // These bytes are this build's own snapshot, so they post-date the
+        // re-base by construction and end the token's usefulness with them.
+        Preferences.preRebasePanelScales = nil
         queue.async { [self] in lastSyncedData = data }
         start()
     }
@@ -187,7 +197,7 @@ final class ConfigFile: @unchecked Sendable {
         DispatchQueue.main.async {
             MainActor.assumeIsolated {
                 do {
-                    try Preferences.shared.importSettings(from: data)
+                    try Preferences.shared.importSettings(from: data, mayPredateNativeSizing: true)
                     Log.config.info("config file applied")
                 } catch {
                     // Never wipe settings over a bad file — keep current values.

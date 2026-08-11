@@ -517,10 +517,8 @@ enum PanelAppearance: String, CaseIterable, Sendable {
 }
 
 /// Multiplier applied to the switcher's name/title text only, independent of
-/// the panel scale (#62). On very wide displays the screen-adaptive clamp in
-/// `SwitcherMetrics.forScreen` renders text at up to 1.8× base; this lets users
-/// shrink (or grow) just the text while icons, tiles, and spacing keep following
-/// the panel scale.
+/// the panel scale (#62). Lets users shrink (or grow) just the text while icons,
+/// tiles, and spacing keep following `panelScalePercent`.
 enum SwitcherFontScale: String, CaseIterable, Sendable {
     case extraSmall
     case small
@@ -680,8 +678,16 @@ final class Preferences: ObservableObject {
     static let defaultSwipeSensitivity = 5
     nonisolated static let swipeSensitivityRange: ClosedRange<Int> = 1...10
 
-    nonisolated static let defaultPanelScalePercent = 120
-    nonisolated static let panelScalePercentRange: ClosedRange<Int> = 50...150
+    /// 100 % is the native macOS Cmd+Tab size (`SwitcherMetrics.nativeScale`),
+    /// so the panel ships matching the switcher it replaces.
+    nonisolated static let defaultPanelScalePercent = 100
+    /// Floored at 35, not 50: #170 re-based 100 % onto the native Cmd+Tab size, so a
+    /// percentage now buys 1.5× the panel it used to. Somebody who had picked the old
+    /// minimum wanted a *small* switcher, and re-basing lands them at 42 — clamped
+    /// straight back to 50 by the old floor, unable to reach their old size in the
+    /// very release that exists because the panel got too big. 35 × 1.5 / 100 = 0.525
+    /// effective scale, which is where the old 50 % sat.
+    nonisolated static let panelScalePercentRange: ClosedRange<Int> = 35...150
     nonisolated static let panelOpacityRange: ClosedRange<Int> = 30...100
     /// `0` means "automatic" (track the size-derived metric), `-1` pins fully
     /// square corners (#129); above `0` the user pins an explicit radius in
@@ -724,6 +730,11 @@ final class Preferences: ObservableObject {
         static let titleRefreshIntervalMs = "Switcher.titleRefreshIntervalMs"
         static let panelSize = "Switcher.panelSize" // legacy presets
         static let panelScalePercent = "Switcher.panelScalePercent"
+        /// Set once `panelScalePercent` (and every per-shortcut override carrying one)
+        /// has been re-based onto the #170 meaning of 100 % — the native Cmd+Tab size.
+        /// Local bookkeeping, never exported: see `preRebasePanelScales` for
+        /// how an imported payload is dated instead.
+        static let panelScaleRebased = "Switcher.panelScaleRebased"
         static let panelAppearance = "Switcher.panelAppearance"
         static let fontScale = "Switcher.fontScale"
         static let fontFace = "Switcher.fontFace"
@@ -1889,19 +1900,100 @@ final class Preferences: ObservableObject {
         min(panelScalePercentRange.upperBound, max(panelScalePercentRange.lowerBound, value))
     }
 
-    /// Convert the three pre-#105 persisted presets to their exact effective
-    /// percentages. Kept nonisolated so profile dictionaries can migrate too.
+    /// Convert the three pre-#105 persisted presets to their effective
+    /// percentages. Re-pointed for #170, which re-based 100 % onto the native
+    /// Cmd+Tab size: the presets keep their old *relative* sizes (small = 5/6 of
+    /// standard, large = 5/4) rather than their old numbers, which now mean
+    /// something 1.5× larger. Kept nonisolated so profile dictionaries migrate too.
     nonisolated static func legacyPanelScalePercent(_ rawValue: String) -> Int? {
         switch rawValue {
-        case "small": return 100
-        case "standard": return 120
-        case "large": return 150
+        case "small": return 83
+        case "standard": return 100
+        case "large": return 125
         default: return nil
         }
     }
 
+    /// Old default (#105…#170), and the neutral point every stored percentage was
+    /// picked relative to before 100 % came to mean the native Cmd+Tab size.
+    private static let preNativeDefaultPercent = 120.0
+
+    /// Re-base a percentage stored before #170. Those numbers were relative to a
+    /// 120 % default that rendered *smaller* than today's 100 %, so carrying them
+    /// over verbatim would enlarge every slider user's panel by half — the very
+    /// complaint #170 is about. Rescaling preserves each user's ratio to the
+    /// default (150 % of the old default stays 125 % of the new one); the absolute
+    /// size still moves, because the baseline being wrong is what was fixed.
+    nonisolated static func rebasedPanelScalePercent(_ stored: Int) -> Int {
+        clampPanelScalePercent(Int((Double(stored) * Double(defaultPanelScalePercent)
+            / preNativeDefaultPercent).rounded()))
+    }
+
+    /// Re-base every stored panel percentage — the global one and each per-shortcut
+    /// override — onto the #170 meaning of 100 %, exactly once, then record that with
+    /// `Keys.panelScaleRebased`.
+    ///
+    /// One place owns the whole migration so the readers stay pure decoders: without
+    /// this, `ShortcutOverride.init(dictionary:)` would have to know about #170 and
+    /// would re-base on every decode, shrinking the value each time it round-trips.
+    ///
+    /// Runs from `init`, before anything can read a percentage. The flag read/write is
+    /// what makes a repeat call idempotent — never move it into a value getter.
+    static func rebasePanelScalesIfNeeded(_ defaults: UserDefaults) {
+        guard !defaults.bool(forKey: Keys.panelScaleRebased) else { return }
+        defaults.set(true, forKey: Keys.panelScaleRebased)
+
+        var migratedFrom: (percent: Int?, overrides: [String: Int]) = (nil, [:])
+        if let stored = defaults.object(forKey: Keys.panelScalePercent) as? Int {
+            defaults.set(rebasedPanelScalePercent(stored), forKey: Keys.panelScalePercent)
+            migratedFrom.percent = stored
+        }
+        // Per-shortcut overrides carry their own percentage as a decimal string, under
+        // the old baseline too, so that shortcut would still open an oversized panel.
+        if let raw = defaults.array(forKey: Keys.shortcutOverrides) as? [[String: String]] {
+            var migrated = raw
+            for (index, entry) in raw.enumerated() {
+                guard let percent = entry["panelScalePercent"].flatMap(Int.init) else { continue }
+                migrated[index]["panelScalePercent"] = String(rebasedPanelScalePercent(percent))
+                if let target = entry["target"] { migratedFrom.overrides[target] = percent }
+            }
+            if migrated != raw { defaults.set(migrated, forKey: Keys.shortcutOverrides) }
+        }
+        if migratedFrom.percent != nil || !migratedFrom.overrides.isEmpty {
+            preRebasePanelScales = migratedFrom
+        }
+    }
+
+    /// The percentages this launch just re-based, keyed as the payload spells them, held
+    /// only until this launch's `config.json` has been dated against them — spent by
+    /// `importSettings` on the read, or by `ConfigFile` when there is no file to read.
+    ///
+    /// A settings file carries no version, so this is the only handle on the age of the
+    /// one file the app re-reads by itself: `config.json` is imported a moment *after*
+    /// `init` migrated the defaults, and the two-way sync means the file still holds the
+    /// very numbers that were migrated. A payload that carries them was therefore
+    /// written by the pre-#170 build and means the old baseline.
+    ///
+    /// Matching on the value rather than on "a migration happened" is what keeps a
+    /// hand-written or templated config (the documented dotfiles use) and the user's own
+    /// edits later in the same session verbatim: both differ from the migrated number.
+    /// Nil on a fresh install — nothing was stored, so there is no local history to date
+    /// a file against.
+    ///
+    /// Known limit, one case, one shrink: two Macs sharing the file, upgraded days apart.
+    /// The second Mac's stored percentage is whatever the first Mac's migration wrote and
+    /// the sync carried over, so it re-bases that once more (100 → 83) and syncs it back.
+    /// Nothing local separates "the old build's 100" from "another Mac's new 100" — only a
+    /// marker inside the file would, and that means putting an internal migration flag in
+    /// a file people hand-edit. The slider fixes it in one drag; the marker would be
+    /// permanent.
+    static var preRebasePanelScales: (percent: Int?, overrides: [String: Int])?
+
     /// Prefer the continuous value, otherwise migrate the legacy preset once.
     /// Called on import reload too, so old `.cmdtab` files upgrade in place.
+    ///
+    /// Pure loader: re-basing stored percentages onto the #170 baseline happens in
+    /// `rebasePanelScalesIfNeeded`, which must already have run.
     private static func loadPanelScalePercent(_ defaults: UserDefaults) -> Int {
         if let stored = defaults.object(forKey: Keys.panelScalePercent) as? Int {
             let clamped = clampPanelScalePercent(stored)
@@ -1992,6 +2084,10 @@ final class Preferences: ObservableObject {
         // riding along in every settings export.
         defaults.removeObject(forKey: "Switcher.accentChoice")
         defaults.removeObject(forKey: "Switcher.customAccentHex")
+
+        // Before any percentage is read below, so the values this init publishes are
+        // already on the #170 baseline.
+        Self.rebasePanelScalesIfNeeded(defaults)
 
         let layoutRaw = defaults.string(forKey: Keys.switcherLayoutMode)
         self.switcherLayoutMode = layoutRaw.flatMap(SwitcherLayoutMode.init(rawValue:)) ?? .gridView

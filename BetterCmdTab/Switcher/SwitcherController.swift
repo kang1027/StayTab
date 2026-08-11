@@ -2820,7 +2820,7 @@ final class SwitcherController: SwitcherViewDelegate {
     /// in `handleScreenParametersChange()`; `refreshDisplay()` re-presents.
     private func applySessionScreen(_ screen: NSScreen) {
         panel.targetScreen = screen
-        currentMetrics = makeMetrics(for: screen)
+        currentMetrics = makeMetrics()
         refreshDisplay()
     }
 
@@ -3231,7 +3231,7 @@ final class SwitcherController: SwitcherViewDelegate {
 
         let sessionScreen = resolveSessionScreen()
         panel.targetScreen = sessionScreen
-        currentMetrics = makeMetrics(for: sessionScreen)
+        currentMetrics = makeMetrics()
         syncActiveBrowserTabPreviewKeys()
         prewarmActiveBrowserTabPreview()
         view.configure(rows: rows, labels: displayLabels, selectedIndex: index, metrics: currentMetrics, effective: effective, highlightPrefix: letterBuffer)
@@ -3334,7 +3334,7 @@ final class SwitcherController: SwitcherViewDelegate {
 
         let sessionScreen = resolveSessionScreen()
         panel.targetScreen = sessionScreen
-        currentMetrics = makeMetrics(for: sessionScreen)
+        currentMetrics = makeMetrics()
         syncActiveBrowserTabPreviewKeys()
         prewarmActiveBrowserTabPreview()
         view.configure(rows: rows, labels: displayLabels, selectedIndex: index, metrics: currentMetrics, effective: effective, highlightPrefix: letterBuffer)
@@ -5799,14 +5799,13 @@ final class SwitcherController: SwitcherViewDelegate {
             searchExpandsTabs: Preferences.shared.searchExpandsBrowserTabs)
     }
 
-    /// Build the panel metrics for `screen` from the current reveal's effective
-    /// settings. Single funnel so the `browserTabsExpanded` rule lives in
-    /// exactly one place.
-    private func makeMetrics(for screen: NSScreen?) -> SwitcherMetrics {
-        SwitcherMetrics.forScreen(
-            screen,
+    /// Build the panel metrics from the current reveal's effective settings.
+    /// Single funnel so the `browserTabsExpanded` rule lives in exactly one
+    /// place. Screen-independent by design — see `SwitcherMetrics.scale(forPercent:)`.
+    private func makeMetrics() -> SwitcherMetrics {
+        SwitcherMetrics.forScale(
+            SwitcherMetrics.scale(forPercent: effective.panelScalePercent),
             layoutMode: effective.layoutMode,
-            userScale: CGFloat(effective.panelScalePercent) / 100,
             fontScale: effective.fontScale.multiplier,
             letterHints: effective.letterHintsEnabled,
             showAppNames: effective.showApplicationNames,
@@ -5822,7 +5821,7 @@ final class SwitcherController: SwitcherViewDelegate {
     /// teardown path (`resetSearch`) never re-presents, so it needs no sync.
     private func syncSearchMetrics() {
         guard phase == .visible else { return }
-        currentMetrics = makeMetrics(for: panel.targetScreen)
+        currentMetrics = makeMetrics()
     }
 
     private func toggleSearch() {

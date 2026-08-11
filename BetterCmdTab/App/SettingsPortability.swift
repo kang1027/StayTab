@@ -42,6 +42,9 @@ extension Preferences {
         "Switcher.accentChoice",
         "Switcher.customAccentHex",
         "Switcher.customCommitSoundFilename",
+        // Migration bookkeeping for THIS Mac's stored percentages, not a setting
+        // — see `Preferences.preRebasePanelScales`.
+        "Switcher.panelScaleRebased",
         // `$schema` is the editor's schema pointer in the config file, not a
         // setting — never store or re-export it.
         "Switcher.$schema",
@@ -169,7 +172,13 @@ extension Preferences {
     /// are ignored. Throws `SettingsImportError` on a malformed or
     /// newer-than-supported file. Keys absent from the file keep their current
     /// value (a partial import, not a wipe).
-    func importSettings(from data: Data) throws {
+    ///
+    /// Pass `mayPredateNativeSizing` for bytes the app reads on its own — today only
+    /// `config.json`, which is re-read at every launch and so can still hold sizes
+    /// written by a pre-#170 build. A file the user picked in the import panel is
+    /// always applied verbatim: "import this file" means these numbers, and silently
+    /// rescaling them would be both invisible and unfixable from the file.
+    func importSettings(from data: Data, mayPredateNativeSizing: Bool = false) throws {
         guard let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
             throw SettingsImportError.malformed
         }
@@ -222,6 +231,32 @@ extension Preferences {
         // correctly-but-surprisingly preferring the pre-existing new key.
         if values[Preferences.Keys.panelSize] != nil, values[Preferences.Keys.panelScalePercent] == nil {
             defaults.removeObject(forKey: Preferences.Keys.panelScalePercent)
+        }
+        // The config file this Mac was syncing before the update still holds the very
+        // percentages `init` just re-based, and adopting them verbatim would write the
+        // oversized numbers straight back over the finished migration. So re-base what
+        // the payload carries — but only values that match what was migrated: anything
+        // else is a file already re-based on another Mac, a hand-written one, or an edit
+        // made after the update, and shrinking those would be invisible to their author
+        // and unfixable from the file. Dates one read, not the whole launch; by the
+        // second read the write-back has persisted the new numbers.
+        if mayPredateNativeSizing, let migrated = Preferences.preRebasePanelScales {
+            Preferences.preRebasePanelScales = nil
+            if let carried = values[Preferences.Keys.panelScalePercent] as? Int,
+               carried == migrated.percent {
+                defaults.set(Preferences.rebasedPanelScalePercent(carried),
+                             forKey: Preferences.Keys.panelScalePercent)
+            }
+            if let overrides = values[Preferences.Keys.shortcutOverrides] as? [[String: String]] {
+                defaults.set(overrides.map { entry in
+                    guard let target = entry["target"],
+                          let percent = entry["panelScalePercent"].flatMap(Int.init),
+                          migrated.overrides[target] == percent else { return entry }
+                    var rebased = entry
+                    rebased["panelScalePercent"] = String(Preferences.rebasedPanelScalePercent(percent))
+                    return rebased
+                }, forKey: Preferences.Keys.shortcutOverrides)
+            }
         }
         // A pre-graduation export carries only the experimental tab-recency key.
         // Drop this Mac's newer key so the reload's fallback honors the imported

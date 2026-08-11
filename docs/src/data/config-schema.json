@@ -360,9 +360,9 @@
       "type" : "integer"
     },
     "panelScalePercent" : {
-      "description" : "Overall size of the switcher panel, in percent.",
+      "description" : "Overall size of the switcher panel, in percent. 100% matches the macOS switcher.",
       "maximum" : 150,
-      "minimum" : 50,
+      "minimum" : 35,
       "type" : "integer"
     },
     "panelSize" : {
@@ -640,7 +640,7 @@
             "type" : "string"
           },
           "panelScalePercent" : {
-            "description" : "Override: Overall size of the switcher panel, in percent. Accepted: 50…150. Written as a decimal string.",
+            "description" : "Override: Overall size of the switcher panel, in percent. 100% matches the macOS switcher. Accepted: 35…150. Written as a decimal string.",
             "pattern" : "^-?[0-9]+$",
             "type" : "string"
           },

@@ -258,7 +258,7 @@ const defaults: Record<string, string> = {
   panelAppearance: '"system"',
   panelCornerRadius: '0',
   panelOpacity: '100',
-  panelScalePercent: '120',
+  panelScalePercent: '100',
   pinnedBundleIDs: '[]',
   previewTitleAlignment: '"center"',
   recentlyClosedLimit: '5',

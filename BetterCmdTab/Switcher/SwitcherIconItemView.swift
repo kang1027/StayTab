@@ -66,7 +66,6 @@ final class SwitcherIconItemView: NSView, SwitcherItemViewProtocol {
 
         selectionBackdrop.wantsLayer = true
         selectionBackdrop.layer?.cornerCurve = .continuous
-        selectionBackdrop.layer?.borderWidth = 1.5
         selectionBackdrop.isHidden = true
         addSubview(selectionBackdrop)
 
@@ -172,17 +171,28 @@ final class SwitcherIconItemView: NSView, SwitcherItemViewProtocol {
 
     private func updateSelectionAppearance() {
         let isDark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        let fill: NSColor
-        let border: NSColor
-        if isDark {
-            fill = NSColor.white.withAlphaComponent(0.14)
-            border = NSColor.white.withAlphaComponent(0.50)
-        } else {
-            fill = NSColor.black.withAlphaComponent(0.10)
-            border = NSColor.black.withAlphaComponent(0.55)
-        }
+        // Fill-only, like the native switcher — no border. The two alphas are not
+        // symmetric because the panel is not: clear glass over the light haze lands
+        // near black in dark mode but only mid-grey in light mode, so white at 0.14
+        // lifts the plate far more than the same alpha of black would sink it.
+        // Measured on the rendered panel: dark 0.077 → 0.251, light 0.396 → 0.277.
+        let fill = isDark
+            ? NSColor.white.withAlphaComponent(0.14)
+            : NSColor.black.withAlphaComponent(0.30)
         selectionBackdrop.layer?.backgroundColor = fill.cgColor
-        selectionBackdrop.layer?.borderColor = border.cgColor
+        // The fill only reads as selection where it shows *around* the artwork. The
+        // icon canvas overhangs the plate by 4 pt a side and is drawn on top, so the
+        // plate shows through the transparent margin every real app icon carries —
+        // worst case measured across 81 installed apps was 0.875 of the canvas, which
+        // still leaves 4 pt of plate. The hairline is kept before macOS 26 because the
+        // fill alone is weak against the frosted `NSVisualEffectView` backdrop there,
+        // not because a border would survive an icon that really was full-bleed.
+        if #unavailable(macOS 26.0) {
+            selectionBackdrop.layer?.borderWidth = 1.5
+            selectionBackdrop.layer?.borderColor = (isDark
+                ? NSColor.white.withAlphaComponent(0.50)
+                : NSColor.black.withAlphaComponent(0.55)).cgColor
+        }
     }
 
     private var currentLabel: String = ""
@@ -402,7 +412,6 @@ final class SwitcherIconItemView: NSView, SwitcherItemViewProtocol {
     private func applyMetrics(_ metrics: SwitcherMetrics) {
         self.metrics = metrics
         letterLabel.font = NSFont.monospacedSystemFont(ofSize: metrics.tileLetterFontSize, weight: .bold)
-        badgeLabel.font = NSFont.systemFont(ofSize: metrics.tileLetterFontSize, weight: .bold)
         nameLabel.font = SwitcherFont.font(ofSize: metrics.tileNameFontSize, weight: .medium, design: effective.fontFace)
         titleLabel.font = SwitcherFont.font(ofSize: metrics.tileTitleFontSize, weight: .regular, design: effective.fontFace)
         selectionBackdrop.layer?.cornerRadius = metrics.tileSelectionCornerRadius
@@ -535,20 +544,24 @@ final class SwitcherIconItemView: NSView, SwitcherItemViewProtocol {
         // the top strip and otherwise overlap.
         letterLabel.isHidden = !actionBar.isHidden
 
-        // Dock badge: hug the icon's top-right corner with a hair of outward
-        // float, like a native badge. The icon is inset within the tile so this
-        // never clips.
+        // Dock badge, hung off the corner of the icon's *visible artwork*. Apple bakes a
+        // transparent margin into every icon, so anchoring on the image box (`iconRect`)
+        // floats the badge diagonally away from the squircle it is supposed to sit on.
         if !badgePill.isHidden {
             // Circle for 1–2 digits; widens into a fixed-height pill for 3+,
             // matching native Dock badges. Font is full-size (not shrunk).
-            let height = m.tileLetterBadgeSize
-            let font = NSFont.systemFont(ofSize: round(m.tileLetterFontSize * 0.9), weight: .regular)
+            let height = m.tileBadgeSize
+            let font = NSFont.systemFont(ofSize: round(height * 0.52), weight: .regular)
             badgeLabel.font = font
             let size = BadgeText.size(for: badgeLabel.stringValue, font: font, height: height)
-            let overflow = round(height * 0.1)
+            let artwork = iconRect.width * SwitcherMetrics.iconArtworkRatio
+            let inset = round(artwork * SwitcherMetrics.badgeCornerInsetRatio)
+            // Pills grow leftward from the circle's right edge, as in the Dock.
+            let centerX = iconRect.midX + artwork / 2 - inset
+            let centerY = iconRect.midY + artwork / 2 - inset
             badgePill.frame = NSRect(
-                x: iconRect.maxX + overflow - size.width,
-                y: iconRect.maxY + overflow - height,
+                x: round(centerX + height / 2 - size.width),
+                y: round(centerY - height / 2),
                 width: size.width,
                 height: height
             )
@@ -560,13 +573,19 @@ final class SwitcherIconItemView: NSView, SwitcherItemViewProtocol {
         let labelAreaH = m.tileLabelArea
         let nameH = ceil(nameLabel.font?.pointSize ?? m.tileNameFontSize) + 4
         let titleH = ceil(titleLabel.font?.pointSize ?? m.tileTitleFontSize) + 2
+        // Both lines run the width of the selection plate, not of the tile: text that
+        // reached the tile edge sat closer to the panel edge than the icon artwork does.
+        // The plate is the widest thing that is unambiguously "inside" the tile — the
+        // icon canvas overhangs it by its own transparent margin.
+        let textW = selectionBackdrop.frame.width
+        let textX = selectionBackdrop.frame.minX
         if nameLabel.isHidden {
             // No app name (names hidden): the secondary line takes the top slot
             // so there's no empty gap between the icon and the text.
-            titleLabel.frame = NSRect(x: 0, y: labelAreaH - titleH, width: w, height: titleH)
+            titleLabel.frame = NSRect(x: textX, y: labelAreaH - titleH, width: textW, height: titleH)
         } else {
-            nameLabel.frame = NSRect(x: 0, y: labelAreaH - nameH, width: w, height: nameH)
-            titleLabel.frame = NSRect(x: 0, y: labelAreaH - nameH - titleH, width: w, height: titleH)
+            nameLabel.frame = NSRect(x: textX, y: labelAreaH - nameH, width: textW, height: nameH)
+            titleLabel.frame = NSRect(x: textX, y: labelAreaH - nameH - titleH, width: textW, height: titleH)
         }
 
         if !actionBar.isHidden {

@@ -68,7 +68,9 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
         NSLayoutConstraint.activate([
             scaleSlider.widthAnchor.constraint(equalToConstant: 140),
         ])
-        addRow(to: layout, title: sizeTitle, accessory: scaleStack, searchItemID: SearchID.size)
+        addRow(to: layout, title: sizeTitle,
+               subtitle: String(localized: "100% matches the size of the macOS switcher, on every display."),
+               accessory: scaleStack, searchItemID: SearchID.size)
 
         let listWidthTitle = String(localized: "Maximum list width")
         listWidthSlider.minValue = Double(Preferences.listWidthPercentRange.lowerBound)
@@ -597,10 +599,9 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
         let effective = prefs.effectiveSettings(for: ShortcutOverride())
         let screen = view.window?.screen ?? SwitcherPanel.preferredScreen()
         panel.targetScreen = screen
-        let metrics = SwitcherMetrics.forScreen(
-            screen,
+        let metrics = SwitcherMetrics.forScale(
+            SwitcherMetrics.scale(forPercent: effective.panelScalePercent),
             layoutMode: effective.layoutMode,
-            userScale: CGFloat(effective.panelScalePercent) / 100,
             fontScale: effective.fontScale.multiplier,
             letterHints: effective.letterHintsEnabled,
             showAppNames: effective.showApplicationNames,

@@ -130,6 +130,10 @@ final class SwitcherView: NSView, TabStripDelegate {
     private var searchActive: Bool = false
     private var accent: NSColor = .controlAccentColor
     private var tabStripActive: Bool = false
+    /// Visible frame the cached layout was fitted to. Metrics no longer vary by
+    /// display, so without this a move to a same-metrics screen would keep a
+    /// layout wrapped and clamped against the previous screen's bounds.
+    private var layoutScreenFrameUsed: NSRect = .zero
     private var appliedPanelAppearance: PanelAppearance = .system
     /// Resolved appearance for the current reveal (#74). Set at the top of
     /// `configure` so the layout helpers below (and on standalone relayouts) read
@@ -150,16 +154,19 @@ final class SwitcherView: NSView, TabStripDelegate {
         // resize. The item views still reconfigure below and relayout themselves
         // if their own content changed.
         let stripActiveNew = (tabStripItems?.isEmpty == false)
-        // Shrink grid/preview tiles to fit the screen for large app/window counts
-        // so they stay fully visible instead of overflowing top/bottom. Shadows
+        // Shrink the panel to fit the screen for large app/window counts so it
+        // stays fully visible instead of overflowing top/bottom. Shadows
         // the incoming `metrics` so every downstream sizing path (layout math and
         // the item views, which read the stored metrics) uses the fitted scale.
         let metrics = fittedMetrics(metrics, count: rows.count, searchActive: searchActive, tabActive: stripActiveNew)
+        let screenFrame = layoutScreenFrame()
         let geometryChanged =
             rows.count != self.rows.count ||
             metrics != self.metrics ||
             searchActive != self.searchActive ||
-            stripActiveNew != self.tabStripActive
+            stripActiveNew != self.tabStripActive ||
+            screenFrame != layoutScreenFrameUsed
+        self.layoutScreenFrameUsed = screenFrame
         self.tabStripActive = stripActiveNew
         self.rows = rows
         self.labels = labels
@@ -637,11 +644,9 @@ final class SwitcherView: NSView, TabStripDelegate {
         }
     }
 
-    /// Search-bar height for the current scale (0 when search is inactive).
-    private var searchBarHeight: CGFloat { round(30 * metrics.scale) }
     /// Vertical strip reserved above the list for the search bar plus a gap.
     private var reservedSearchHeight: CGFloat {
-        searchActive ? searchBarHeight + metrics.outerPadding : 0
+        metrics.reservedSearchHeight(active: searchActive)
     }
     /// Height the tab strip occupies under the list (with a gap).
     private var tabStripHeight: CGFloat { TabStripView.stripHeight }
@@ -667,9 +672,9 @@ final class SwitcherView: NSView, TabStripDelegate {
         if searchActive {
             searchBar.frame = NSRect(
                 x: outer,
-                y: bounds.height - outer - searchBarHeight,
+                y: bounds.height - outer - metrics.searchBarHeight,
                 width: max(0, bounds.width - outer * 2),
-                height: searchBarHeight
+                height: metrics.searchBarHeight
             )
         }
 
@@ -727,25 +732,34 @@ final class SwitcherView: NSView, TabStripDelegate {
         let cols: Int
     }
 
-    /// For the grid / window-preview layouts, shrink the tile scale just enough
-    /// that `count` tiles fit within the visible height once columns have been
-    /// expanded to the width limit — so a large app/window count stays fully on
-    /// screen instead of overflowing (or being clipped) top and bottom. Returns
-    /// `base` unchanged for the list layout (it bounds itself via columns) and
-    /// whenever the content already fits. Floored so tiles never get microscopic;
-    /// counts beyond even the floor's capacity fall back to the panel's
-    /// visible-frame clamp in `SwitcherPanel.present()`.
+    /// Shrink the scale just enough that `count` items fit within the visible
+    /// area once columns have been expanded to the width limit — so a large
+    /// app/window count stays fully on screen instead of overflowing (or being
+    /// clipped) top and bottom. Returns `base` whenever the content already fits.
+    /// Floored so items never get microscopic; counts beyond even the floor's
+    /// capacity fall back to the panel's visible-frame clamp in
+    /// `SwitcherPanel.present()`.
     private func fittedMetrics(_ base: SwitcherMetrics, count: Int, searchActive: Bool, tabActive: Bool) -> SwitcherMetrics {
-        guard base.layoutMode == .gridView || base.layoutMode == .windowPreview else { return base }
         let frame = layoutScreenFrame()
         let letterHints = base.tileLetterArea > 0
         let userCap = effective.gridMaxColumns
 
         func fits(_ m: SwitcherMetrics) -> Bool {
-            let reservedSearch = searchActive ? round(30 * m.scale) + m.outerPadding : 0
+            let reservedSearch = m.reservedSearchHeight(active: searchActive)
             let reservedTab = tabActive ? TabStripView.stripHeight + m.outerPadding : 0
             let maxW = frame.width * maxScreenWidthFraction - m.outerPadding * 2
             let maxH = frame.height * maxScreenHeightFraction - m.outerPadding * 2 - reservedSearch - reservedTab
+            if m.layoutMode == .list {
+                // The list wraps into columns on its own, but a wide base row or a
+                // tall row height can still outrun the screen once the columns are
+                // capped by width (#170).
+                let fit = Self.listFit(count: count, rowH: m.rowHeight,
+                                       baseRowW: m.resolvedRowWidth(percent: effective.listWidthPercent),
+                                       scale: m.scale, maxListWidth: maxW, maxListHeight: maxH)
+                // Width needs no test: `listFit` already clamps it to `maxListWidth`,
+                // so overflow can only show up as height.
+                return fit.listHeight <= maxH
+            }
             let tileW: CGFloat, itemH: CGFloat, gap: CGFloat
             if m.layoutMode == .windowPreview {
                 tileW = m.previewTileWidth
@@ -876,24 +890,20 @@ final class SwitcherView: NSView, TabStripDelegate {
         return (cols, rowsCount, listWidth, listHeight)
     }
 
-    private func computeListLayout() -> ListLayout {
-        let rowH = metrics.rowHeight
-        let baseRowW = metrics.resolvedRowWidth(percent: effective.listWidthPercent)
-        let outerPadding = metrics.outerPadding
-        let count = max(rows.count, 1)
-        let screen = layoutScreenFrame()
-        // Reserve room for the search bar so an at-cap list + search strip
-        // doesn't push the panel past the visible frame (present() centers
-        // without clamping).
-        let maxListHeight = screen.height * maxScreenHeightFraction - outerPadding * 2 - reservedSearchHeight
-        let maxListWidth = screen.width * maxScreenWidthFraction - outerPadding * 2
-
+    /// Shared column/row packing for the list layout: as many rows per column as
+    /// the visible height allows, wrapping into more columns while the width
+    /// permits. The list analogue of `gridFit`, extracted so the configure-time
+    /// fit-shrink can ask "would this scale fit?" without laying anything out.
+    /// `listWidth` is always clamped to `maxListWidth` (one column takes the min, more
+    /// columns are bounded by `maxColsByWidth`); only `listHeight` can still exceed its
+    /// maximum at extreme counts — that is the signal for the caller to shrink the scale.
+    nonisolated static func listFit(count: Int, rowH: CGFloat, baseRowW: CGFloat, scale: CGFloat, maxListWidth: CGFloat, maxListHeight: CGFloat) -> (cols: Int, rowsPerCol: Int, rowW: CGFloat, listWidth: CGFloat, listHeight: CGFloat) {
         let maxRowsByHeight = max(1, Int(floor(maxListHeight / rowH)))
 
         // Minimum column width: still enough for letter + app name + icon + a
         // bit of title before truncation. Scale with display, but never past a
         // user width cap (#124) — the cap wins over the readability floor.
-        let minColWidth: CGFloat = min(round(380 * metrics.scale), baseRowW)
+        let minColWidth = min(round(380 * scale), baseRowW)
         let maxColsByWidth = max(1, Int(floor(maxListWidth / minColWidth)))
 
         // Determine how many columns we need to fit `count` without exceeding
@@ -901,20 +911,43 @@ final class SwitcherView: NSView, TabStripDelegate {
         let neededCols = max(1, Int(ceil(Double(count) / Double(maxRowsByHeight))))
         let cols = min(neededCols, maxColsByWidth)
         let rowsPerCol = max(1, Int(ceil(Double(count) / Double(cols))))
-        let effectiveRowsPerCol = cols == 1 ? count : rowsPerCol
 
-        // One column keeps full base width; multiple columns shrink to share
-        // the available width evenly, clamped to [minColWidth, baseRowW].
+        // One column keeps full base width but never wider than the screen allows
+        // (#170: a high panel scale can make the base row wider than the display,
+        // and a single column has no divide step to rein it back in); multiple
+        // columns shrink to share the available width evenly.
         let rowW: CGFloat
         if cols == 1 {
-            rowW = baseRowW
+            rowW = min(baseRowW, maxListWidth)
         } else {
             let divided = floor(maxListWidth / CGFloat(cols))
             rowW = max(minColWidth, min(baseRowW, divided))
         }
+        return (cols, rowsPerCol, rowW, CGFloat(cols) * rowW, CGFloat(rowsPerCol) * rowH)
+    }
 
-        let listWidth = CGFloat(cols) * rowW
-        let listHeight = CGFloat(effectiveRowsPerCol) * rowH
+    private func computeListLayout() -> ListLayout {
+        let rowH = metrics.rowHeight
+        let baseRowW = metrics.resolvedRowWidth(percent: effective.listWidthPercent)
+        let outerPadding = metrics.outerPadding
+        let count = max(rows.count, 1)
+        let screen = layoutScreenFrame()
+        // Reserve room for the search bar and the tab strip so an at-cap list plus
+        // either strip doesn't push the panel past the visible frame (present()
+        // centers without clamping). Both are subtracted by the grid and preview
+        // paths, added back by `intrinsicContentSize`, and subtracted by the list
+        // branch of `fits()` — omitting one here made the fit check and the layout
+        // disagree by exactly the strip's height.
+        let maxListHeight = screen.height * maxScreenHeightFraction - outerPadding * 2
+            - reservedSearchHeight - reservedTabStripHeight
+        let maxListWidth = screen.width * maxScreenWidthFraction - outerPadding * 2
+
+        let fit = Self.listFit(count: count, rowH: rowH, baseRowW: baseRowW, scale: metrics.scale,
+                               maxListWidth: maxListWidth, maxListHeight: maxListHeight)
+        let effectiveRowsPerCol = fit.rowsPerCol
+        let rowW = fit.rowW
+        let listWidth = fit.listWidth
+        let listHeight = fit.listHeight
 
         var frames: [NSRect] = []
         frames.reserveCapacity(rows.count)
@@ -937,7 +970,7 @@ final class SwitcherView: NSView, TabStripDelegate {
             listSize: NSSize(width: listWidth, height: listHeight),
             total: total,
             rowsPerCol: effectiveRowsPerCol,
-            cols: cols
+            cols: fit.cols
         )
     }
 

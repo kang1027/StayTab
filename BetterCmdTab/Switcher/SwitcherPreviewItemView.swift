@@ -57,6 +57,9 @@ final class SwitcherPreviewItemView: NSView, SwitcherItemViewProtocol {
 
         selectionBackdrop.wantsLayer = true
         selectionBackdrop.layer?.cornerCurve = .continuous
+        // Kept on every system, unlike the grid tile's: this plate surrounds an arbitrary
+        // window thumbnail rather than a masked icon on glass, so a fill alone can vanish
+        // against whatever the window happens to show.
         selectionBackdrop.layer?.borderWidth = 1.5
         selectionBackdrop.isHidden = true
         addSubview(selectionBackdrop)

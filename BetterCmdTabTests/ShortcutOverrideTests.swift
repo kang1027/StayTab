@@ -131,8 +131,8 @@ struct ShortcutOverrideTests {
     @Test("legacy panel preset migrates to a clamped continuous override")
     func legacyPanelScaleOverride() {
         let legacy = ShortcutOverride(dictionary: ["panelSize": "standard"])
-        #expect(legacy?.panelScalePercent == 120)
-        #expect(legacy?.dictionary["panelScalePercent"] == "120")
+        #expect(legacy?.panelScalePercent == 100)
+        #expect(legacy?.dictionary["panelScalePercent"] == "100")
         #expect(legacy?.dictionary["panelSize"] == nil)
 
         let corrupt = ShortcutOverride(dictionary: ["panelScalePercent": "999"])
