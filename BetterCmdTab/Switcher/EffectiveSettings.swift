@@ -18,6 +18,7 @@ struct EffectiveSettings {
     let fontScale: SwitcherFontScale
     let fontFace: SwitcherFontFace
     let gridMaxColumns: Int
+    let gridSingleRow: Bool
     let listWidthPercent: Int
     let panelOpacity: Int
     let panelCornerRadius: Int
@@ -56,6 +57,9 @@ extension Preferences {
             fontScale: override.fontScale ?? fontScale,
             fontFace: override.fontFace ?? fontFace,
             gridMaxColumns: override.gridMaxColumns ?? gridMaxColumns,
+            // Not per-shortcut overridable: it is one global answer to "does the
+            // grid wrap", so `ShortcutOverride` carries no field for it.
+            gridSingleRow: gridSingleRow,
             listWidthPercent: override.listWidthPercent ?? listWidthPercent,
             panelOpacity: override.panelOpacity ?? panelOpacity,
             panelCornerRadius: override.panelCornerRadius ?? panelCornerRadius,

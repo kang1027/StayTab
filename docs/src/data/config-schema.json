@@ -239,6 +239,10 @@
       "minimum" : 0,
       "type" : "integer"
     },
+    "gridSingleRow" : {
+      "description" : "Keep the grid on one row, shrinking the icons to fit, instead of wrapping. Ignored while gridMaxColumns caps the columns.",
+      "type" : "boolean"
+    },
     "hapticOnCommit" : {
       "description" : "Tap the trackpad when the switcher commits a selection.",
       "type" : "boolean"

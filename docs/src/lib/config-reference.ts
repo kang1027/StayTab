@@ -47,7 +47,7 @@ const sections: { title: string; blurb: string; keys: string[] }[] = [
   {
     title: 'Layout',
     blurb: 'Which layout the switcher uses and how big it is.',
-    keys: ['layoutMode', 'panelScalePercent', 'listWidthPercent', 'gridMaxColumns'],
+    keys: ['layoutMode', 'panelScalePercent', 'listWidthPercent', 'gridMaxColumns', 'gridSingleRow'],
   },
   {
     title: 'Appearance',
@@ -237,6 +237,7 @@ const defaults: Record<string, string> = {
   fuzzySearchEnabled: 'true',
   fuzzySearchRankBestMatchFirst: 'false',
   gridMaxColumns: '0',
+  gridSingleRow: 'true',
   hapticOnCommit: 'false',
   hideAllExcludedBundleIDs: '[]',
   hideFromScreenSharing: 'false',

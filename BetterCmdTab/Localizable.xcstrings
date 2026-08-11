@@ -10926,6 +10926,40 @@
         }
       }
     },
+    "Shrink the icons to keep every window on one line instead of starting a second row." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verkleinert die Symbole, damit alle Fenster in einer Zeile bleiben, statt eine zweite Reihe zu beginnen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reduce los iconos para mantener todas las ventanas en una línea en lugar de empezar una segunda fila."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réduit les icônes pour garder toutes les fenêtres sur une seule ligne au lieu d'ouvrir une deuxième rangée."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zmniejsza ikony, aby wszystkie okna mieściły się w jednej linii, zamiast otwierać drugi rząd."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缩小图标以将所有窗口保持在一行，而不是另起一行。"
+          }
+        }
+      }
+    },
     "Sidebar" : {
       "localizations" : {
         "de" : {
@@ -10956,6 +10990,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "侧边栏"
+          }
+        }
+      }
+    },
+    "Single row" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einzelne Reihe"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una sola fila"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une seule rangée"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jeden rząd"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "单行"
           }
         }
       }

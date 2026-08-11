@@ -111,6 +111,35 @@ struct SettingsPortabilityTests {
         #expect(Preferences.shared.sinkMinimizedWindows == true)
     }
 
+    /// The grid reads this through `EffectiveSettings` on every reveal, so a
+    /// missing `reloadFromDefaults()` line would leave an imported "off" invisible
+    /// until the next launch. Default-true reproduces the shipped behavior, which
+    /// is also what the macOS switcher does.
+    @Test("gridSingleRow round-trips and defaults to true when the key is absent")
+    func gridSingleRowRoundTrip() throws {
+        let prefs = Preferences.shared
+        let key = Preferences.Keys.gridSingleRow
+        let savedRaw = UserDefaults.standard.object(forKey: key)
+        let saved = prefs.gridSingleRow
+        defer {
+            prefs.gridSingleRow = saved
+            if savedRaw == nil { UserDefaults.standard.removeObject(forKey: key) }
+        }
+
+        prefs.gridSingleRow = false
+        let data = try Preferences.exportedJSONData()
+        let root = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(root["gridSingleRow"] as? Bool == false)
+
+        prefs.gridSingleRow = true
+        try prefs.importSettings(from: data)
+        #expect(prefs.gridSingleRow == false)
+
+        UserDefaults.standard.removeObject(forKey: key)
+        prefs.reloadFromDefaults()
+        #expect(prefs.gridSingleRow == true)
+    }
+
     @Test("flat import accepts keys that already carry the Switcher. prefix")
     func flatImportPrefixLeniency() throws {
         let prefs = Preferences.shared

@@ -739,6 +739,7 @@ final class Preferences: ObservableObject {
         static let fontScale = "Switcher.fontScale"
         static let fontFace = "Switcher.fontFace"
         static let gridMaxColumns = "Switcher.gridMaxColumns"
+        static let gridSingleRow = "Switcher.gridSingleRow"
         static let appExceptions = "Switcher.appExceptions"
         /// Pre-Exceptions key: a plain bundle-ID array of always-hidden apps.
         /// Read once at launch and folded into `appExceptions` (hide = .always).
@@ -984,6 +985,16 @@ final class Preferences: ObservableObject {
             }
             guard oldValue != gridMaxColumns else { return }
             UserDefaults.standard.set(gridMaxColumns, forKey: Keys.gridMaxColumns)
+        }
+    }
+
+    /// Keep the Grid layout on a single row, shrinking the tiles until everything
+    /// fits across, the way the macOS switcher behaves. On by default. Off wraps
+    /// into rows at full size; a `gridMaxColumns` cap wraps either way.
+    @Published var gridSingleRow: Bool {
+        didSet {
+            guard oldValue != gridSingleRow else { return }
+            UserDefaults.standard.set(gridSingleRow, forKey: Keys.gridSingleRow)
         }
     }
 
@@ -2114,6 +2125,7 @@ final class Preferences: ObservableObject {
         self.fontFace = defaults.string(forKey: Keys.fontFace).flatMap(SwitcherFontFace.init(rawValue:)) ?? .system
 
         self.gridMaxColumns = defaults.object(forKey: Keys.gridMaxColumns) as? Int ?? 0
+        self.gridSingleRow = defaults.object(forKey: Keys.gridSingleRow) as? Bool ?? true
 
         // Exceptions: honor the new key if present, otherwise build a first-run
         // default — carry over the pre-Exceptions excluded-app list as hide=.always
@@ -2279,6 +2291,7 @@ final class Preferences: ObservableObject {
         fontScale = defaults.string(forKey: Keys.fontScale).flatMap(SwitcherFontScale.init(rawValue:)) ?? .standard
         fontFace = defaults.string(forKey: Keys.fontFace).flatMap(SwitcherFontFace.init(rawValue:)) ?? .system
         gridMaxColumns = defaults.object(forKey: Keys.gridMaxColumns) as? Int ?? 0
+        gridSingleRow = defaults.object(forKey: Keys.gridSingleRow) as? Bool ?? true
 
         if let stored = defaults.array(forKey: Keys.appExceptions) as? [[String: String]] {
             appExceptions = stored.compactMap(AppException.init(dictionary:))

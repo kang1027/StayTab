@@ -256,6 +256,8 @@ enum ConfigSchemaDocs {
         "gridMaxColumns": ConfigSettingDoc(
             "integer", "Column cap for the grid layout. 0 = automatic (as many as fit).",
             range: Preferences.gridMaxColumnsRange),
+        "gridSingleRow": ConfigSettingDoc(
+            "boolean", "Keep the grid on one row, shrinking the icons to fit, instead of wrapping. Ignored while gridMaxColumns caps the columns."),
         "panelAppearance": ConfigSettingDoc(
             "string", "Light or dark switcher, independent of the rest of macOS.",
             values: ConfigValues(PanelAppearance.self, \.displayName)),

@@ -835,7 +835,7 @@ final class SwitcherView: NSView, TabStripDelegate {
         // while a single row is still reachable above the scale floor. A user
         // column cap asks for rows, and the list and preview layouts wrap by
         // design, so both keep wrapping.
-        let noWrap = base.layoutMode == .gridView && userCap == 0
+        let noWrap = effective.gridSingleRow && base.layoutMode == .gridView && userCap == 0
 
         if fits(base, allowWrap: !noWrap) { return base }
         // Shrink in small steps until it fits or we hit the floor (half the base

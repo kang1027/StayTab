@@ -16,6 +16,7 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
     private let scaleValueField = NSTextField()
     private let fontSizePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let fontFacePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let gridSingleRowSwitch = NSSwitch()
     private let windowTitleSwitch = NSSwitch()
     private let appNamesSwitch = NSSwitch()
     private let statusIconsSwitch = NSSwitch()
@@ -99,6 +100,11 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
         addRow(to: layout, title: String(localized: "Grid columns"),
                subtitle: String(localized: "Applies to the Grid and Previews layouts."),
                accessory: gridPopup, searchItemID: SearchID.gridColumns)
+
+        configureSwitch(gridSingleRowSwitch, action: #selector(toggleGridSingleRow(_:)))
+        addRow(to: layout, title: String(localized: "Single row"),
+               subtitle: String(localized: "Shrink the icons to keep every window on one line instead of starting a second row."),
+               accessory: gridSingleRowSwitch, searchItemID: SearchID.gridSingleRow)
 
         // Labels section — the text on each row/tile.
         let labels = addSection(title: String(localized: "Labels"), anchor: SettingsAnchor.appearanceLabels)
@@ -312,6 +318,10 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.applyListWidth($0) }
             .store(in: &cancellables)
+        prefs.$gridSingleRow
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.gridSingleRowSwitch.state = $0 ? .on : .off }
+            .store(in: &cancellables)
         prefs.$showWindowTitleLabel
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.windowTitleSwitch.state = $0 ? .on : .off }
@@ -369,6 +379,7 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
         applyScale(prefs.panelScalePercent)
         selectAppearance(prefs.panelAppearance)
         selectGrid(prefs.gridMaxColumns)
+        gridSingleRowSwitch.state = prefs.gridSingleRow ? .on : .off
         applyListWidth(prefs.listWidthPercent)
         windowTitleSwitch.state = prefs.showWindowTitleLabel ? .on : .off
         selectTitleAlignment(prefs.previewTitleAlignment)
@@ -407,12 +418,16 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
             gridPopup.addItem(withTitle: "\(value)")
             gridPopup.selectItem(at: gridPopup.numberOfItems - 1)
         }
+        // A column cap wraps the grid whatever the toggle says, so the toggle
+        // only applies while the count is automatic.
+        gridSingleRowSwitch.isEnabled = (value == 0)
     }
 
     @objc private func gridChanged() {
         let i = gridPopup.indexOfSelectedItem
         guard gridValues.indices.contains(i) else { return }
         Preferences.shared.gridMaxColumns = gridValues[i]
+        gridSingleRowSwitch.isEnabled = (gridValues[i] == 0)
     }
 
     @objc private func listWidthChanged(_ sender: NSSlider) {
@@ -449,6 +464,10 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
         let clamped = Preferences.clampPanelScalePercent(value)
         Preferences.shared.panelScalePercent = clamped
         applyScale(clamped)
+    }
+
+    @objc private func toggleGridSingleRow(_ sender: NSSwitch) {
+        Preferences.shared.gridSingleRow = (sender.state == .on)
     }
 
     @objc private func toggleWindowTitle(_ sender: NSSwitch) {
