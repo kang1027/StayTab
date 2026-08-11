@@ -653,8 +653,8 @@ final class SwitcherView: NSView, TabStripDelegate {
         // Park surplus views instead of destroying them: a search keystroke
         // shrinks and regrows the row count within one session, and destroying
         // views per keystroke defeats the idle pool. `prepareForIdle` drops
-        // their image retains and windowID so a late thumbnail callback can't
-        // paint a parked tile; the hard trim stays in `releaseIdleResources`,
+        // their image retains and thumbnail key so a late thumbnail callback
+        // can't paint a parked tile; the hard trim stays in `releaseIdleResources`,
         // which bounds the pool at dismiss.
         while itemViews.count > max(rows.count, Self.idleItemPoolLimit) {
             let v = itemViews.removeLast()

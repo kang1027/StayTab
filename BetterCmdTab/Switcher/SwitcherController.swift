@@ -3206,6 +3206,9 @@ final class SwitcherController: SwitcherViewDelegate {
         // Expand inline browser-tab rows from the persisted per-session cache so a
         // re-open shows tabs immediately instead of windows-then-flicker. The
         // background re-scan re-derives its collapsed source from `baseRows`.
+        // Resolve the active tab first: it decides which tab row is marked active,
+        // and that row is the one whose tile shows the window's frame.
+        syncFocusedBrowserTabIndex()
         let expandedAtReveal = applyBrowserTabMRU(expandBrowserTabs(baseRows))
         if browserTabMRUActive {
             // Tab-MRU reorders the expanded rows by unified tab+window recency, so
@@ -3253,11 +3256,9 @@ final class SwitcherController: SwitcherViewDelegate {
         let sessionScreen = resolveSessionScreen()
         panel.targetScreen = sessionScreen
         currentMetrics = makeMetrics()
-        syncFocusedBrowserTabIndex()
         view.configure(rows: rows, labels: displayLabels, selectedIndex: index, metrics: currentMetrics, effective: effective, highlightPrefix: letterBuffer)
         panel.present(opacity: effective.panelOpacity)
         phase = .visible
-        syncFocusedBrowserTabIndex()
         cache.setPanelVisible(true)
         dockBadgeObserver.start(enabled: effective.showUnreadBadges)
         // Inline browser-tab mode: start scanning the visible browser windows'
@@ -3343,6 +3344,7 @@ final class SwitcherController: SwitcherViewDelegate {
         let collapsedIndex = count > 0 ? ((delta % count) + count) % count : 0
         let selectedRow = sorted.indices.contains(collapsedIndex) ? sorted[collapsedIndex] : nil
 
+        syncFocusedBrowserTabIndex()
         baseRows = applyBrowserTabMRU(expandBrowserTabs(sorted))
         baseLabels = RowLabels.labels(for: baseRows)
         rows = baseRows
@@ -3354,11 +3356,9 @@ final class SwitcherController: SwitcherViewDelegate {
         let sessionScreen = resolveSessionScreen()
         panel.targetScreen = sessionScreen
         currentMetrics = makeMetrics()
-        syncFocusedBrowserTabIndex()
         view.configure(rows: rows, labels: displayLabels, selectedIndex: index, metrics: currentMetrics, effective: effective, highlightPrefix: letterBuffer)
         panel.present(opacity: effective.panelOpacity)
         phase = .visible
-        syncFocusedBrowserTabIndex()
         cache.setPanelVisible(true)
         dockBadgeObserver.start(enabled: effective.showUnreadBadges)
         // Forced for the same reason as the apps-mode reveal: fresh tab state
@@ -4024,8 +4024,7 @@ final class SwitcherController: SwitcherViewDelegate {
               var cached = browserTabsCache[AXRef(element: focused)],
               let index = Self.activeBrowserTabIndex(
                   tabs: cached.tabs,
-                  windowTitle: openFocusedWindowTitle,
-                  cachedActive: cached.activeIndex
+                  windowTitle: openFocusedWindowTitle
               ) else { return nil }
         guard cached.activeIndex != index else { return (index, false) }
         cached.activeIndex = index
@@ -5494,27 +5493,17 @@ final class SwitcherController: SwitcherViewDelegate {
     }
 
     /// Resolve the active tab from the focused browser window's current AX
-    /// title. Duplicate titles stay intentionally ambiguous: skipping one frame
-    /// is better than caching the current page under another tab's index.
-    ///
-    /// *No* title matches is a different case, and `cachedActive` answers it:
-    /// the live title left the cached tab set, which is what navigating the
-    /// active tab looks like, and navigation leaves that tab's index alone.
-    /// Reusing it lets the reveal capture the current page instead of waiting
-    /// out the osascript tab scan and painting the pre-navigation frame (#145).
-    nonisolated static func activeBrowserTabIndex(
-        tabs: [BrowserTabInfo],
-        windowTitle: String,
-        cachedActive: Int? = nil
-    ) -> Int? {
+    /// title, or nil when the title is ambiguous (two tabs share it) or matches
+    /// nothing (the active tab navigated away from its cached title). Nil means
+    /// "don't move the marker", leaving the cached active index in place — which
+    /// is right for navigation, since navigating a tab never changes its index.
+    nonisolated static func activeBrowserTabIndex(tabs: [BrowserTabInfo], windowTitle: String) -> Int? {
         var match: Int?
         for index in tabs.indices where BrowserTabs.windowTitle(windowTitle, matchesTab: tabs[index].title) {
             guard match == nil else { return nil }
             match = index
         }
-        if let match { return match }
-        guard let cachedActive, tabs.indices.contains(cachedActive) else { return nil }
-        return cachedActive
+        return match
     }
 
     /// Recently closed windows/apps to surface for reopening. `forSearchQuery`

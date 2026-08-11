@@ -355,28 +355,6 @@ struct SwitcherActiveBrowserTabTests {
         ) == nil)
     }
 
-    @Test func navigatedTitleFallsBackToCachedIndexButAmbiguityStillRejects() {
-        let tabs = [
-            BrowserTabInfo(title: "Old", url: "https://old.test"),
-            BrowserTabInfo(title: "Current", url: "https://current.test"),
-        ]
-        // Navigating tab 1 leaves the cached titles behind: no tab matches the live
-        // title, but the tab's index didn't move, so the reveal still captures (#145).
-        #expect(SwitcherController.activeBrowserTabIndex(
-            tabs: tabs, windowTitle: "Somewhere Else", cachedActive: 1) == 1)
-        // Duplicate titles stay ambiguous even with a cached index to fall back on.
-        #expect(SwitcherController.activeBrowserTabIndex(
-            tabs: tabs + [BrowserTabInfo(title: "Current", url: "https://duplicate.test")],
-            windowTitle: "Current",
-            cachedActive: 0
-        ) == nil)
-        // A cached index the tab list no longer has is refused, not clamped.
-        #expect(SwitcherController.activeBrowserTabIndex(
-            tabs: tabs, windowTitle: "Somewhere Else", cachedActive: 7) == nil)
-        // No cached index (the default) keeps the original strict behavior.
-        #expect(SwitcherController.activeBrowserTabIndex(
-            tabs: tabs, windowTitle: "Somewhere Else") == nil)
-    }
 }
 
 @Suite("Switcher window selection")

@@ -22,9 +22,6 @@ final class SwitcherPreviewItemView: NSView, SwitcherItemViewProtocol {
     private var effective: EffectiveSettings = .defaults
     private var accentKey: String = NSColor.controlAccentColor.description
 
-    /// CGWindowID of the row this tile shows, so a late thumbnail capture can be
-    /// matched back to the right tile. 0 for rows without a real window.
-    private(set) var windowID: CGWindowID = 0
     /// Window whose captured frame this tile shows, or nil for tiles that stay
     /// on their app icon (no real window, or a browser tab that isn't the
     /// active one). Also the `onReady`/live-tick handle for late captures.
@@ -189,15 +186,14 @@ final class SwitcherPreviewItemView: NSView, SwitcherItemViewProtocol {
     func prepareForIdle() {
         // Release the thumbnail and app-icon retains so WindowThumbnailCache /
         // IconCache can evict them; all are re-set by `configure` on reuse.
-        // Reset windowID to 0 so a late `setThumbnail` callback can't paint this
-        // pooled tile after it's been parked.
+        // Clearing `thumbnailKey` also stops a late `setThumbnail` callback from
+        // painting this pooled tile after it's been parked.
         imageView.image = nil
         iconView.image = nil
         letterLabel.stringValue = ""
         nameLabel.stringValue = ""
         badgeLabel.stringValue = ""
         placeholderIcon = nil
-        windowID = 0
         thumbnailKey = nil
         usesCompactTabIcon = false
         currentLabel = ""
@@ -271,11 +267,13 @@ final class SwitcherPreviewItemView: NSView, SwitcherItemViewProtocol {
         // the *active* tab. So the active tab's tile is the window's own frame —
         // literally the same picture, shared with the collapsed window row — and
         // every other tab tile keeps the app icon, identified by its tab title.
-        windowID = row.cgWindowID != 0 ? row.cgWindowID : (row.window.map { PrivateAPI.cgWindowId(of: $0) } ?? 0)
+        let rowWindowID = row.cgWindowID != 0
+            ? row.cgWindowID
+            : (row.window.map { PrivateAPI.cgWindowId(of: $0) } ?? 0)
         let showsWindowFrame = row.browserTab.map {
             $0.isActive && Preferences.shared.browserTabPreviews
         } ?? true
-        thumbnailKey = showsWindowFrame && windowID != 0 ? windowID : nil
+        thumbnailKey = showsWindowFrame && rowWindowID != 0 ? rowWindowID : nil
         if let wid = thumbnailKey {
             let scale = window?.backingScaleFactor ?? 2
             WindowThumbnailCache.shared.request(wid: wid, pixelHeight: metrics.previewThumbHeight * scale)
