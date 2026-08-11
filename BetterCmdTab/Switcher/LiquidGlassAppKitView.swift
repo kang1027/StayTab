@@ -3,17 +3,6 @@ import ObjectiveC.runtime
 import os
 
 final class LiquidGlassAppKitView: NSView {
-    /// Probe ObjC property + setter existence before KVC. Defends against
-    /// Apple renaming a private property on NSGlassEffectView between macOS 26
-    /// betas — `responds(to:)` catches setter rename, `class_getProperty`
-    /// catches @property removal that would otherwise trigger
-    /// `setValue:forUndefinedKey:` → NSUndefinedKeyException → SIGABRT.
-    private static func canSetProperty(_ object: AnyObject, key: String) -> Bool {
-        let setterName = "set" + key.prefix(1).uppercased() + key.dropFirst() + ":"
-        guard object.responds(to: Selector(setterName)) else { return false }
-        let cls: AnyClass = type(of: object)
-        return key.withCString { class_getProperty(cls, $0) != nil }
-    }
     var cornerRadius: CGFloat { didSet { applyConfiguration() } }
     var variant: LiquidGlassVariant { didSet { applyConfiguration() } }
     var tintColor: NSColor? { didSet { applyConfiguration() } }
@@ -88,17 +77,9 @@ final class LiquidGlassAppKitView: NSView {
     }
 
     private func configureGlassView(_ glassView: NSView) {
-        if Self.canSetProperty(glassView, key: "cornerRadius") {
-            glassView.setValue(cornerRadius, forKey: "cornerRadius")
-        } else {
-            Log.ui.warning("NSGlassEffectView cornerRadius setter missing, skipping")
-        }
+        setGlassValue(cornerRadius, forKey: "cornerRadius", on: glassView)
         if let tintColor {
-            if Self.canSetProperty(glassView, key: "tintColor") {
-                glassView.setValue(tintColor, forKey: "tintColor")
-            } else {
-                Log.ui.warning("NSGlassEffectView tintColor setter missing, skipping")
-            }
+            setGlassValue(tintColor, forKey: "tintColor", on: glassView)
         }
     }
 
@@ -196,10 +177,10 @@ final class LiquidGlassAppKitView: NSView {
 
         view.translatesAutoresizingMaskIntoConstraints = false
 
-        if NSStringFromClass(type(of: backing)).contains("NSGlassEffectView"),
-           Self.canSetProperty(backing, key: "contentView") {
-            backing.setValue(view, forKey: "contentView")
-        } else {
+        // Glass hosts its content itself; anything else gets the content as a subview.
+        let hostedByGlass = NSStringFromClass(type(of: backing)).contains("NSGlassEffectView")
+            && setGlassValue(view, forKey: "contentView", on: backing)
+        if !hostedByGlass {
             backing.addSubview(view)
             NSLayoutConstraint.activate([
                 view.leadingAnchor.constraint(equalTo: backing.leadingAnchor),

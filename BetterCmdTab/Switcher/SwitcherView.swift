@@ -34,8 +34,19 @@ final class SwitcherView: NSView, TabStripDelegate {
     weak var delegate: SwitcherViewDelegate?
 
     private let glassBackdrop: NSView
+    /// `NSGlassEffectView` outlines itself: a hairline a shade lighter than the panel,
+    /// traced right inside its own edge, which reads as a window border rather than as
+    /// glass. Nothing turns it off — not `clipsToBounds`, not `masksToBounds` on its
+    /// layer, and none of the private knobs (`_variant`, `_contentLensing`, `_scrimState`
+    /// and the rest were measured). So the glass is grown past the panel by this much and
+    /// the whole view is clipped back to the panel's own rounded rect, which cuts the
+    /// outline off along with it. Zero on the pre-26 fallback, which draws no such line.
+    private let glassEdgeBleed: CGFloat
     private let allowsWindowCapture: Bool
     private let contentContainer = NSView()
+    /// Backdrop pair layered under the content on Liquid Glass: a light frost, then a dim.
+    private let haze = NSVisualEffectView()
+    private let dim = BackdropDimView()
     private let listContainer = NSView()
     private let searchBar = SwitcherSearchBarView()
     private let tabStrip = TabStripView()
@@ -74,12 +85,16 @@ final class SwitcherView: NSView, TabStripDelegate {
         self.allowsWindowCapture = allowsWindowCapture
         if #available(macOS 26.0, *) {
             let glass = NSGlassEffectView()
-            glass.style = .regular
+            // `.regular` is frosted: it blurs the backdrop away into a flat slab, so the
+            // panel reads as blur rather than as glass. `.clear` keeps the backdrop
+            // legible and lets the material show its refraction, which is the look this
+            // panel wants; the legibility that frosting used to provide is restored by
+            // the dimming layer behind the content below.
+            glass.style = .clear
             glass.cornerRadius = SwitcherMetrics.baseCornerRadius
-            glass.wantsLayer = true
-            glass.layer?.masksToBounds = true
             glassBackdrop = glass
-            Log.ui.debug("Glass: NSGlassEffectView style=regular")
+            glassEdgeBleed = 1
+            Log.ui.debug("Glass: NSGlassEffectView")
         } else {
             let fallback = NSVisualEffectView()
             fallback.material = .hudWindow
@@ -90,6 +105,7 @@ final class SwitcherView: NSView, TabStripDelegate {
             fallback.layer?.cornerCurve = .continuous
             fallback.layer?.masksToBounds = true
             glassBackdrop = fallback
+            glassEdgeBleed = 0
             Log.ui.debug("Glass: NSVisualEffectView fallback")
         }
         super.init(frame: frameRect)
@@ -97,6 +113,36 @@ final class SwitcherView: NSView, TabStripDelegate {
         addSubview(glassBackdrop)
         if #available(macOS 26.0, *), let glass = glassBackdrop as? NSGlassEffectView {
             glass.contentView = contentContainer
+            wantsLayer = true   // clips the glass back to the panel; see `glassEdgeBleed`
+            layer?.cornerCurve = .continuous
+            layer?.masksToBounds = true
+            // Clear glass leaves the backdrop sharp, so a frosted layer at low alpha
+            // softens it back to a light blur, and the dim above it restores the
+            // legibility that frosting used to provide (Apple pairs clear glass with a
+            // dimming layer for the same reason). Order matters: both sit below every
+            // row and label, so the dim darkens the backdrop rather than the text.
+            //
+            // Costs ~5 ms to stand up, which lands on `SwitcherController.init` — this
+            // view is built once and reused for every reveal, so no reveal pays it.
+            // The second `.behindWindow` sampler does keep compositing while the panel
+            // is open, so it was measured (GPU device utilization, panel held open,
+            // macOS 26.6, MacBook Pro 16-inch / MacBookPro18,4, Apple M1 Max):
+            // idle 6 %, glass alone 25 %, glass + haze 29 %. Clear glass is
+            // itself ~3 points cheaper than the frosted style it replaced (27 %), so the
+            // pair lands ~2 points above what shipped — for as long as the panel shows.
+            haze.material = .hudWindow
+            haze.blendingMode = .behindWindow
+            haze.state = .active   // the panel never becomes key, so don't dim with focus
+            haze.alphaValue = 0.85
+            for backdrop in [haze, dim] {
+                backdrop.frame = contentContainer.bounds
+                backdrop.autoresizingMask = [.width, .height]
+                backdrop.wantsLayer = true
+                backdrop.layer?.cornerCurve = .continuous
+                backdrop.layer?.cornerRadius = SwitcherMetrics.baseCornerRadius
+                backdrop.layer?.masksToBounds = true
+                contentContainer.addSubview(backdrop)
+            }
         } else {
             glassBackdrop.addSubview(contentContainer)
         }
@@ -364,7 +410,10 @@ final class SwitcherView: NSView, TabStripDelegate {
 
     private func updateBackdropCornerRadius(_ radius: CGFloat) {
         if #available(macOS 26.0, *), let glass = glassBackdrop as? NSGlassEffectView {
-            glass.cornerRadius = radius
+            layer?.cornerRadius = radius
+            glass.cornerRadius = radius + glassEdgeBleed
+            haze.layer?.cornerRadius = radius
+            dim.layer?.cornerRadius = radius
         } else {
             glassBackdrop.layer?.cornerRadius = radius
         }
@@ -388,8 +437,12 @@ final class SwitcherView: NSView, TabStripDelegate {
         metrics.resolvedCornerRadius(pref: effective.panelCornerRadius)
     }
 
-    /// Apply the chosen blur material to the fallback backdrop. The macOS 26
-    /// glass backdrop has no material knob, so it's left untouched there.
+    /// Apply the chosen blur material to the fallback backdrop. The macOS 26 glass
+    /// path is left untouched: the glass itself takes no material, and the `haze`
+    /// behind it is deliberately pinned to `.hudWindow` — it exists to put a light
+    /// blur under clear glass, not to expose a second material control, and letting
+    /// the preference drive it would change what Liquid Glass looks like rather than
+    /// what the fallback blurs with.
     private func applyBackdropMaterial() {
         if #available(macOS 26.0, *), glassBackdrop is NSGlassEffectView { return }
         guard let effect = glassBackdrop as? NSVisualEffectView else { return }
@@ -555,18 +608,13 @@ final class SwitcherView: NSView, TabStripDelegate {
         super.scrollWheel(with: event)
     }
 
+    /// Row under a window-space point. The frames come out of `computeLayout()` in
+    /// `listContainer`'s space — the same rects the item views get — so the point is
+    /// converted there rather than summed along the parent chain, which silently goes
+    /// wrong whenever an ancestor's origin moves (`glassEdgeBleed` did exactly that).
     private func indexAtWindowPoint(_ pointInWindow: NSPoint) -> Int? {
-        let local = convert(pointInWindow, from: nil)
-        let layoutInfo = computeLayout()
-        let listOrigin = listContainer.frame.origin
-        let contentOrigin = contentContainer.frame.origin
-        let offsetX = contentOrigin.x + listOrigin.x
-        let offsetY = contentOrigin.y + listOrigin.y
-        for (i, rect) in layoutInfo.frames.enumerated() {
-            let translated = rect.offsetBy(dx: offsetX, dy: offsetY)
-            if translated.contains(local) { return i }
-        }
-        return nil
+        let local = listContainer.convert(pointInWindow, from: nil)
+        return computeLayout().frames.firstIndex { $0.contains(local) }
     }
 
     private func applySelection() {
@@ -663,10 +711,14 @@ final class SwitcherView: NSView, TabStripDelegate {
     override func layout() {
         super.layout()
         let info = computeLayout()
-        glassBackdrop.frame = bounds
+        glassBackdrop.frame = bounds.insetBy(dx: -glassEdgeBleed, dy: -glassEdgeBleed)
 
         let contentSize = NSSize(width: bounds.width, height: bounds.height)
-        contentContainer.frame = NSRect(origin: .zero, size: contentSize)
+        // Offset by the bleed so the content stays put while the glass around it grows.
+        contentContainer.frame = NSRect(
+            origin: NSPoint(x: glassEdgeBleed, y: glassEdgeBleed),
+            size: contentSize
+        )
 
         let outer = metrics.outerPadding
         if searchActive {
@@ -1086,6 +1138,27 @@ final class SwitcherView: NSView, TabStripDelegate {
             rowsPerCol: rowsCount,
             cols: cols
         )
+    }
+}
+
+/// Veil under the clear glass, dark on dark and light on light. A fixed black would
+/// darken the backdrop behind the near-black labels of a light panel and cost the
+/// contrast it is there to buy — and a `CGColor` set once never re-resolves when the
+/// system theme (or the panel-appearance preference) flips under a live view.
+private final class BackdropDimView: NSView {
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateAppearance()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        updateAppearance()
+    }
+
+    private func updateAppearance() {
+        let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        layer?.backgroundColor = (dark ? NSColor.black : NSColor.white).withAlphaComponent(0.2).cgColor
     }
 }
 

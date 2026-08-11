@@ -1,3 +1,4 @@
+import AppKit
 import Testing
 @testable import BetterCmdTab
 
@@ -31,5 +32,33 @@ struct LiquidGlassVariantTests {
     func allCasesEnumerable() {
         // CaseIterable conformance — protect against accidental case removal.
         #expect(LiquidGlassVariant.allCases.count >= 24)
+    }
+}
+
+/// `setGlassValue` exists only so a renamed or removed private property on
+/// `NSGlassEffectView` degrades into a skipped write instead of
+/// `setValue:forUndefinedKey:` → NSUndefinedKeyException → SIGABRT. That guard is the
+/// whole point of the helper and nothing else exercises it. Runs on any OS: a plain
+/// `NSView` has none of the glass properties, which is exactly the shape of the
+/// failure being guarded against.
+@MainActor
+@Suite("Liquid Glass KVC guard")
+struct LiquidGlassValueGuardTests {
+
+    @Test("a property the view does not have is skipped, not written")
+    func missingPropertyIsSkipped() {
+        let view = NSView(frame: .zero)
+        #expect(setGlassValue(1, forKey: "_variant", on: view) == false)
+        #expect(setGlassValue(1, forKey: "_scrimState", on: view) == false)
+        #expect(setGlassValue("nope", forKey: "definitelyNotAProperty", on: view) == false)
+    }
+
+    @Test("a real property still round-trips through KVC")
+    func presentPropertyIsWritten() {
+        // Without this the negative case above would also pass if the helper had
+        // regressed into always returning false.
+        let view = NSView(frame: .zero)
+        #expect(setGlassValue(true, forKey: "hidden", on: view))
+        #expect(view.isHidden)
     }
 }
