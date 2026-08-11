@@ -1,18 +1,6 @@
 import AppKit
 import ApplicationServices
 
-/// Cache identity of one browser tab's preview frame; `index` is the tab's
-/// 0-based position within its window. Deliberately excludes the tab's page identity (URL/title): only the active
-/// tab is ever captured, and its frame is by definition whatever the window
-/// shows right now, so freshness is `WindowThumbnailCache.refreshTTL`'s job.
-/// Keying on the page made the tile wait for the AppleScript tab scan, which
-/// painted the previous page for as long as that scan took (#145).
-struct BrowserTabPreviewKey: Hashable, Sendable {
-    let pid: pid_t
-    let windowID: CGWindowID
-    let index: Int
-}
-
 /// One tab of a browser window, backing an inline browser-tab row.
 /// `parentTitle` is the parent window's AX title, used to resolve the
 /// AppleScript `window N` on commit without a raise (matching
@@ -22,10 +10,6 @@ struct BrowserTabRef {
     let parentTitle: String
     let url: String
     let isActive: Bool
-
-    func previewKey(pid: pid_t, windowID: CGWindowID) -> BrowserTabPreviewKey {
-        BrowserTabPreviewKey(pid: pid, windowID: windowID, index: index)
-    }
 }
 
 struct SwitcherRow {
@@ -223,11 +207,6 @@ struct SwitcherRow {
             tabs: tabTitles.map { BrowserTabInfo(title: $0, url: "") },
             activeIndex: 0
         )
-    }
-
-    var browserTabPreviewKey: BrowserTabPreviewKey? {
-        guard let browserTab, let pid else { return nil }
-        return browserTab.previewKey(pid: pid, windowID: cgWindowID)
     }
 
     /// Collapse a browser-tab row back to its parent-window row — the inverse of

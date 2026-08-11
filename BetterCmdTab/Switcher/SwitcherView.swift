@@ -338,15 +338,7 @@ final class SwitcherView: NSView, TabStripDelegate {
             guard let preview = view as? SwitcherPreviewItemView,
                   !preview.isHidden,
                   let key = preview.thumbnailKey else { continue }
-            switch key {
-            case .window(let wid):
-                WindowThumbnailCache.shared.requestLiveFrame(wid: wid, pixelHeight: pixelHeight)
-            case .browserTab(let tab) where preview.isActiveBrowserTab
-                && Preferences.shared.browserTabPreviews:
-                WindowThumbnailCache.shared.requestBrowserTab(tab, pixelHeight: pixelHeight, isLive: true)
-            case .browserTab:
-                break
-            }
+            WindowThumbnailCache.shared.requestLiveFrame(wid: key, pixelHeight: pixelHeight)
         }
     }
 

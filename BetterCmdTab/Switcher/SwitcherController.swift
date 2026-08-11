@@ -367,7 +367,6 @@ final class SwitcherController: SwitcherViewDelegate {
     /// keep osascript spawns (and CPU) bounded.
     private var lastForcedBrowserScanAt: TimeInterval = 0
     private static let forcedBrowserScanMinInterval: TimeInterval = 0.4
-    private var browserTabPreviewRequested = false
     private var windowsOnlyMode: Bool = false
     private var windowsOnlyPid: pid_t? = nil
     private var windowsOnlyPrimedDelta: Int = 0
@@ -1967,7 +1966,6 @@ final class SwitcherController: SwitcherViewDelegate {
             // commit/cancel → `.idle` both pass through here, so the normal fast
             // path disarms it well before it could fire.
             if newValue.isPrimed {
-                browserTabPreviewRequested = false
                 armPrimedWatchdog()
             } else {
                 primedWatchdog?.invalidate()
@@ -3107,10 +3105,9 @@ final class SwitcherController: SwitcherViewDelegate {
                     guard self.phase == .visible, self.openFocusedWindow == nil else { return }
                     self.openFocusedWindow = window
                     self.openFocusedWindowTitle = title
-                    if self.syncFocusedBrowserTabIndex() != nil {
+                    if self.syncFocusedBrowserTabIndex()?.changed == true {
                         self.reExpandBrowserTabs(force: true)
                     }
-                    self.prewarmActiveBrowserTabPreview()
                 }
             }
         }
@@ -3256,13 +3253,11 @@ final class SwitcherController: SwitcherViewDelegate {
         let sessionScreen = resolveSessionScreen()
         panel.targetScreen = sessionScreen
         currentMetrics = makeMetrics()
-        syncActiveBrowserTabPreviewKeys()
-        prewarmActiveBrowserTabPreview()
+        syncFocusedBrowserTabIndex()
         view.configure(rows: rows, labels: displayLabels, selectedIndex: index, metrics: currentMetrics, effective: effective, highlightPrefix: letterBuffer)
         panel.present(opacity: effective.panelOpacity)
         phase = .visible
-        syncActiveBrowserTabPreviewKeys()
-        prewarmActiveBrowserTabPreview()
+        syncFocusedBrowserTabIndex()
         cache.setPanelVisible(true)
         dockBadgeObserver.start(enabled: effective.showUnreadBadges)
         // Inline browser-tab mode: start scanning the visible browser windows'
@@ -3359,13 +3354,11 @@ final class SwitcherController: SwitcherViewDelegate {
         let sessionScreen = resolveSessionScreen()
         panel.targetScreen = sessionScreen
         currentMetrics = makeMetrics()
-        syncActiveBrowserTabPreviewKeys()
-        prewarmActiveBrowserTabPreview()
+        syncFocusedBrowserTabIndex()
         view.configure(rows: rows, labels: displayLabels, selectedIndex: index, metrics: currentMetrics, effective: effective, highlightPrefix: letterBuffer)
         panel.present(opacity: effective.panelOpacity)
         phase = .visible
-        syncActiveBrowserTabPreviewKeys()
-        prewarmActiveBrowserTabPreview()
+        syncFocusedBrowserTabIndex()
         cache.setPanelVisible(true)
         dockBadgeObserver.start(enabled: effective.showUnreadBadges)
         // Forced for the same reason as the apps-mode reveal: fresh tab state
@@ -4015,76 +4008,29 @@ final class SwitcherController: SwitcherViewDelegate {
                         fetchedAt: stamp
                     )
                 }
-                self.syncActiveBrowserTabPreviewKeys()
+                self.syncFocusedBrowserTabIndex()
                 onDone?()
-                self.prewarmActiveBrowserTabPreview()
             }
         }
     }
 
-    private func syncActiveBrowserTabPreviewKeys() {
-        guard let focused = openFocusedWindow,
-              let row = collapsedBrowserSource().first(where: {
-                  $0.window.map { CFEqual($0, focused) } == true
-              }),
-              let pid = row.pid,
-              row.cgWindowID != 0,
-              let activeIndex = syncFocusedBrowserTabIndex(),
-              let cached = browserTabsCache[AXRef(element: focused)],
-              cached.tabs.indices.contains(activeIndex) else {
-            WindowThumbnailCache.shared.setActiveBrowserTab(nil)
-            return
-        }
-        WindowThumbnailCache.shared.setActiveBrowserTab(BrowserTabPreviewKey(
-            pid: pid,
-            windowID: row.cgWindowID,
-            index: activeIndex
-        ))
-    }
-
+    /// Resolve the focused browser window's active tab and store it back on the
+    /// cache. `changed` reports whether the index actually moved: a forced
+    /// re-expand rebuilds every row on the reveal hot path, so callers that only
+    /// need the marker moved skip it when it didn't.
     @discardableResult
-    private func syncFocusedBrowserTabIndex() -> Int? {
+    private func syncFocusedBrowserTabIndex() -> (index: Int, changed: Bool)? {
         guard let focused = openFocusedWindow,
               var cached = browserTabsCache[AXRef(element: focused)],
               let index = Self.activeBrowserTabIndex(
                   tabs: cached.tabs,
-                  windowTitle: openFocusedWindowTitle
+                  windowTitle: openFocusedWindowTitle,
+                  cachedActive: cached.activeIndex
               ) else { return nil }
-        if cached.activeIndex != index {
-            cached.activeIndex = index
-            browserTabsCache[AXRef(element: focused)] = cached
-        }
-        return index
-    }
-
-    /// At most one non-blocking browser-tab capture per switcher trigger.
-    private func prewarmActiveBrowserTabPreview() {
-        guard !browserTabPreviewRequested,
-              Preferences.shared.browserTabPreviews,
-              effective.layoutMode == .windowPreview,
-              phase == .primed || phase == .visible,
-              let app = previousFrontmostApp,
-              BrowserTabs.Family.from(bundleID: app.bundleIdentifier) != nil,
-              let focused = openFocusedWindow,
-              let row = collapsedBrowserSource().first(where: {
-                  $0.pid == app.processIdentifier && $0.window.map { CFEqual($0, focused) } == true
-              }),
-              row.cgWindowID != 0,
-              let activeIndex = syncFocusedBrowserTabIndex(),
-              let cached = browserTabsCache[AXRef(element: focused)],
-              cached.tabs.indices.contains(activeIndex) else { return }
-        let key = BrowserTabPreviewKey(
-            pid: app.processIdentifier,
-            windowID: row.cgWindowID,
-            index: activeIndex
-        )
-        browserTabPreviewRequested = true
-        let scale = panel.backingScaleFactor
-        WindowThumbnailCache.shared.setActiveBrowserTab(key)
-        WindowThumbnailCache.shared.requestBrowserTab(
-            key,
-            pixelHeight: currentMetrics.previewThumbHeight * scale
-        )
+        guard cached.activeIndex != index else { return (index, false) }
+        cached.activeIndex = index
+        browserTabsCache[AXRef(element: focused)] = cached
+        return (index, true)
     }
 
     /// Reveal-time / post-action browser-tab scan over the currently displayed
@@ -5548,15 +5494,27 @@ final class SwitcherController: SwitcherViewDelegate {
     }
 
     /// Resolve the active tab from the focused browser window's current AX
-    /// title. Duplicate titles are intentionally ambiguous: skipping one frame
-    /// is better than caching the current page under another tab's URL.
-    nonisolated static func activeBrowserTabIndex(tabs: [BrowserTabInfo], windowTitle: String) -> Int? {
+    /// title. Duplicate titles stay intentionally ambiguous: skipping one frame
+    /// is better than caching the current page under another tab's index.
+    ///
+    /// *No* title matches is a different case, and `cachedActive` answers it:
+    /// the live title left the cached tab set, which is what navigating the
+    /// active tab looks like, and navigation leaves that tab's index alone.
+    /// Reusing it lets the reveal capture the current page instead of waiting
+    /// out the osascript tab scan and painting the pre-navigation frame (#145).
+    nonisolated static func activeBrowserTabIndex(
+        tabs: [BrowserTabInfo],
+        windowTitle: String,
+        cachedActive: Int? = nil
+    ) -> Int? {
         var match: Int?
         for index in tabs.indices where BrowserTabs.windowTitle(windowTitle, matchesTab: tabs[index].title) {
             guard match == nil else { return nil }
             match = index
         }
-        return match
+        if let match { return match }
+        guard let cachedActive, tabs.indices.contains(cachedActive) else { return nil }
+        return cachedActive
     }
 
     /// Recently closed windows/apps to surface for reopening. `forSearchQuery`

@@ -229,7 +229,7 @@ struct SwitcherRowTests {
         #expect(rows.allSatisfy { $0.window != nil })
     }
 
-    @Test("browser tab rows carry URL, active state, and index-stable preview keys")
+    @Test("browser tab rows carry URL, active state, and the parent window's id")
     func browserTabIdentity() {
         let parent = browserWindowRow(title: "Browser Window")
         let rows = parent.browserTabRows(tabs: [
@@ -239,16 +239,9 @@ struct SwitcherRowTests {
 
         #expect(rows[0].browserTab?.url == "https://example.test/a#one")
         #expect(rows.map(\.browserTab?.isActive) == [false, true])
-        #expect(rows[0].browserTabPreviewKey != rows[1].browserTabPreviewKey) // index is part of identity
-
-        // Navigating a tab must NOT move its preview key: only the active tab is
-        // ever captured and its frame is whatever the window shows right now, so
-        // a URL-derived key only stalled the tile behind the tab scan (#145).
-        let navigated = parent.browserTabRows(tabs: [
-            BrowserTabInfo(title: "Elsewhere", url: "https://other.test/"),
-            BrowserTabInfo(title: "Duplicate", url: "https://example.test/b"),
-        ], activeIndex: 1)
-        #expect(rows[0].browserTabPreviewKey == navigated[0].browserTabPreviewKey)
+        // Tabs share the parent window's id: a window screenshot shows the active
+        // tab, so that one frame is the preview and the others keep their icon.
+        #expect(rows.allSatisfy { $0.cgWindowID == parent.cgWindowID })
     }
 
     @Test("a single tab expands into a tab row; an empty window stays collapsed")
