@@ -277,6 +277,29 @@ struct SwitcherMetricsTests {
         }
     }
 
+    /// Grid and preview size the panel to their results, so a query specific enough to
+    /// leave one match used to shrink the panel to a single tile and squeeze the query
+    /// chip. The floor has to clear that case at every slider position, not just the
+    /// default one — the preview tile is the tight one, it clears by a fifth of what
+    /// the grid tile does. The list is sized by its own width slider instead of by the
+    /// match count, so the floor must never widen even the narrowest one.
+    @Test("the search width floor outgrows a one-tile panel and spares the list")
+    func searchFloorClearsASingleTile() {
+        for percent in Preferences.panelScalePercentRange {
+            let scale = SwitcherMetrics.scale(forPercent: percent)
+            let grid = SwitcherMetrics.forScale(scale, layoutMode: .gridView)
+            #expect(grid.searchMinPanelWidth > grid.tileSize + grid.outerPadding * 2)
+
+            let previews = SwitcherMetrics.forScale(scale, layoutMode: .windowPreview)
+            #expect(previews.searchMinPanelWidth
+                > previews.previewTileWidth + previews.outerPadding * 2)
+
+            let list = SwitcherMetrics.forScale(scale, layoutMode: .list)
+            let narrowest = list.resolvedRowWidth(percent: Preferences.listWidthPercentRange.lowerBound)
+            #expect(list.searchMinPanelWidth <= narrowest + list.outerPadding * 2)
+        }
+    }
+
     /// A preview tile fills its box — thumbnail across the width, window title under it —
     /// so it needs a wider margin than the grid, whose tile is mostly air around a centred
     /// plate. Sharing the grid's padding put window titles on the panel edge.

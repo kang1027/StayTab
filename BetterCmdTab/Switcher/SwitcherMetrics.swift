@@ -182,18 +182,32 @@ struct SwitcherMetrics: Equatable {
         percent >= 100 ? rowWidth : round(rowWidth * CGFloat(max(0, percent)) / 100)
     }
 
-    /// Height of the fuzzy-search bar. Lives here so the fitting pass, which runs
+    /// Height of the fuzzy-search bar, and with it of the query pill that fills it.
+    /// Sized for a pill shrink-wrapped around the query rather than the full-width
+    /// slab this used to be: at the old 30 the strip put too much air between the
+    /// query and the first row of icons. Lives here so the fitting pass, which runs
     /// against *candidate* metrics rather than the live ones, reserves exactly what
     /// the layout will later draw — the two drifting apart is what oversized the
     /// panel on a search reveal once already.
-    var searchBarHeight: CGFloat { round(30 * scale) }
+    var searchBarHeight: CGFloat { round(24 * scale) }
 
-    /// Strip the layout reserves above the list for the search bar plus its gap.
-    /// Same reason as `searchBarHeight`: the fitting pass and the layout pass have to
-    /// spell the reservation once, not twice.
+    /// Strip the layout reserves above the list for the search bar plus the padding
+    /// above it (the bar sits flush with the bottom of the reservation, so the list
+    /// starts where the chip ends). Same reason as `searchBarHeight`: the fitting pass
+    /// and the layout pass have to spell the reservation once, not twice.
     func reservedSearchHeight(active: Bool) -> CGFloat {
         active ? searchBarHeight + outerPadding : 0
     }
+
+    /// Floor on the panel's width while search is open. The grid and preview
+    /// layouts size the panel to their results, so without a floor the panel
+    /// narrowed to a single tile as the query got more specific — squeezing the
+    /// query chip exactly when it was longest, and resizing the window on every
+    /// keystroke that changed the match count. The list never collapses that way:
+    /// its width is the user's own slider (#124), which at the low end is narrower
+    /// than this floor, so flooring it would widen the panel on the search key for
+    /// exactly the people who asked for a narrow one.
+    var searchMinPanelWidth: CGFloat { layoutMode == .list ? 0 : round(280 * scale) }
 
     /// App-name column width for a list row that is actually `actualRowWidth`
     /// wide. The column is metric-fixed, so on a row narrowed below the natural

@@ -222,8 +222,12 @@ final class SwitcherView: NSView, TabStripDelegate {
         // user's macOS accent (re-read per reveal so it stays reactive).
         self.accent = .controlAccentColor
         self.selectedIndex = selectedIndex
-        searchBar.update(query: searchQuery)
-        searchBar.applyFont(fontScale: metrics.fontScale, face: effective.fontFace)
+        // Only when it's on screen: this runs on every reveal, and the common
+        // ⌘Tab has no search bar to configure.
+        if searchActive {
+            searchBar.update(query: searchQuery)
+            searchBar.apply(metrics: metrics, face: effective.fontFace)
+        }
         searchBar.isHidden = !searchActive
         if let items = tabStripItems, !items.isEmpty {
             tabStrip.configure(items: items, selectedIndex: tabStripSelectedIndex, accent: accent)
@@ -705,6 +709,11 @@ final class SwitcherView: NSView, TabStripDelegate {
     override var intrinsicContentSize: NSSize {
         var size = computeLayout().total
         size.height += reservedSearchHeight + reservedTabStripHeight
+        // Grid/preview size the panel to their results, so a specific query used
+        // to shrink it to a single tile. Floor it while search is open (the floor
+        // depends only on `searchActive`, never on the query, so typing resizes
+        // the panel no more often than it already did).
+        if searchActive { size.width = max(size.width, metrics.searchMinPanelWidth) }
         return size
     }
 
@@ -1180,44 +1189,54 @@ private final class BackdropDimView: NSView {
 /// Display-only search bar shown at the top of the panel in fuzzy-search mode.
 /// Keystrokes are captured by the global event tap (not a real text field), so
 /// this view only renders the current query text.
+///
+/// The view spans the panel width but draws only a chip sized to the query and
+/// centered over the list: a full-width slab left a long empty trough above a
+/// short result set, and read as pre-glass chrome sitting on top of the panel
+/// rather than as part of it. The chip grows with the query up to the width of
+/// the strip, but never shrinks below `chipMinWidth`.
 @MainActor
 private final class SwitcherSearchBarView: NSView {
+    private let chip = NSView()
     private let icon = NSImageView()
     private let field = NSTextField(labelWithString: "")
-    private let placeholder = String(localized: "Type to filter apps & windows…")
+    private var lastQuery: String?
+    // A sentence-long hint stretched the empty chip wider than any query ever makes it;
+    // the magnifier already says what the field does. Reuses a string the catalog
+    // already carries, so no translation is lost.
+    private let placeholder = String(localized: "Search")
+
+    /// Chip geometry, refreshed per reveal from the live panel metrics. Every
+    /// other element scales with the Size slider; the chip's insets and glyph
+    /// used to be pinned to fixed points, which read a third too small at the
+    /// default scale next to a 16.5pt app name. Starts at 0 so the first reveal
+    /// always takes the apply path, whatever scale it comes in at.
+    private var scale: CGFloat = 0
+    private var iconSize: CGFloat = 0
+
+    private var chipPadding: CGFloat { round(11 * scale) }
+    private var chipSpacing: CGFloat { round(6 * scale) }
+    /// Floor on the chip's width. Sized to the query alone, a one or two letter
+    /// filter collapsed the chip to a glyph and a stub — too small to read as the
+    /// panel's search field, and it twitched wider on every keystroke.
+    private var chipMinWidth: CGFloat { round(150 * scale) }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
-        wantsLayer = true
-        layer?.cornerCurve = .continuous
+        chip.wantsLayer = true
+        chip.layer?.cornerCurve = .continuous
 
         icon.image = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: nil)
-        icon.symbolConfiguration = .init(pointSize: 13, weight: .semibold)
         icon.contentTintColor = .secondaryLabelColor
-        icon.translatesAutoresizingMaskIntoConstraints = false
 
-        field.font = .systemFont(ofSize: 14, weight: .medium)
         field.lineBreakMode = .byTruncatingTail
-        field.translatesAutoresizingMaskIntoConstraints = false
-        // Text size/face applied per reveal via `applyFont` (#62) — the bar is
+        // Size/face come from `apply(metrics:face:)` per reveal (#62) — the bar is
         // created once, so the init font is only the pre-first-reveal default.
+        field.font = .systemFont(ofSize: 14, weight: .medium)
 
-        addSubview(icon)
-        addSubview(field)
-        // The bar itself is positioned by manual frame layout (see SwitcherView.layout),
-        // so its autoresizing mask yields a `width == 0` constraint while it is hidden /
-        // before first sizing. Keep the trailing inset non-required so it breaks cleanly
-        // at that transient zero width instead of logging an unsatisfiable-constraint error.
-        let fieldTrailing = field.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -12)
-        fieldTrailing.priority = .defaultHigh
-        NSLayoutConstraint.activate([
-            icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
-            icon.centerYAnchor.constraint(equalTo: centerYAnchor),
-            icon.widthAnchor.constraint(equalToConstant: 16),
-            field.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 8),
-            fieldTrailing,
-            field.centerYAnchor.constraint(equalTo: centerYAnchor),
-        ])
+        chip.addSubview(icon)
+        chip.addSubview(field)
+        addSubview(chip)
         update(query: "")
     }
 
@@ -1225,7 +1244,21 @@ private final class SwitcherSearchBarView: NSView {
 
     override func layout() {
         super.layout()
-        layer?.cornerRadius = bounds.height / 2
+        let height = bounds.height   // the pill fills the strip, so the bar height is the pill height
+        let pad = chipPadding
+        let gap = chipSpacing
+        let leading = pad + iconSize + gap
+        let text = field.intrinsicContentSize   // measured once: this runs per keystroke
+        let width = min(max(leading + ceil(text.width) + pad, chipMinWidth), bounds.width)
+
+        chip.frame = NSRect(x: round((bounds.width - width) / 2), y: 0,
+                            width: width, height: height)
+        chip.layer?.cornerRadius = height / 2
+        icon.frame = NSRect(x: pad, y: round((height - iconSize) / 2),
+                            width: iconSize, height: iconSize)
+        let textHeight = ceil(text.height)
+        field.frame = NSRect(x: leading, y: round((height - textHeight) / 2),
+                             width: max(0, width - leading - pad), height: textHeight)
         updateAppearance()
     }
 
@@ -1234,30 +1267,49 @@ private final class SwitcherSearchBarView: NSView {
         updateAppearance()
     }
 
+    /// Guarded so the reveals that don't change the query (a selection move, a
+    /// badge repaint) don't dirty the text field or the chip's width. The guard
+    /// compares the query and not what's rendered, or a query that happens to
+    /// equal the placeholder would be drawn in placeholder gray.
     func update(query: String) {
-        if query.isEmpty {
-            field.stringValue = placeholder
-            field.textColor = .tertiaryLabelColor
-        } else {
-            field.stringValue = query
-            field.textColor = .labelColor
-        }
+        guard lastQuery != query else { return }
+        lastQuery = query
+        field.stringValue = query.isEmpty ? placeholder : query
+        field.textColor = query.isEmpty ? .tertiaryLabelColor : .labelColor
+        needsLayout = true
     }
 
-    /// Text size/face for the query text (#62), applied per reveal — the bar is
-    /// created once and pooled, so a pref change must reach the live field.
-    /// Guarded: `SwitcherFont` memoizes, so the common no-change path is one
-    /// dictionary hit + pointer compare.
-    func applyFont(fontScale: CGFloat, face: SwitcherFontFace) {
-        let font = SwitcherFont.font(ofSize: round(14 * fontScale), weight: .medium, design: face)
-        if field.font != font { field.font = font }
+    /// Chip size/face, applied per reveal — the bar is created once and pooled,
+    /// so a metrics or font change has to reach the live views. Guarded:
+    /// `SwitcherFont` memoizes, so the common no-change path is one dictionary
+    /// hit + pointer compare.
+    func apply(metrics: SwitcherMetrics, face: SwitcherFontFace) {
+        // Match the label the current layout draws for each item, so the query reads as
+        // part of the panel's type scale instead of the largest text on screen: a fixed
+        // 13pt sat two points above the names in grid and preview.
+        let pointSize: CGFloat
+        switch metrics.layoutMode {
+        case .list: pointSize = metrics.fontSize
+        case .gridView: pointSize = metrics.tileNameFontSize
+        case .windowPreview: pointSize = metrics.previewNameFontSize
+        }
+        let font = SwitcherFont.font(ofSize: pointSize, weight: .medium, design: face)
+        if field.font != font {
+            field.font = font
+            needsLayout = true
+        }
+        guard metrics.scale != scale else { return }
+        scale = metrics.scale
+        // Box a little larger than the glyph, so a symbol whose bounds exceed its
+        // point size still has room to draw.
+        iconSize = round(16 * metrics.scale)
+        icon.symbolConfiguration = .init(pointSize: round(iconSize * 0.8), weight: .semibold)
+        needsLayout = true
     }
 
     private func updateAppearance() {
         let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         let base = dark ? NSColor.white : NSColor.black
-        layer?.backgroundColor = base.withAlphaComponent(dark ? 0.10 : 0.06).cgColor
-        layer?.borderWidth = 0.5
-        layer?.borderColor = base.withAlphaComponent(dark ? 0.12 : 0.08).cgColor
+        chip.layer?.backgroundColor = base.withAlphaComponent(dark ? 0.10 : 0.06).cgColor
     }
 }

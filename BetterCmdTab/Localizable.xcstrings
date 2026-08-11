@@ -12864,40 +12864,6 @@
         }
       }
     },
-    "Type to filter apps & windows…" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tippen, um Apps und Fenster zu filtern…"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Escribe para filtrar apps y ventanas…"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Saisissez pour filtrer les apps et fenêtres…"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pisz, aby filtrować programy i okna…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "输入以筛选应用和窗口…"
-          }
-        }
-      }
-    },
     "Type-to-filter search" : {
       "localizations" : {
         "de" : {
