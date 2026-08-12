@@ -4624,11 +4624,14 @@ final class SwitcherController: SwitcherViewDelegate {
         // resolved during the scan, so the strip appears instantly with no fetch.
         // Committing a strip entry raises that tab's window (selecting the tab).
         if row.tabWindows.count > 1 {
+            // The strip is ordered by the app's tab bar, so the tab being drilled
+            // is wherever the user sees it — not index 0.
             applyDrill(
                 titles: row.tabWindows.map(\.title),
                 liveTabs: row.tabWindows.map(\.ref),
                 backend: .windows,
-                window: window
+                window: window,
+                selectedIndex: row.tabWindows.firstIndex { CFEqual($0.ref, window) } ?? 0
             )
             return
         }
@@ -4695,7 +4698,11 @@ final class SwitcherController: SwitcherViewDelegate {
 
     /// Apply a fetched/cached tab set to the panel — single sink used by
     /// both the cache-hit and async paths so they can't drift.
-    private func applyDrill(titles: [String], faviconKeys: [String?] = [], liveTabs: [AXUIElement], backend: TabDrillBackend, window: AXUIElement) {
+    ///
+    /// `selectedIndex` is live-path only: `TabPrefetch` doesn't carry it, so a
+    /// cache hit starts on the first tab. Only the native-window-tab branch
+    /// passes a non-zero index, and it returns before the cache lookup.
+    private func applyDrill(titles: [String], faviconKeys: [String?] = [], liveTabs: [AXUIElement], backend: TabDrillBackend, window: AXUIElement, selectedIndex: Int = 0) {
         // Snapshot the detach state on first entry only (a re-drill onto another
         // row must keep the original pre-drill value, not the forced `true`).
         if !tabDrillActive { stickyOpenBeforeDrill = stickyOpen }
@@ -4705,7 +4712,7 @@ final class SwitcherController: SwitcherViewDelegate {
         }
         liveTabElements = liveTabs
         tabDrillBackend = backend
-        tabIndex = 0
+        tabIndex = titles.indices.contains(selectedIndex) ? selectedIndex : 0
         tabDrillActive = true
         tabDrillHint = nil
         drillWindow = window
@@ -4776,8 +4783,10 @@ final class SwitcherController: SwitcherViewDelegate {
             axTabs = WindowEnumerator.tabs(in: window)
         }
         guard axTabs.count > 1 else { return .none }
-        let titles = WindowEnumerator.tabTitles(for: axTabs)
-        return .tabs(titles: titles, faviconKeys: [], liveTabs: axTabs, backend: .accessibility)
+        // Ordered left-to-right on screen, so the strip matches the app's own tab
+        // bar rather than the tab group's internal order.
+        let ordered = WindowEnumerator.orderedTabs(axTabs)
+        return .tabs(titles: ordered.titles, faviconKeys: [], liveTabs: ordered.tabs, backend: .accessibility)
     }
 
     /// Kick a background prefetch for the highlighted row after a short

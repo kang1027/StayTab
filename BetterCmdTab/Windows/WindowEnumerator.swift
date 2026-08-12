@@ -554,12 +554,17 @@ enum WindowEnumerator {
             expand: expand,
             stageManager: stageManager
         )
+        let isOwnProcess = pid == getpid()
         for (i, raw) in raws.enumerated() where resolution.keep[i] {
             let siblings = resolution.siblingIndices[i] ?? []
-            let tabWindows: [TabWindowRef] = siblings.isEmpty ? [] :
-                ([i] + siblings).map { idx in
-                    TabWindowRef(ref: raws[idx].element, title: raws[idx].title, cgWindowID: raws[idx].cgWindowID)
-                }
+            let tabRefs: [TabWindowRef] = siblings.isEmpty ? [] : ([i] + siblings).map { idx in
+                TabWindowRef(ref: raws[idx].element, title: raws[idx].title, cgWindowID: raws[idx].cgWindowID)
+            }
+            // Ordered by the front window's tab bar, so the `\` strip lists the
+            // tabs left to right as the app draws them rather than front-first.
+            // Never for our own windows: walking our AX tree off the main thread
+            // re-enters the layout engine (see `isOwnProcess` in SwitcherController).
+            let tabWindows = isOwnProcess ? tabRefs : orderedTabWindows(front: raw.element, windows: tabRefs)
             infos.append(WindowInfo(
                 ref: raw.element,
                 cgWindowID: raw.cgWindowID,
@@ -762,19 +767,103 @@ enum WindowEnumerator {
         }.map { $0.info }
     }
 
-    /// Fetch titles for a tab group's `AXTab` children. Each tab is a separate
-    /// AX element so the call is N IPCs — keep off the reveal path and only
-    /// invoke when the user actually drills in.
-    static func tabTitles(for tabs: [AXUIElement]) -> [String] {
-        var titles: [String] = []
-        titles.reserveCapacity(tabs.count)
-        for tab in tabs {
+    /// Fetch a tab group's `AXTab` children with their titles, ordered the way
+    /// the user sees them: left to right on screen. `AXTabs` reports the tab
+    /// group's internal order, which stops matching the tab bar as soon as tabs
+    /// are dragged around, so the on-screen x position is the ground truth.
+    /// Elements and titles stay paired — the caller activates `tabs[i]` for the
+    /// strip entry it drew from `titles[i]`.
+    ///
+    /// Each tab is a separate AX element so the call is N IPCs (position rides
+    /// along in the same round trip as the title). Never call it from the main
+    /// thread: the drill-in reads a cached order, and the background scan pays
+    /// it via `orderedTabWindows`.
+    static func orderedTabs(_ tabs: [AXUIElement]) -> (tabs: [AXUIElement], titles: [String]) {
+        let attrs = [kAXTitleAttribute, kAXPositionAttribute] as CFArray
+        var entries: [(tab: AXUIElement, title: String, origin: CGFloat?, offset: Int)] = []
+        entries.reserveCapacity(tabs.count)
+        for (offset, tab) in tabs.enumerated() {
             AXUIElementSetMessagingTimeout(tab, Self.confirmedTimeout)
-            var titleValue: AnyObject?
-            AXUIElementCopyAttributeValue(tab, kAXTitleAttribute as CFString, &titleValue)
-            titles.append((titleValue as? String) ?? "")
+            var valuesRef: CFArray?
+            guard AXUIElementCopyMultipleAttributeValues(tab, attrs, AXCopyMultipleAttributeOptions(rawValue: 0), &valuesRef) == .success,
+                  let values = valuesRef as? [AnyObject], values.count == 2 else {
+                entries.append((tab, "", nil, offset))
+                continue
+            }
+            var point = CGPoint.zero
+            let hasOrigin = CFGetTypeID(values[1]) == AXValueGetTypeID()
+                && AXValueGetValue(values[1] as! AXValue, .cgPoint, &point)
+            entries.append((tab, (values[0] as? String) ?? "", hasOrigin ? point.x : nil, offset))
         }
-        return titles
+        // A tab bar that reports no positions (or only some) keeps the AX order
+        // rather than shuffling half the strip against a missing coordinate.
+        if entries.contains(where: { $0.origin == nil }) {
+            return (entries.map(\.tab), entries.map(\.title))
+        }
+        let sorted = entries.sorted {
+            $0.origin == $1.origin ? $0.offset < $1.offset : ($0.origin ?? 0) < ($1.origin ?? 0)
+        }
+        return (sorted.map(\.tab), sorted.map(\.title))
+    }
+
+    /// Reorders native window tabs (Finder, Terminal) the way their tab bar
+    /// shows them. Those apps expose no `AXTabs`: every tab is its own window
+    /// and only the front one carries the bar, an `AXTabGroup` child holding one
+    /// `AXRadioButton` per tab. Those buttons do carry an on-screen x, so
+    /// `orderedTabs` sorts them exactly as it sorts a real tab group, and
+    /// `orderTabWindows(_:byTitles:)` matches the windows to them.
+    ///
+    /// Costs two children fetches, one role read per window child and per tab
+    /// button, and one attribute read per button — measured at 0.3ms for a
+    /// two-tab Finder window. It runs on the background scan that builds the tab
+    /// stack, so the drill-in stays a cache read.
+    static func orderedTabWindows(front: AXUIElement, windows: [TabWindowRef]) -> [TabWindowRef] {
+        guard windows.count > 1, let bar = tabBar(of: front) else { return windows }
+        let buttons = children(of: bar).filter { role(of: $0) == kAXRadioButtonRole }
+        guard buttons.count > 1 else { return windows }
+        return orderTabWindows(windows, byTitles: orderedTabs(buttons).titles)
+    }
+
+    /// Puts `windows` in the order their titles appear in `titles`. Duplicate
+    /// titles (two tabs on the same folder) keep their relative order.
+    ///
+    /// The bar has to account for every window: a title the bar doesn't name
+    /// means the two lists describe different things (Terminal shows a shorter
+    /// tab title than its window title, a tab was closed mid-scan), and a
+    /// partial match would silently drop that window to the end rather than
+    /// leave the strip alone.
+    static func orderTabWindows(_ windows: [TabWindowRef], byTitles titles: [String]) -> [TabWindowRef] {
+        var remaining = windows
+        var ordered: [TabWindowRef] = []
+        ordered.reserveCapacity(windows.count)
+        for title in titles {
+            guard let match = remaining.firstIndex(where: { $0.title == title }) else { continue }
+            ordered.append(remaining.remove(at: match))
+        }
+        return ordered.count == windows.count ? ordered : windows
+    }
+
+    /// The window's own tab bar, if AppKit's native window tabbing put one there.
+    private static func tabBar(of window: AXUIElement) -> AXUIElement? {
+        children(of: window).first { role(of: $0) == kAXTabGroupRole }
+    }
+
+    private static func role(of element: AXUIElement) -> String? {
+        var value: AnyObject?
+        AXUIElementSetMessagingTimeout(element, Self.confirmedTimeout)
+        guard AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &value) == .success else {
+            return nil
+        }
+        return value as? String
+    }
+
+    private static func children(of element: AXUIElement) -> [AXUIElement] {
+        var value: AnyObject?
+        AXUIElementSetMessagingTimeout(element, Self.confirmedTimeout)
+        guard AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &value) == .success else {
+            return []
+        }
+        return (value as? [AXUIElement]) ?? []
     }
 
     /// Recursively locate a window's tab buttons. Apps that use AppKit's native
@@ -804,12 +893,7 @@ enum WindowEnumerator {
 
     private static func findTabsRecursive(in element: AXUIElement, depth: Int) -> [AXUIElement] {
         guard depth < tabSearchMaxDepth else { return [] }
-        var childrenValue: AnyObject?
-        guard AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childrenValue) == .success,
-              let children = childrenValue as? [AXUIElement] else {
-            return []
-        }
-        for child in children {
+        for child in children(of: element) {
             if let tabs = tabsAttribute(of: child), tabs.count > 1 {
                 return tabs
             }
