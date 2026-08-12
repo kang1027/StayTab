@@ -54,6 +54,7 @@ const sections: { title: string; keys: string[] }[] = [
       'panelOpacity',
       'panelCornerRadius',
       'backdropMaterial',
+      'animationsEnabled',
       'fontScale',
       'fontFace',
       'boldSelectedLabel',
@@ -202,6 +203,7 @@ const sectionTranslationKeys: Record<string, string> = {
  * Swift case name.
  */
 const defaults: Record<string, string> = {
+  animationsEnabled: 'true',
   applicationsOnly: 'false',
   backdropMaterial: '"hud"',
   backtickReversesAppSwitching: 'false',

@@ -7,6 +7,10 @@
       "description" : "Location of this schema. Ignored as a setting.",
       "type" : "string"
     },
+    "animationsEnabled" : {
+      "description" : "Glide the panel, the tiles and the tab strip between states. Off, or with macOS Reduce Motion on, every change is a hard cut.",
+      "type" : "boolean"
+    },
     "appExceptions" : {
       "description" : "Per-app rules. An app with no entry follows the global settings.",
       "items" : {

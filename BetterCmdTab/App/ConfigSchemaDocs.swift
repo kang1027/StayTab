@@ -277,6 +277,10 @@ enum ConfigSchemaDocs {
         "backdropMaterial": ConfigSettingDoc(
             "string", "Blur material behind the rows. Ignored by the macOS 26 glass backdrop.",
             values: ConfigValues(BackdropMaterial.self, \.displayName)),
+        "animationsEnabled": ConfigSettingDoc(
+            "boolean",
+            "Glide the panel, the tiles and the tab strip between states. "
+                + "Off, or with macOS Reduce Motion on, every change is a hard cut."),
         "fontScale": ConfigSettingDoc(
             "string", "Size of the name/title text, independent of the panel scale.",
             values: ConfigValues(SwitcherFontScale.self, \.displayName)),

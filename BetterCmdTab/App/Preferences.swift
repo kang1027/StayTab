@@ -870,6 +870,7 @@ final class Preferences: ObservableObject {
         static let hoverShowQuit = "Switcher.hoverShowQuit"
         static let hoverShowForceQuit = "Switcher.hoverShowForceQuit"
         static let hideFromScreenSharing = "Switcher.hideFromScreenSharing"
+        static let animationsEnabled = "Switcher.animationsEnabled"
         static let vimNavigationEnabled = "Switcher.vimNavigationEnabled"
         static let shiftTapStepsBackward = "Switcher.shiftTapStepsBackward"
         static let backtickReversesAppSwitching = "Switcher.backtickReversesAppSwitching"
@@ -1910,6 +1911,19 @@ final class Preferences: ObservableObject {
         }
     }
 
+    /// Global switch for the switcher's motion: the tab strip's sliding
+    /// selection, the panel resizing itself when the content changes, and the
+    /// tiles gliding to their new slots when the grid reflows. Off makes every
+    /// such transition a hard cut — and skips the per-frame layout it costs.
+    /// Default on. Read through `SwitcherMotion.isEnabled`, which also honors
+    /// the system's Reduce Motion setting.
+    @Published var animationsEnabled: Bool {
+        didSet {
+            guard oldValue != animationsEnabled else { return }
+            UserDefaults.standard.set(animationsEnabled, forKey: Keys.animationsEnabled)
+        }
+    }
+
     static func clampDelay(_ value: Int) -> Int {
         min(revealDelayRange.upperBound, max(revealDelayRange.lowerBound, value))
     }
@@ -2298,6 +2312,7 @@ final class Preferences: ObservableObject {
         self.hoverShowQuit = defaults.object(forKey: Keys.hoverShowQuit) as? Bool ?? true
         self.hoverShowForceQuit = defaults.object(forKey: Keys.hoverShowForceQuit) as? Bool ?? false
         self.hideFromScreenSharing = defaults.object(forKey: Keys.hideFromScreenSharing) as? Bool ?? false
+        self.animationsEnabled = defaults.object(forKey: Keys.animationsEnabled) as? Bool ?? true
     }
 
     /// Re-read every preference from `UserDefaults` into the published
@@ -2418,5 +2433,6 @@ final class Preferences: ObservableObject {
         hoverShowQuit = defaults.object(forKey: Keys.hoverShowQuit) as? Bool ?? true
         hoverShowForceQuit = defaults.object(forKey: Keys.hoverShowForceQuit) as? Bool ?? false
         hideFromScreenSharing = defaults.object(forKey: Keys.hideFromScreenSharing) as? Bool ?? false
+        animationsEnabled = defaults.object(forKey: Keys.animationsEnabled) as? Bool ?? true
     }
 }

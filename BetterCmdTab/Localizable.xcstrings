@@ -682,6 +682,40 @@
         }
       }
     },
+    "Animations" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Animationen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Animaciones"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Animations"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Animacje"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "动画"
+          }
+        }
+      }
+    },
     "App rules" : {
       "localizations" : {
         "de" : {
@@ -7824,6 +7858,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "面板不透明度"
+          }
+        }
+      }
+    },
+    "Panel, tiles and tab strip glide between states. Off, or macOS Reduce Motion, switches instantly." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Panel, Kacheln und Tab-Leiste gleiten zwischen Zuständen. Aus – oder macOS „Bewegung reduzieren“ – schaltet sofort um."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El panel, los iconos y la barra de pestañas se deslizan entre estados. Desactivado, o con Reducir movimiento de macOS, el cambio es instantáneo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le panneau, les vignettes et la barre d’onglets glissent d’un état à l’autre. Désactivé, ou avec Réduire les animations de macOS, le changement est instantané."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Panel, kafelki i pasek kart płynnie przechodzą między stanami. Wyłączone lub „Ogranicz ruch” w macOS przełącza natychmiast."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "面板、图块和标签栏在状态之间滑动。关闭（或开启 macOS 的“减弱动态效果”）则立即切换。"
           }
         }
       }

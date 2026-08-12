@@ -143,6 +143,7 @@ enum SearchID {
     static let theme = "appearance.theme"
     static let opacity = "appearance.opacity"
     static let cornerRadius = "appearance.cornerRadius"
+    static let animations = "appearance.animations"
     static let preview = "appearance.preview"
     static let browserTabPreviews = "appearance.browserTabPreviews"
     static let livePreviews = "appearance.livePreviews"
@@ -407,6 +408,8 @@ enum SettingsCatalog {
              String(localized: "Panel opacity"), ["opacity", "transparency", "alpha", "translucent"]),
         item(SearchID.cornerRadius, .appearance, SettingsAnchor.appearancePanel, String(localized: "Appearance"), String(localized: "Panel"),
              String(localized: "Corner radius"), ["corner", "radius", "rounded", "rounding"]),
+        item(SearchID.animations, .appearance, SettingsAnchor.appearancePanel, String(localized: "Appearance"), String(localized: "Panel"),
+             String(localized: "Animations"), ["animation", "animations", "motion", "slide", "resize", "instant", "static"]),
         item(SearchID.preview, .appearance, SettingsAnchor.appearancePanel, String(localized: "Appearance"), String(localized: "Panel"),
              String(localized: "Preview"), ["preview", "sample", "test", "live"]),
 

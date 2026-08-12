@@ -27,6 +27,7 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
     private let opacityValueField = NSTextField()
     private let radiusSlider = NSSlider()
     private let radiusValueLabel = NSTextField(labelWithString: "")
+    private let animationsSwitch = NSSwitch()
     private let previewButton = NSButton()
 
     private var cancellables = Set<AnyCancellable>()
@@ -208,6 +209,11 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
         addRow(to: panel, title: String(localized: "Corner radius"),
                subtitle: String(localized: "Rounding of the panel's corners. Automatic follows the panel size; Square turns rounding off."),
                accessory: radiusStack, searchItemID: SearchID.cornerRadius)
+
+        configureSwitch(animationsSwitch, action: #selector(toggleAnimations(_:)))
+        addRow(to: panel, title: String(localized: "Animations"),
+               subtitle: String(localized: "Panel, tiles and tab strip glide between states. Off, or macOS Reduce Motion, switches instantly."),
+               accessory: animationsSwitch, searchItemID: SearchID.animations)
 
         previewButton.title = String(localized: "Show Preview")
         previewButton.bezelStyle = .rounded
@@ -391,6 +397,10 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.applyRadius($0) }
             .store(in: &cancellables)
+        prefs.$animationsEnabled
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.animationsSwitch.state = $0 ? .on : .off }
+            .store(in: &cancellables)
         prefs.objectWillChange
             .sink { [weak self] in self?.schedulePreviewRefresh() }
             .store(in: &cancellables)
@@ -420,6 +430,7 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
         boldSelectedSwitch.state = prefs.boldSelectedLabel ? .on : .off
         appNamesSwitch.state = prefs.showApplicationNames ? .on : .off
         statusIconsSwitch.state = prefs.showWindowStatusIcons ? .on : .off
+        animationsSwitch.state = prefs.animationsEnabled ? .on : .off
         applyOpacity(prefs.panelOpacity)
         applyRadius(prefs.panelCornerRadius)
     }
@@ -519,6 +530,10 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
 
     @objc private func toggleStatusIcons(_ sender: NSSwitch) {
         Preferences.shared.showWindowStatusIcons = (sender.state == .on)
+    }
+
+    @objc private func toggleAnimations(_ sender: NSSwitch) {
+        Preferences.shared.animationsEnabled = (sender.state == .on)
     }
 
     @objc private func toggleBoldSelected(_ sender: NSSwitch) {
