@@ -1,9 +1,10 @@
 <div align="center">
 
-<img src="https://github.com/user-attachments/assets/ee39f23a-0b35-46e7-966b-7887ba0f16aa"  alt="BetterCmdTab 宣传图" />
+<img width="128" height="128" alt="AppIcon-macOS-Dark-256x256@1x" src="https://github.com/user-attachments/assets/3e4bbb67-ef7d-4619-8068-1458d8460331" />
 
-<br>
-<br>
+# BetterCmdTab
+
+The Cmd+Tab macOS deserves.
 
 <p>
   <a href="https://github.com/rokartur/BetterCmdTab/releases/latest"><img alt="最新版本" src="https://img.shields.io/github/v/release/rokartur/BetterCmdTab?include_prereleases&style=for-the-badge&label=release&color=white"></a>
