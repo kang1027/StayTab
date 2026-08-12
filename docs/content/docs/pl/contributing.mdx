@@ -59,11 +59,13 @@ xcodebuild -scheme "BetterCmdTab Debug" -destination 'platform=macOS' \
   test -only-testing:BetterCmdTabTests/FuzzyMatchTests/noMatch
 ```
 
-Obejmują **wyłącznie czystą logikę** — metryki przełącznika, etykiety wierszy,
-filtrowanie katalogu, dopasowanie rozmyte, analizę aktualizacji, wybór Liquid Glass i
-przenośność ustawień. Zachowanie UI jest sprawdzane ręcznie: przełącznik potrzebuje
-działającego WindowServer i uprawnienia Dostępność, dlatego ten obszar nie działa w
-środowisku bez interfejsu graficznego i nie należy do testów jednostkowych.
+Obejmują **czystą logikę** — metryki przełącznika, etykiety wierszy, filtrowanie
+katalogu, dopasowanie rozmyte, analizę aktualizacji, wybór Liquid Glass i przenośność
+ustawień — oraz niewielki zestaw osadzony w AppKit (`TabStripWindowingTests`,
+`SwitcherReflowTests`), który wymaga działającego WindowServer i wyłączonej opcji
+Ogranicz ruch w macOS. Reszta UI jest sprawdzana ręcznie: przełącznik potrzebuje
+uprawnienia Dostępność, dlatego ten obszar nie działa w środowisku bez interfejsu
+graficznego i nie należy do testów jednostkowych.
 
 ## Gdzie znajdują się poszczególne elementy
 

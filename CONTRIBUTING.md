@@ -41,7 +41,7 @@ You need Xcode 16+ and the macOS 26 SDK installed. The Liquid Glass code paths a
 xcodebuild -scheme "BetterCmdTab Debug" -destination 'platform=macOS' test
 ```
 
-Tests live under `BetterCmdTabTests/`. They cover pure logic — switcher metrics, row labelling, updater parsing, Liquid Glass selection. UI behavior is verified manually because the switcher needs a real WindowServer + Accessibility permissions.
+Tests live under `BetterCmdTabTests/`. They cover pure logic — switcher metrics, row labelling, updater parsing, Liquid Glass selection — plus a small AppKit-hosted set (`TabStripWindowingTests`, `SwitcherReflowTests`) that needs a live WindowServer and macOS Reduce Motion off. The rest of the UI is verified manually because the switcher needs Accessibility permissions.
 
 ## Pull request checklist
 

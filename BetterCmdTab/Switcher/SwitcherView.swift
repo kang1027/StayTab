@@ -22,18 +22,14 @@ protocol SwitcherViewDelegate: AnyObject {
 }
 
 @MainActor
-final class SwitcherView: NSView, TabStripDelegate {
-    func tabStrip(_ strip: TabStripView, didSelectIndex index: Int) {
-        delegate?.switcherViewDidSelectTab(index)
-    }
-
-    func tabStrip(_ strip: TabStripView, didHoverIndex index: Int) {
-        delegate?.switcherViewDidHoverTab(index)
-    }
+final class SwitcherView: NSView {
 
     weak var delegate: SwitcherViewDelegate?
 
     private let glassBackdrop: NSView
+    /// Specular hairline on the panel edge — the same rim the tab strip's
+    /// selection capsule wears, at the panel's corner radius.
+    private let rim = GlassRimView()
     /// `NSGlassEffectView` outlines itself: a hairline a shade lighter than the panel,
     /// traced right inside its own edge, which reads as a window border rather than as
     /// glass. Nothing turns it off — not `clipsToBounds`, not `masksToBounds` on its
@@ -146,11 +142,14 @@ final class SwitcherView: NSView, TabStripDelegate {
         } else {
             glassBackdrop.addSubview(contentContainer)
         }
+        // The row block is slid by its layer on every reflow, so it owns one
+        // outright instead of relying on the glass backdrop above it to make
+        // the subtree layer-backed — without a layer the glide silently no-ops.
+        listContainer.wantsLayer = true
         contentContainer.addSubview(listContainer)
         searchBar.isHidden = true
         contentContainer.addSubview(searchBar)
         tabStrip.isHidden = true
-        tabStrip.delegate = self
         contentContainer.addSubview(tabStrip)
         emptyIcon.isHidden = true
         emptyIcon.imageScaling = .scaleProportionallyUpOrDown
@@ -161,6 +160,10 @@ final class SwitcherView: NSView, TabStripDelegate {
         emptyTitle.textColor = .secondaryLabelColor
         emptyTitle.font = .systemFont(ofSize: 14, weight: .semibold)
         contentContainer.addSubview(emptyTitle)
+        // Last, so the panel edge stays lit above every row and label.
+        rim.frame = contentContainer.bounds
+        rim.autoresizingMask = [.width, .height]
+        contentContainer.addSubview(rim)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) not implemented") }
@@ -214,6 +217,7 @@ final class SwitcherView: NSView, TabStripDelegate {
             screenFrame != layoutScreenFrameUsed
         self.layoutScreenFrameUsed = screenFrame
         self.tabStripActive = stripActiveNew
+        armReflow(incoming: rows, geometryChanged: geometryChanged)
         self.rows = rows
         self.labels = labels
         self.highlightPrefix = highlightPrefix
@@ -230,7 +234,7 @@ final class SwitcherView: NSView, TabStripDelegate {
         }
         searchBar.isHidden = !searchActive
         if let items = tabStripItems, !items.isEmpty {
-            tabStrip.configure(items: items, selectedIndex: tabStripSelectedIndex, accent: accent)
+            tabStrip.configure(items: items, selectedIndex: tabStripSelectedIndex)
             tabStrip.isHidden = false
         } else {
             tabStrip.isHidden = true
@@ -270,6 +274,10 @@ final class SwitcherView: NSView, TabStripDelegate {
         if geometryChanged {
             cachedLayout = nil
             invalidateIntrinsicContentSize()
+            needsLayout = true
+        } else if reflowAnimates {
+            // Rows only swapped places: the slots are unchanged, but the tiles
+            // have to glide between them, and that needs a layout pass.
             needsLayout = true
         }
         applySelection()
@@ -405,6 +413,7 @@ final class SwitcherView: NSView, TabStripDelegate {
     }
 
     private func updateBackdropCornerRadius(_ radius: CGFloat) {
+        rim.cornerRadius = radius
         if #available(macOS 26.0, *), let glass = glassBackdrop as? NSGlassEffectView {
             layer?.cornerRadius = radius
             glass.cornerRadius = radius + glassEdgeBleed
@@ -522,6 +531,15 @@ final class SwitcherView: NSView, TabStripDelegate {
     }
 
     override func mouseMoved(with event: NSEvent) {
+        // Same manual routing as `handleClick`: the hitTest override pins mouse
+        // events to this view, so the strip is asked what is under the pointer
+        // rather than each cell tracking it.
+        if tabStripActive, !tabStrip.isHidden,
+           let tabIdx = tabStrip.index(atWindowPoint: event.locationInWindow) {
+            setHoveredIndex(-1)
+            delegate?.switcherViewDidHoverTab(tabIdx)
+            return
+        }
         let idx = indexAtWindowPoint(event.locationInWindow)
         setHoveredIndex(idx ?? -1)
         if let idx {
@@ -590,6 +608,11 @@ final class SwitcherView: NSView, TabStripDelegate {
     /// (e.g. vertical-only deltas) it forwards it up the responder chain, which
     /// lands back here — without the guard that would loop forever.
     private var routingScrollToTabStrip = false
+    /// Armed by `configure` for one layout pass. See `armReflow`.
+    private var reflowAnimates = false
+    /// New row index → the frame that row's tile currently occupies, for the
+    /// rows that changed places. See `applyItemFrames`.
+    private var reflowOrigins: [Int: NSRect]?
 
     override func scrollWheel(with event: NSEvent) {
         // hitTest keeps scroll events at the panel level too; hand events over
@@ -740,7 +763,9 @@ final class SwitcherView: NSView, TabStripDelegate {
             x: (bounds.width - info.listSize.width) / 2,
             y: listOriginY
         )
+        let previousListOrigin = listContainer.frame.origin
         listContainer.frame = NSRect(origin: listOrigin, size: info.listSize)
+        if reflowAnimates { glideListContainer(from: previousListOrigin) }
 
         // Empty state: stack the glyph over the caption and center the group in
         // the list area. Sized off the active scale so it tracks panel size.
@@ -764,17 +789,113 @@ final class SwitcherView: NSView, TabStripDelegate {
         }
 
         if tabStripActive {
+            // The strip spans the same width as the row highlights above it,
+            // which sit `highlightInset` inside their row.
+            let stripInset = outer + metrics.highlightInset
             tabStrip.frame = NSRect(
-                x: outer,
+                x: stripInset,
                 y: outer,
-                width: max(0, bounds.width - outer * 2),
+                width: max(0, bounds.width - stripInset * 2),
                 height: tabStripHeight
             )
         }
 
-        for (i, rect) in info.frames.enumerated() where i < itemViews.count {
-            itemViews[i].frame = rect
+        applyItemFrames(info.frames)
+    }
+
+    /// Slides the whole row block from where it was drawn a moment ago to where
+    /// this layout puts it. The panel resizes around its own center, so a strip
+    /// claiming height at the bottom lifts every row on screen — and because the
+    /// measuring layout pass runs before the panel's frame animation starts, the
+    /// rows would otherwise land in their final screen position in a single
+    /// frame and just sit there while the glass grows around them.
+    /// Translating the layer rather than animating the frame is what keeps this
+    /// stable: the panel's resize re-runs this layout on every step, so the model
+    /// frame has to stay at the layout's answer while only the presentation lags.
+    private func glideListContainer(from previous: NSPoint) {
+        let current = listContainer.frame.origin
+        let offset = NSPoint(x: previous.x - current.x, y: previous.y - current.y)
+        guard offset.x != 0 || offset.y != 0, let layer = listContainer.layer else { return }
+        let slide = CABasicAnimation(keyPath: "transform")
+        slide.fromValue = NSValue(caTransform3D: CATransform3DMakeTranslation(offset.x, offset.y, 0))
+        slide.duration = SwitcherMotion.duration
+        slide.timingFunction = SwitcherMotion.timing
+        layer.add(slide, forKey: "reflowGlide")
+    }
+
+    /// Decides whether the next layout pass glides its tiles into place, and
+    /// from where. Two things move tiles: the grid re-flowing (the search strip
+    /// or the tab strip claiming height, a wider panel fitting another column)
+    /// and rows swapping places. Either way a tile is followed by identity, so
+    /// it glides to wherever its own icon ended up instead of having content
+    /// swapped underneath it while it stays put. A row that wasn't on screen a
+    /// moment ago gets no entry and simply appears in its slot.
+    /// Stays a hard cut when the panel isn't showing this content yet (a reveal
+    /// has to land in one frame) or the user turned animations off.
+    private func armReflow(incoming: [SwitcherRow], geometryChanged: Bool) {
+        reflowOrigins = nil
+        reflowAnimates = false
+        // The panel exists from launch on, so its mere presence proves nothing:
+        // the reveal reconfigures rows over a layout that has never run, and
+        // gliding from that would fly the grid in from the window corner.
+        guard window?.isVisible == true, !isHidden, !rows.isEmpty, !incoming.isEmpty,
+              SwitcherMotion.isEnabled else { return }
+        // Cheap first: every cycle step reconfigures the same rows at the same
+        // size, and that path stays a handful of integer comparisons with
+        // nothing allocated.
+        guard geometryChanged
+            || rows.count != incoming.count
+            || zip(rows, incoming).contains(where: { $0.identity != $1.identity }) else { return }
+        reflowAnimates = true
+        var current: [SwitcherRow.Identity: NSRect] = [:]
+        current.reserveCapacity(rows.count)
+        for (index, row) in rows.enumerated() where index < itemViews.count {
+            current[row.identity] = itemViews[index].frame
         }
+        var origins: [Int: NSRect] = [:]
+        for (index, row) in incoming.enumerated() {
+            if let from = current[row.identity] { origins[index] = from }
+        }
+        reflowOrigins = origins.isEmpty ? nil : origins
+    }
+
+    /// Parks every tile where its row was last drawn, then lets it glide to the
+    /// slot the layout just computed. Straight assignment otherwise — including
+    /// the relayout passes that a resizing panel fires, which must not disturb a
+    /// glide already in flight: `animator()` writes the target frame through
+    /// immediately, so the equality check below leaves those tiles alone.
+    private func applyItemFrames(_ frames: [NSRect]) {
+        let origins = reflowOrigins
+        let animates = reflowAnimates
+        reflowOrigins = nil
+        reflowAnimates = false
+        guard animates else {
+            for (index, rect) in frames.enumerated()
+            where index < itemViews.count && itemViews[index].frame != rect {
+                itemViews[index].frame = rect
+            }
+            return
+        }
+        // A tile with no origin is showing a row that wasn't on screen a moment
+        // ago — nothing to glide from, so it lands in its slot directly.
+        for (index, rect) in frames.enumerated() where index < itemViews.count {
+            itemViews[index].frame = origins?[index] ?? rect
+        }
+        // `SwitcherPanel.present()` measures the panel by laying this view out
+        // inside a transaction with actions disabled, and that is exactly the
+        // pass a reflow lands in. Re-enable actions for the glide alone — without
+        // this the tiles cut straight to their new slots.
+        CATransaction.begin()
+        CATransaction.setDisableActions(false)
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = SwitcherMotion.duration
+            context.timingFunction = SwitcherMotion.timing
+            for (index, rect) in frames.enumerated()
+            where index < itemViews.count && itemViews[index].frame != rect {
+                itemViews[index].animator().frame = rect
+            }
+        }
+        CATransaction.commit()
     }
 
     private struct ListLayout {

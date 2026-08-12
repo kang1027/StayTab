@@ -188,6 +188,12 @@ final class SwitcherPanel: NSPanel {
     /// `opacity` is the resolved per-shortcut panel opacity (#74), 30–100.
     func present(opacity: Int = 100) {
         guard let content = contentView else { return }
+        // Growing/shrinking for a drill-in, a search filter or a row count change
+        // can glide; a first reveal (or a re-reveal from the off-screen park)
+        // must land at its final size in one frame. Captured before the un-park
+        // below undoes the evidence.
+        let resizeAnimates = isVisible && parkedFrame == nil && !content.isHidden
+            && SwitcherMotion.isEnabled
         isPresented = true
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -219,7 +225,15 @@ final class SwitcherPanel: NSPanel {
         )
         let newFrame = NSRect(origin: origin, size: size)
         if frame != newFrame {
-            setFrame(newFrame, display: true)
+            if resizeAnimates {
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = SwitcherMotion.duration
+                    context.timingFunction = SwitcherMotion.timing
+                    animator().setFrame(newFrame, display: false)
+                }
+            } else {
+                setFrame(newFrame, display: true)
+            }
         }
         // Restore opacity that `dismiss()` zeroed to mask the glass-layer
         // teardown ghost, and un-hide the content `dismiss()` hid to drop the
@@ -264,7 +278,9 @@ final class SwitcherPanel: NSPanel {
             }
         }
         CATransaction.commit()
-        onFrameDidChange?(Self.cgGlobalFrame(from: frame))
+        // `newFrame`, not `frame`: mid-animation the window is still catching up,
+        // and the hit region has to describe where the panel is landing.
+        onFrameDidChange?(Self.cgGlobalFrame(from: newFrame))
         // A non-activating panel isn't always granted key on the first
         // `makeKeyAndOrderFront` if another app is mid-activation when the switcher
         // opens; re-key on the next runloop (same approach as `resignKey`) so the

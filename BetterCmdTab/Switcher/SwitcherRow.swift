@@ -255,6 +255,31 @@ struct SwitcherRow {
     /// `nil` for launchable rows (no process yet).
     var pid: pid_t? { app?.processIdentifier }
 
+    /// Value identity of what a row stands for, stable across catalog refreshes
+    /// and filtering. The switcher view follows it to recognize a row it already
+    /// drew, so a re-layout glides that tile to its new slot instead of swapping
+    /// content underneath a tile that stayed put.
+    enum Identity: Hashable {
+        case window(pid_t, CGWindowID)
+        case browserTab(pid_t, CGWindowID, Int)
+        case app(pid_t)
+        case launchable(String)
+        case recentlyClosed(String, String)
+    }
+
+    var identity: Identity {
+        switch subject {
+        case .running(let app):
+            let pid = app.processIdentifier
+            if let tab = browserTab { return .browserTab(pid, cgWindowID, tab.index) }
+            return cgWindowID == 0 ? .app(pid) : .window(pid, cgWindowID)
+        case .launchable(let installed):
+            return .launchable(installed.bundleID)
+        case .recentlyClosed(let entry):
+            return .recentlyClosed(entry.bundleID, entry.title)
+        }
+    }
+
     var appName: String {
         switch subject {
         case .running(let app): return app.localizedName ?? ""

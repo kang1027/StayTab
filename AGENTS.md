@@ -31,10 +31,12 @@ Tests use **Swift Testing** (`import Testing`, `@Suite`/`@Test`), not XCTest —
 no `testXxx()` methods, so select a single case by its Swift function name (e.g. `noMatch`,
 `appNameSubsequence`), not by a `test`-prefixed name.
 
-Tests cover **pure logic only** (switcher metrics, row labels, catalog filtering, fuzzy
-match, updater parsing, Liquid Glass selection, settings portability). UI behavior is
-verified manually — the switcher needs a live WindowServer + Accessibility permission, so
-the UI test surface fails in headless/CI and is not part of the unit run.
+Tests cover **pure logic** (switcher metrics, row labels, catalog filtering, fuzzy
+match, updater parsing, Liquid Glass selection, settings portability), plus a small
+AppKit-hosted set — `TabStripWindowingTests`, `SwitcherReflowTests` — that needs a live
+WindowServer and macOS Reduce Motion off. The rest of the UI is verified manually: the
+switcher needs Accessibility permission, so that surface fails in headless/CI and is not
+part of the unit run.
 
 ## Release / version
 

@@ -58,10 +58,12 @@ xcodebuild -scheme "BetterCmdTab Debug" -destination 'platform=macOS' \
   test -only-testing:BetterCmdTabTests/FuzzyMatchTests/noMatch
 ```
 
-They cover **pure logic only** — switcher metrics, row labels, catalog filtering,
-fuzzy match, updater parsing, Liquid Glass selection, settings portability. UI
-behaviour is verified by hand: the switcher needs a live WindowServer plus
-Accessibility, so that surface fails headless and is not part of the unit run.
+They cover **pure logic** — switcher metrics, row labels, catalog filtering, fuzzy
+match, updater parsing, Liquid Glass selection, settings portability — plus a small
+AppKit-hosted set (`TabStripWindowingTests`, `SwitcherReflowTests`) that needs a live
+WindowServer and macOS Reduce Motion off. The rest of the UI is verified by hand: the
+switcher needs Accessibility, so that surface fails headless and is not part of the
+unit run.
 
 ## Where things live
 
