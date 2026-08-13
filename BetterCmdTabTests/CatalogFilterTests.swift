@@ -347,6 +347,33 @@ struct CatalogFilterTests {
         #expect(drop.isEmpty)
     }
 
+    // MARK: - stranded-app rescue (#168)
+
+    @Test("an app that loses every window row is re-admitted at its first index")
+    func strandedAppRescued() {
+        // pid 7 keeps a row, pid 9 loses both — only 9 needs rescuing, and it comes
+        // back at index 1 so its MRU position is unchanged.
+        #expect(CatalogFilter.strandedAppIndices(
+            pids: [7, 9, 9], kept: [true, false, false], rescuable: [true, true, true]) == [1])
+        #expect(CatalogFilter.strandedAppIndices(
+            pids: [7, 9, 9], kept: [true, false, true], rescuable: [true, true, true]).isEmpty)
+    }
+
+    @Test("an app hidden on purpose is never rescued")
+    func deliberatelyHiddenAppNotRescued() {
+        // The whole point of the rescue is reachability, not overriding an
+        // "always hide this app" exception.
+        #expect(CatalogFilter.strandedAppIndices(
+            pids: [9, 9], kept: [false, false], rescuable: [false, false]).isEmpty)
+    }
+
+    @Test("windowless and placeholder rows carry no pid and are left alone")
+    func pidlessRowsNotRescued() {
+        #expect(CatalogFilter.strandedAppIndices(
+            pids: [nil, nil], kept: [false, false], rescuable: [true, true]).isEmpty)
+        #expect(CatalogFilter.strandedAppIndices(pids: [], kept: [], rescuable: []).isEmpty)
+    }
+
     // MARK: - needsSpaceResolution (phantom-resolution gate)
 
     @Test("multi-window app detected for the phantom-resolution gate")

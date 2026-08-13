@@ -107,9 +107,30 @@ enum CatalogFilter {
         // they're removed even under an identity config that skips the rest.
         let phantomFiltered = filterPhantomWindows(rows, spaces)
         if cfg.isIdentity { return phantomFiltered }
-        var filtered = phantomFiltered.filter {
+        // Flags rather than a filter: a rescued row has to slot back in at its
+        // original index so MRU order survives. Only reached on a non-identity
+        // config — the default reveal returned above.
+        var kept = phantomFiltered.map {
             includes(bundleID: $0.bundleIdentifier, isPlaceholder: $0.isPlaceholder, isMinimized: $0.isMinimized, appHidden: $0.isHidden, hasWindow: $0.window != nil, cfg)
         }
+        // An app can lose *every* row to the minimized/hidden window drops while
+        // still running. It then vanishes from the switcher and stays gone, because
+        // the only thing that un-minimizes it is activating it (Activator.activateApp)
+        // and that needs a row to activate from — one hide-all minimizes every Finder
+        // window, so with "show minimized windows" off Finder becomes permanently
+        // unreachable (#168). Re-admit one row per stranded app.
+        if cfg.showWindowless, !cfg.showMinimized || !cfg.showHidden {
+            for index in strandedAppIndices(
+                pids: phantomFiltered.map(\.pid),
+                kept: kept,
+                rescuable: phantomFiltered.map {
+                    admittedByAppRules(bundleID: $0.bundleIdentifier, hasWindow: $0.window != nil, cfg)
+                }
+            ) {
+                kept[index] = true
+            }
+        }
+        var filtered = phantomFiltered.indices.compactMap { kept[$0] ? phantomFiltered[$0] : nil }
         if cfg.sortOrder != .mru {
             filtered = applySortOrder(filtered, cfg.sortOrder, name: { $0.appName }, pid: { $0.pid })
         }
@@ -467,6 +488,39 @@ enum CatalogFilter {
     /// Row-level inclusion test split out so it can be unit-tested without
     /// constructing `NSRunningApplication` instances. Placeholders are always
     /// kept (transient cache-warm rows).
+    /// Whether the *app-level* rules alone admit this row, ignoring the per-window
+    /// minimized/hidden drops. A row failing this was hidden on purpose, so
+    /// `strandedAppIndices` must never rescue it back into the list.
+    static func admittedByAppRules(bundleID: String?, hasWindow: Bool, _ cfg: Config) -> Bool {
+        guard let bid = bundleID, let mode = cfg.hideModes[bid] else { return true }
+        switch mode {
+        case .always: return false
+        case .whenNoWindows: return hasWindow
+        case .dontHide: return true
+        }
+    }
+
+    /// Pure index-level core of the stranded-app rescue: the first index of every
+    /// app that kept no row at all, skipping apps the user hid deliberately.
+    ///
+    /// Returning the *first* index keeps the app at its most recent position once
+    /// the caller re-admits it, so the rescue never reorders the list. An app with
+    /// at least one surviving row needs nothing — it is still reachable.
+    static func strandedAppIndices(pids: [pid_t?], kept: [Bool], rescuable: [Bool]) -> [Int] {
+        var survivors: Set<pid_t> = []
+        for index in pids.indices where kept[index] {
+            if let pid = pids[index] { survivors.insert(pid) }
+        }
+        var rescued: [Int] = []
+        var seen: Set<pid_t> = []
+        for index in pids.indices {
+            guard !kept[index], rescuable[index], let pid = pids[index],
+                  !survivors.contains(pid), seen.insert(pid).inserted else { continue }
+            rescued.append(index)
+        }
+        return rescued
+    }
+
     static func includes(bundleID: String?, isPlaceholder: Bool, isMinimized: Bool, appHidden: Bool, hasWindow: Bool = true, _ cfg: Config) -> Bool {
         if isPlaceholder { return true }
         if let bid = bundleID, let mode = cfg.hideModes[bid] {
