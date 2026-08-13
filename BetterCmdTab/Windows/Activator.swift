@@ -988,7 +988,10 @@ enum Activator {
         if !excluded.contains(finderBundleID),
            let finderPid = running.first(where: { $0.bundleIdentifier == finderBundleID })?.processIdentifier {
             DispatchQueue.global(qos: .userInitiated).async {
-                setFinderWindowsMinimized(true, pid: finderPid)
+                let minimized = minimizeFinderWindows(pid: finderPid)
+                // Union, not assign: a second hide-all before any show-all only
+                // reports the windows opened since the first one.
+                finderWindowsMinimizedByHideAll.withLock { $0.formUnion(minimized) }
             }
         }
     }
@@ -1018,9 +1021,16 @@ enum Activator {
         where app.activationPolicy == .regular && app.isHidden && app.processIdentifier != targetPid {
             app.unhide()
         }
-        if let finderPid = running.first(where: { $0.bundleIdentifier == finderBundleID })?.processIdentifier {
+        // Restore only what hide-all minimized, and consume the record so a later
+        // show-all can't re-open a window the user has since put away themselves.
+        let ourMinimized = finderWindowsMinimizedByHideAll.withLock { ids -> Set<CGWindowID> in
+            defer { ids = [] }
+            return ids
+        }
+        if !ourMinimized.isEmpty,
+           let finderPid = running.first(where: { $0.bundleIdentifier == finderBundleID })?.processIdentifier {
             DispatchQueue.global(qos: .userInitiated).async {
-                setFinderWindowsMinimized(false, pid: finderPid)
+                restoreFinderWindows(pid: finderPid, ids: ourMinimized)
             }
         }
         // Raise the hide-time source app last so it ends frontmost. Unhide it first
@@ -1032,18 +1042,52 @@ enum Activator {
         }
     }
 
-    /// Set the minimized state of every window of `pid` (used for Finder, which
-    /// can't be `.hide()`'d — see `hideAllApps()`). Cross-process AX, so call
-    /// off-main; a short messaging timeout keeps a wedged Finder from stalling.
-    private static func setFinderWindowsMinimized(_ minimized: Bool, pid: pid_t) {
+    /// The Finder windows `hideAllApps()` minimized, so `showAllApps()` restores
+    /// exactly those. Finder can't be `.hide()`'d, so hide-all minimizes instead —
+    /// but minimizing is not the transient state hiding is, so the reversal has to
+    /// be just as precise: un-minimizing *every* Finder window would silently undo
+    /// a window the user had put away themselves, long before any hide-all.
+    private static let finderWindowsMinimizedByHideAll =
+        OSAllocatedUnfairLock<Set<CGWindowID>>(initialState: [])
+
+    /// Minimize every currently un-minimized Finder window, answering the ids of
+    /// the ones actually touched (used for Finder, which can't be `.hide()`'d —
+    /// see `hideAllApps()`). Cross-process AX, so call off-main; a short messaging
+    /// timeout keeps a wedged Finder from stalling.
+    private static func minimizeFinderWindows(pid: pid_t) -> Set<CGWindowID> {
+        let axApp = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(axApp, 0.25)
+        var windowsValue: AnyObject?
+        guard AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windowsValue) == .success,
+              let windows = windowsValue as? [AXUIElement] else { return [] }
+        var touched: Set<CGWindowID> = []
+        for window in windows {
+            var minimizedValue: AnyObject?
+            if AXUIElementCopyAttributeValue(window, kAXMinimizedAttribute as CFString, &minimizedValue) == .success,
+               (minimizedValue as? Bool) == true { continue }   // already away, not ours to restore
+            // Resolve the id *before* minimizing: right after the state flips the
+            // window can report id 0 for a few hundred ms. A window we cannot
+            // identify is left alone rather than minimized with no way back.
+            let id = PrivateAPI.cgWindowId(of: window)
+            guard id != 0,
+                  AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, kCFBooleanTrue) == .success
+            else { continue }
+            touched.insert(id)
+        }
+        return touched
+    }
+
+    /// Un-minimize exactly the Finder windows `ids` names. Same off-main / timeout
+    /// contract as `minimizeFinderWindows`.
+    private static func restoreFinderWindows(pid: pid_t, ids: Set<CGWindowID>) {
+        guard !ids.isEmpty else { return }
         let axApp = AXUIElementCreateApplication(pid)
         AXUIElementSetMessagingTimeout(axApp, 0.25)
         var windowsValue: AnyObject?
         guard AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windowsValue) == .success,
               let windows = windowsValue as? [AXUIElement] else { return }
-        let value: CFBoolean = minimized ? kCFBooleanTrue : kCFBooleanFalse
-        for window in windows {
-            AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, value)
+        for window in windows where ids.contains(PrivateAPI.cgWindowId(of: window)) {
+            AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
         }
     }
 
