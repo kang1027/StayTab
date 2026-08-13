@@ -115,54 +115,50 @@ echo "[release-quality-gate] Log: $log_path"
 echo "[release-quality-gate] Total warnings: $total_warnings"
 echo "[release-quality-gate] High-risk warnings: $high_risk_count"
 
-echo "[release-quality-gate] High-risk summary by category:"
-if [[ "$high_risk_count" -gt 0 ]]; then
-  printf '%s\n' "$high_risk_lines" | awk '
+# Tally the high-risk warnings, most frequent first. Both summaries are the same
+# count-and-sort over a different key: "category" buckets by what the warning is
+# about, "file" by where it fired.
+summarize_high_risk() {
+  if [[ "$high_risk_count" -eq 0 ]]; then
+    echo "0"
+    return
+  fi
+  printf '%s\n' "$high_risk_lines" | awk -v mode="$1" '
     {
-      msg = $0
-      if (msg ~ /main actor-isolated/) {
-        cat = "MainActor"
-      } else if (msg ~ /concurrently-executing/) {
-        cat = "ConcurrentExecution"
-      } else if (msg ~ /UnsafeMutableRawPointer/) {
-        cat = "UnsafeMutableRawPointer"
-      } else if (msg ~ /Sendable/) {
-        cat = "Sendable"
+      if (mode == "category") {
+        if ($0 ~ /main actor-isolated/) {
+          key = "MainActor"
+        } else if ($0 ~ /concurrently-executing/) {
+          key = "ConcurrentExecution"
+        } else if ($0 ~ /UnsafeMutableRawPointer/) {
+          key = "UnsafeMutableRawPointer"
+        } else if ($0 ~ /Sendable/) {
+          key = "Sendable"
+        } else {
+          key = "Other"
+        }
       } else {
-        cat = "Other"
+        key = $0
+        sub(/^[0-9]+:/, "", key)
+        sub(/:[0-9]+:[0-9]+: warning:.*/, "", key)
       }
-      counts[cat]++
+      if (key != "") {
+        counts[key]++
+      }
     }
     END {
-      for (cat in counts) {
-        printf("%d\t%s\n", counts[cat], cat)
+      for (key in counts) {
+        printf("%d\t%s\n", counts[key], key)
       }
     }
   ' | sort -nr
-else
-  echo "0"
-fi
+}
+
+echo "[release-quality-gate] High-risk summary by category:"
+summarize_high_risk category
 
 echo "[release-quality-gate] High-risk summary by file:"
-if [[ "$high_risk_count" -gt 0 ]]; then
-  printf '%s\n' "$high_risk_lines" | awk '
-    {
-      file = $0
-      sub(/^[0-9]+:/, "", file)
-      sub(/:[0-9]+:[0-9]+: warning:.*/, "", file)
-      if (file != "") {
-        counts[file]++
-      }
-    }
-    END {
-      for (file in counts) {
-        printf("%d\t%s\n", counts[file], file)
-      }
-    }
-  ' | sort -nr
-else
-  echo "0"
-fi
+summarize_high_risk file
 
 if [[ "$fail_on_high_risk" -eq 1 && "$high_risk_count" -gt 0 ]]; then
   echo "[release-quality-gate] Failing because high-risk warnings were found." >&2
