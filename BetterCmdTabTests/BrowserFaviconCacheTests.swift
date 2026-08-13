@@ -26,11 +26,11 @@ struct BrowserFaviconCacheTests {
         try png(size: 2).write(to: icons.appendingPathComponent(md5(pngUUID)))
         try ico(size: 16).write(to: icons.appendingPathComponent(md5(icoUUID)))
 
-        let found = BrowserFaviconCache.loadSafari(
+        let found = BrowserFaviconCache.loadSafariResult(
             urls: ["https://example.test/page#section", "https://example.test/icon"],
             databaseURL: database,
             iconsURL: icons
-        )
+        ).images
         #expect(found["https://example.test/page"]?.size.width == 2)
         #expect(found["https://example.test/icon"] != nil)
     }
@@ -51,11 +51,11 @@ struct BrowserFaviconCacheTests {
         try exec(db, "INSERT INTO page_url VALUES ('https://example.test/pl', '\(uuid)')")
         try png(size: 5).write(to: icons.appendingPathComponent(md5(uuid)))
 
-        let found = BrowserFaviconCache.loadSafari(
+        let found = BrowserFaviconCache.loadSafariResult(
             urls: ["https://example.test/pl/"],
             databaseURL: database,
             iconsURL: icons
-        )
+        ).images
         #expect(found["https://example.test/pl/"]?.size.width == 5)
     }
 
@@ -78,7 +78,7 @@ struct BrowserFaviconCacheTests {
 
         let profiles = BrowserFaviconCache.chromiumProfileDirectories(in: root)
         #expect(profiles.first?.path == profile2.path)
-        let found = BrowserFaviconCache.loadChromium(urls: ["https://example.test/page#fragment", "https://missing.test"], dataDirectory: root)
+        let found = BrowserFaviconCache.loadChromiumResult(urls: ["https://example.test/page#fragment", "https://missing.test"], dataDirectory: root).images
         #expect(found["https://example.test/page"]?.size.width == 4)
         #expect(found["https://missing.test"] == nil)
 
@@ -87,7 +87,7 @@ struct BrowserFaviconCacheTests {
         let brokenDB = try open(broken.appendingPathComponent("Favicons"))
         try exec(brokenDB, "CREATE TABLE unrelated (value TEXT)")
         sqlite3_close(brokenDB)
-        #expect(BrowserFaviconCache.loadChromium(urls: ["https://example.test/page"], dataDirectory: broken).isEmpty)
+        #expect(BrowserFaviconCache.loadChromiumResult(urls: ["https://example.test/page"], dataDirectory: broken).images.isEmpty)
     }
 
     @Test("missing Local State checks only root and Default")
@@ -113,10 +113,10 @@ struct BrowserFaviconCacheTests {
         try exec(lock, "PRAGMA locking_mode=EXCLUSIVE")
         try exec(lock, "BEGIN EXCLUSIVE")
 
-        let found = BrowserFaviconCache.loadChromium(
+        let found = BrowserFaviconCache.loadChromiumResult(
             urls: ["https://example.test/page"],
             dataDirectory: root
-        )
+        ).images
         #expect(found["https://example.test/page"]?.size.width == 3)
     }
 

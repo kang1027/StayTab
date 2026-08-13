@@ -10,7 +10,9 @@ enum BrowserFaviconCache {
         let url: String
     }
 
-    private struct LoadResult {
+    /// Loaded icons plus whether the lookup saw the whole database — an
+    /// incomplete read (a locked or malformed file) must not be cached as a miss.
+    struct LoadResult {
         let images: [String: NSImage]
         let complete: Bool
     }
@@ -83,11 +85,7 @@ enum BrowserFaviconCache {
         }
     }
 
-    static func loadSafari(urls: [String], databaseURL: URL, iconsURL: URL) -> [String: NSImage] {
-        loadSafariResult(urls: urls, databaseURL: databaseURL, iconsURL: iconsURL).images
-    }
-
-    private static func loadSafariResult(urls: [String], databaseURL: URL, iconsURL: URL) -> LoadResult {
+    static func loadSafariResult(urls: [String], databaseURL: URL, iconsURL: URL) -> LoadResult {
         let normalized = Array(Set(urls.compactMap(normalizedURL)))
         guard !normalized.isEmpty else { return LoadResult(images: [:], complete: true) }
         return withDatabase(at: databaseURL) { db in
@@ -126,11 +124,7 @@ enum BrowserFaviconCache {
         } ?? LoadResult(images: [:], complete: false)
     }
 
-    static func loadChromium(urls: [String], dataDirectory: URL) -> [String: NSImage] {
-        loadChromiumResult(urls: urls, dataDirectory: dataDirectory).images
-    }
-
-    private static func loadChromiumResult(urls: [String], dataDirectory: URL) -> LoadResult {
+    static func loadChromiumResult(urls: [String], dataDirectory: URL) -> LoadResult {
         var unresolved = Set(urls.compactMap(normalizedURL))
         var result: [String: NSImage] = [:]
         var readDatabase = false
