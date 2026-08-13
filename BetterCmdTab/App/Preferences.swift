@@ -1162,9 +1162,9 @@ final class Preferences: ObservableObject {
         }
     }
 
-    /// Experimental. Rank fuzzy-search results best-match-first (contiguous and
+    /// Off by default. Rank fuzzy-search results best-match-first (contiguous and
     /// word-boundary matches in the app name win) instead of showing them in
-    /// catalog/MRU order. Default off.
+    /// catalog/MRU order.
     @Published var fuzzySearchRankBestMatchFirst: Bool {
         didSet {
             guard oldValue != fuzzySearchRankBestMatchFirst else { return }
@@ -1172,11 +1172,11 @@ final class Preferences: ObservableObject {
         }
     }
 
-    /// Experimental. While the search field is active, expand browser windows
+    /// Off by default. While the search field is active, expand browser windows
     /// into one row per tab — for the search only — so a query can match a
     /// background tab. Transient: the rows never enter the canonical list and
     /// collapse back on exit. No effect when `expandBrowserTabsAsWindows` is on
-    /// (the list is already expanded). Default off.
+    /// (the list is already expanded).
     @Published var searchExpandsBrowserTabs: Bool {
         didSet {
             guard oldValue != searchExpandsBrowserTabs else { return }
@@ -1550,7 +1550,12 @@ final class Preferences: ObservableObject {
     @Published var showUnreadBadges: Bool {
         didSet {
             guard oldValue != showUnreadBadges else { return }
-            UserDefaults.standard.set(showUnreadBadges, forKey: Keys.showUnreadBadges)
+            let defaults = UserDefaults.standard
+            defaults.set(showUnreadBadges, forKey: Keys.showUnreadBadges)
+            // Keep the pre-graduation key in step so a downgraded build, or a
+            // second Mac on an older version sharing this config.json, reads
+            // the same value instead of silently reverting to the default.
+            defaults.set(showUnreadBadges, forKey: Keys.legacyUnreadBadges)
         }
     }
 
@@ -2080,37 +2085,59 @@ final class Preferences: ObservableObject {
         value <= 0 ? 0 : min(browserTabRowLimitRange.upperBound, max(browserTabRowLimitRange.lowerBound, value))
     }
 
-    /// Tab recency graduated out of the Experimental pane, so honor the new key
-    /// first and fall back to the pre-graduation one — both at launch and on
-    /// every `reloadFromDefaults`, since an imported settings file or a hand-
-    /// written `config.json` can still carry only the old key. `nonisolated` like
-    /// `storedSpaceScope` — it only reads the `defaults` it is handed.
-    nonisolated static func storedBrowserTabMRU(_ defaults: UserDefaults) -> Bool {
-        defaults.object(forKey: Keys.browserTabMRU) as? Bool
-            ?? defaults.object(forKey: Keys.legacyBrowserTabMRU) as? Bool
-            ?? false
+    /// A preference that graduated out of the Experimental pane. Each one keeps
+    /// *reading* its pre-graduation key as a fallback — an old settings export or
+    /// a hand-written `config.json` can still carry only that key — and keeps
+    /// *writing* it back, so a downgraded build, or a second Mac on an older
+    /// version sharing this `config.json`, reads the same value instead of
+    /// silently losing the choice.
+    ///
+    /// Adding a case here is all a newly graduated preference needs: the launch
+    /// read, the reload read and the import fixup all walk `allCases`.
+    enum GraduatedPreference: CaseIterable {
+        case instantSpaceSwitch
+        case browserTabMRU
+        case browserTabPreviews
+        case livePreviews
+        case showUnreadBadges
+
+        var key: String {
+            switch self {
+            case .instantSpaceSwitch: return Keys.instantSpaceSwitch
+            case .browserTabMRU: return Keys.browserTabMRU
+            case .browserTabPreviews: return Keys.browserTabPreviews
+            case .livePreviews: return Keys.livePreviews
+            case .showUnreadBadges: return Keys.showUnreadBadges
+            }
+        }
+
+        var legacyKey: String {
+            switch self {
+            case .instantSpaceSwitch: return Keys.legacyInstantSpaceSwitch
+            case .browserTabMRU: return Keys.legacyBrowserTabMRU
+            case .browserTabPreviews: return Keys.legacyBrowserTabPreviews
+            case .livePreviews: return Keys.legacyLivePreviews
+            case .showUnreadBadges: return Keys.legacyUnreadBadges
+            }
+        }
+
+        /// Value when neither key is stored. Badges graduated on, the rest off.
+        var fallback: Bool {
+            switch self {
+            case .showUnreadBadges: return true
+            case .instantSpaceSwitch, .browserTabMRU, .browserTabPreviews, .livePreviews: return false
+            }
+        }
     }
 
-    /// Same graduation fallback for the instant Space switch, which moved out of
-    /// the Experimental pane.
-    nonisolated static func storedInstantSpaceSwitch(_ defaults: UserDefaults) -> Bool {
-        defaults.object(forKey: Keys.instantSpaceSwitch) as? Bool
-            ?? defaults.object(forKey: Keys.legacyInstantSpaceSwitch) as? Bool
-            ?? false
-    }
-
-    /// Same graduation fallback for the two Previews-layout capture toggles,
-    /// which moved out of the Experimental pane.
-    nonisolated static func storedBrowserTabPreviews(_ defaults: UserDefaults) -> Bool {
-        defaults.object(forKey: Keys.browserTabPreviews) as? Bool
-            ?? defaults.object(forKey: Keys.legacyBrowserTabPreviews) as? Bool
-            ?? false
-    }
-
-    nonisolated static func storedLivePreviews(_ defaults: UserDefaults) -> Bool {
-        defaults.object(forKey: Keys.livePreviews) as? Bool
-            ?? defaults.object(forKey: Keys.legacyLivePreviews) as? Bool
-            ?? false
+    /// Read a graduated preference: new key first, then the pre-graduation key,
+    /// then the default. Used both at launch and on every `reloadFromDefaults`.
+    /// `nonisolated` like `storedSpaceScope` — it only reads the `defaults` it is
+    /// handed.
+    nonisolated static func stored(_ pref: GraduatedPreference, _ defaults: UserDefaults) -> Bool {
+        defaults.object(forKey: pref.key) as? Bool
+            ?? defaults.object(forKey: pref.legacyKey) as? Bool
+            ?? pref.fallback
     }
 
     /// Pads/truncates to exactly `directActivationSlotCount` entries.
@@ -2233,26 +2260,17 @@ final class Preferences: ObservableObject {
         self.shiftTapStepsBackward = defaults.object(forKey: Keys.shiftTapStepsBackward) as? Bool ?? true
         self.backtickReversesAppSwitching = defaults.object(forKey: Keys.backtickReversesAppSwitching) as? Bool ?? false
         self.cycleTileWidths = defaults.object(forKey: Keys.cycleTileWidths) as? Bool ?? false
-        self.instantSpaceSwitch = Self.storedInstantSpaceSwitch(defaults)
+        self.instantSpaceSwitch = Self.stored(.instantSpaceSwitch, defaults)
         self.tabDrillEnabled = defaults.object(forKey: Keys.tabDrillEnabled) as? Bool ?? true
         self.windowDrillEnabled = defaults.object(forKey: Keys.windowDrillEnabled) as? Bool ?? true
         self.expandTabsAsWindows = defaults.object(forKey: Keys.expandTabsAsWindows) as? Bool ?? false
         self.expandBrowserTabsAsWindows = defaults.object(forKey: Keys.expandBrowserTabsAsWindows) as? Bool ?? false
         self.browserTabRowLimit = Self.clampBrowserTabRowLimit(defaults.object(forKey: Keys.browserTabRowLimit) as? Int ?? 0)
         self.showBrowserIconOnTabs = defaults.object(forKey: Keys.showBrowserIconOnTabs) as? Bool ?? false
-        self.browserTabMRU = Self.storedBrowserTabMRU(defaults)
-        self.browserTabPreviews = Self.storedBrowserTabPreviews(defaults)
-        self.livePreviews = Self.storedLivePreviews(defaults)
-        // Badges graduated out of the Experimental tab and now default on. Honor
-        // the new key if present, otherwise carry over a choice made under the
-        // old experimental key, otherwise default to on.
-        if let stored = defaults.object(forKey: Keys.showUnreadBadges) as? Bool {
-            self.showUnreadBadges = stored
-        } else if let legacy = defaults.object(forKey: Keys.legacyUnreadBadges) as? Bool {
-            self.showUnreadBadges = legacy
-        } else {
-            self.showUnreadBadges = true
-        }
+        self.browserTabMRU = Self.stored(.browserTabMRU, defaults)
+        self.browserTabPreviews = Self.stored(.browserTabPreviews, defaults)
+        self.livePreviews = Self.stored(.livePreviews, defaults)
+        self.showUnreadBadges = Self.stored(.showUnreadBadges, defaults)
 
         self.showWindowTitleLabel = defaults.object(forKey: Keys.showWindowTitleLabel) as? Bool ?? true
         self.showApplicationNames = defaults.object(forKey: Keys.showApplicationNames) as? Bool ?? true
@@ -2386,17 +2404,17 @@ final class Preferences: ObservableObject {
         mouseHoverSelectionEnabled = defaults.object(forKey: Keys.mouseHoverSelectionEnabled) as? Bool ?? true
         mouseClickSelectionEnabled = defaults.object(forKey: Keys.mouseClickSelectionEnabled) as? Bool ?? true
         cycleTileWidths = defaults.object(forKey: Keys.cycleTileWidths) as? Bool ?? false
-        instantSpaceSwitch = Self.storedInstantSpaceSwitch(defaults)
+        instantSpaceSwitch = Self.stored(.instantSpaceSwitch, defaults)
         tabDrillEnabled = defaults.object(forKey: Keys.tabDrillEnabled) as? Bool ?? true
         windowDrillEnabled = defaults.object(forKey: Keys.windowDrillEnabled) as? Bool ?? true
         expandTabsAsWindows = defaults.object(forKey: Keys.expandTabsAsWindows) as? Bool ?? false
         expandBrowserTabsAsWindows = defaults.object(forKey: Keys.expandBrowserTabsAsWindows) as? Bool ?? false
         browserTabRowLimit = defaults.object(forKey: Keys.browserTabRowLimit) as? Int ?? 0
         showBrowserIconOnTabs = defaults.object(forKey: Keys.showBrowserIconOnTabs) as? Bool ?? false
-        browserTabMRU = Self.storedBrowserTabMRU(defaults)
-        browserTabPreviews = Self.storedBrowserTabPreviews(defaults)
-        livePreviews = Self.storedLivePreviews(defaults)
-        showUnreadBadges = defaults.object(forKey: Keys.showUnreadBadges) as? Bool ?? true
+        browserTabMRU = Self.stored(.browserTabMRU, defaults)
+        browserTabPreviews = Self.stored(.browserTabPreviews, defaults)
+        livePreviews = Self.stored(.livePreviews, defaults)
+        showUnreadBadges = Self.stored(.showUnreadBadges, defaults)
 
         showWindowTitleLabel = defaults.object(forKey: Keys.showWindowTitleLabel) as? Bool ?? true
         showWindowStatusIcons = defaults.object(forKey: Keys.showWindowStatusIcons) as? Bool ?? true

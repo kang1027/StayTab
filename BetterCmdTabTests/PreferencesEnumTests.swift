@@ -54,79 +54,33 @@ struct PreferencesEnumTests {
         #expect(Preferences.storedSpaceScope(defaults) == .currentSpace)
     }
 
-    @Test("storedBrowserTabMRU prefers the graduated key, falls back to the experimental one")
-    func storedBrowserTabMRUMigration() throws {
-        let defaults = try #require(UserDefaults(suiteName: "storedBrowserTabMRUMigrationTests"))
-        defer { defaults.removePersistentDomain(forName: "storedBrowserTabMRUMigrationTests") }
-
-        // Fresh install: neither key → off.
-        #expect(Preferences.storedBrowserTabMRU(defaults) == false)
-
-        // Pre-graduation key only — an upgrade, or an import/config.json still
-        // carrying the experimental name: the choice must survive.
-        defaults.set(true, forKey: Preferences.Keys.legacyBrowserTabMRU)
-        #expect(Preferences.storedBrowserTabMRU(defaults) == true)
-
-        // The graduated key wins over a contradicting legacy one, both ways round.
-        defaults.set(false, forKey: Preferences.Keys.browserTabMRU)
-        #expect(Preferences.storedBrowserTabMRU(defaults) == false)
-
-        defaults.set(false, forKey: Preferences.Keys.legacyBrowserTabMRU)
-        defaults.set(true, forKey: Preferences.Keys.browserTabMRU)
-        #expect(Preferences.storedBrowserTabMRU(defaults) == true)
-    }
-
-    @Test("storedInstantSpaceSwitch prefers the graduated key, falls back to the experimental one")
-    func storedInstantSpaceSwitchMigration() throws {
-        let defaults = try #require(UserDefaults(suiteName: "storedInstantSpaceSwitchMigrationTests"))
-        defer { defaults.removePersistentDomain(forName: "storedInstantSpaceSwitchMigrationTests") }
-
-        // Fresh install: neither key → off.
-        #expect(Preferences.storedInstantSpaceSwitch(defaults) == false)
-
-        // Pre-graduation key only — an upgrade, or an import/config.json still
-        // carrying the experimental name: the choice must survive.
-        defaults.set(true, forKey: Preferences.Keys.legacyInstantSpaceSwitch)
-        #expect(Preferences.storedInstantSpaceSwitch(defaults) == true)
-
-        // The graduated key wins over a contradicting legacy one, both ways round.
-        defaults.set(false, forKey: Preferences.Keys.instantSpaceSwitch)
-        #expect(Preferences.storedInstantSpaceSwitch(defaults) == false)
-
-        defaults.set(false, forKey: Preferences.Keys.legacyInstantSpaceSwitch)
-        defaults.set(true, forKey: Preferences.Keys.instantSpaceSwitch)
-        #expect(Preferences.storedInstantSpaceSwitch(defaults) == true)
-    }
-
-    @Test("the Previews capture toggles prefer the graduated key, falling back to the experimental one")
-    func storedPreviewCaptureMigration() throws {
-        let suite = "storedPreviewCaptureMigrationTests"
+    /// Covers every graduated preference, so a newly added case is tested the
+    /// moment it joins `allCases` — badges shipped without this and lost their
+    /// legacy fallback in `reloadFromDefaults` unnoticed.
+    @Test("every graduated preference prefers its own key and falls back to the experimental one",
+          arguments: Preferences.GraduatedPreference.allCases)
+    func graduatedMigration(_ pref: Preferences.GraduatedPreference) throws {
+        let suite = "graduatedMigrationTests.\(pref.key)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
+        let optOut = !pref.fallback
 
-        // Fresh install: neither key → off, both stay opt-in.
-        #expect(Preferences.storedBrowserTabPreviews(defaults) == false)
-        #expect(Preferences.storedLivePreviews(defaults) == false)
+        // Fresh install: neither key → the graduation default.
+        #expect(Preferences.stored(pref, defaults) == pref.fallback)
 
         // Pre-graduation key only — an upgrade, or an import/config.json still
-        // carrying the experimental name: the choice must survive.
-        defaults.set(true, forKey: Preferences.Keys.legacyBrowserTabPreviews)
-        defaults.set(true, forKey: Preferences.Keys.legacyLivePreviews)
-        #expect(Preferences.storedBrowserTabPreviews(defaults) == true)
-        #expect(Preferences.storedLivePreviews(defaults) == true)
+        // carrying the experimental name: the choice must survive, including a
+        // deliberate opt-out of a preference that now defaults on.
+        defaults.set(optOut, forKey: pref.legacyKey)
+        #expect(Preferences.stored(pref, defaults) == optOut)
 
         // The graduated key wins over a contradicting legacy one, both ways round.
-        defaults.set(false, forKey: Preferences.Keys.browserTabPreviews)
-        defaults.set(false, forKey: Preferences.Keys.livePreviews)
-        #expect(Preferences.storedBrowserTabPreviews(defaults) == false)
-        #expect(Preferences.storedLivePreviews(defaults) == false)
+        defaults.set(pref.fallback, forKey: pref.key)
+        #expect(Preferences.stored(pref, defaults) == pref.fallback)
 
-        defaults.set(false, forKey: Preferences.Keys.legacyBrowserTabPreviews)
-        defaults.set(false, forKey: Preferences.Keys.legacyLivePreviews)
-        defaults.set(true, forKey: Preferences.Keys.browserTabPreviews)
-        defaults.set(true, forKey: Preferences.Keys.livePreviews)
-        #expect(Preferences.storedBrowserTabPreviews(defaults) == true)
-        #expect(Preferences.storedLivePreviews(defaults) == true)
+        defaults.set(pref.fallback, forKey: pref.legacyKey)
+        defaults.set(optOut, forKey: pref.key)
+        #expect(Preferences.stored(pref, defaults) == optOut)
     }
 
     @Test("panel scale clamps and migrates every legacy preset")
