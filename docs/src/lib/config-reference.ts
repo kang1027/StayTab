@@ -156,7 +156,7 @@ const sections: { title: string; keys: string[] }[] = [
     ],
   },
   {
-    title: 'Experimental',
+    title: 'Trackpad swipe',
     keys: [
       'experimentalSwipeTrigger',
       'swipeMode',
@@ -193,7 +193,7 @@ const sectionTranslationKeys: Record<string, string> = {
   'Window management': 'windowManagement',
   Shortcuts: 'shortcuts',
   'Feedback & menu bar': 'feedbackMenuBar',
-  Experimental: 'experimental',
+  'Trackpad swipe': 'trackpadSwipe',
   Legacy: 'legacy',
 };
 

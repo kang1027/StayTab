@@ -26,8 +26,14 @@ struct SettingsLifecycleTests {
     @Test("General tab controller deallocates when released")
     func general() { #expect(expectDeallocates { GeneralSettingsViewController() }) }
 
-    @Test("Behavior tab controller deallocates when released")
-    func behavior() { #expect(expectDeallocates { BehaviorSettingsViewController() }) }
+    @Test("Switcher-default panes deallocate when released",
+          arguments: [SwitcherPanesViewController.Pane.switcher, .controls, .tabs])
+    func switcherPanes(pane: SwitcherPanesViewController.Pane) {
+        #expect(expectDeallocates { SwitcherPanesViewController(pane: pane) })
+    }
+
+    @Test("Shortcuts tab controller deallocates when released")
+    func shortcuts() { #expect(expectDeallocates { ShortcutsSettingsViewController() }) }
 
     @Test("Apps tab controller deallocates when released")
     func apps() { #expect(expectDeallocates { AppsSettingsViewController() }) }
@@ -35,8 +41,8 @@ struct SettingsLifecycleTests {
     @Test("Appearance tab controller deallocates when released")
     func appearance() { #expect(expectDeallocates { AppearanceSettingsViewController() }) }
 
-    @Test("Experimental tab controller deallocates when released")
-    func experimental() { #expect(expectDeallocates { ExperimentalSettingsViewController() }) }
+    @Test("Privacy tab controller deallocates when released")
+    func privacy() { #expect(expectDeallocates { PrivacySettingsViewController() }) }
 
     @Test("About tab controller deallocates when released")
     func about() { #expect(expectDeallocates { AboutSettingsViewController() }) }

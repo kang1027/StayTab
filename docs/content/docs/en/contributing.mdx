@@ -97,7 +97,7 @@ Preferences are a contract, not just a variable — several pieces have to move 
 4. Document it in `App/ConfigSchemaDocs.swift`. This feeds the generated `schema.json`,
    so a key you skip here is valid but undocumented — no editor completion, no hover.
 5. Surface it in the right settings pane. Anything fragile or new goes behind the
-   off-by-default **Experimental** pane.
+   off-by-default state, with the “These features are unstable” notice above the section.
 6. If it has pure-logic behaviour, add a test.
 
 New keys are picked up by export/import and the config file automatically — both walk

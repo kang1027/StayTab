@@ -3,17 +3,34 @@ import BetterSettings
 import BetterShortcuts
 import Combine
 
-/// Behavior pane (tab id stays "switcher" so saved tab selection survives) —
-/// which display it opens on, the quick-switch delay, what it lists (Contents),
-/// tab drill-in, type-to-filter search, and keyboard/mouse interaction.
-/// The visual options live under the Appearance tab; per-app rules and pinning
-/// live under the Apps tab.
+/// Backs three sibling panes that all edit the switcher's global defaults, so
+/// they share one set of controls and one `viewWillAppear` sync:
+///
+/// - **Switcher** — what the panel lists (Contents) and its two timing knobs.
+/// - **Controls** — how you drive the open panel: keys, letter jump, search,
+///   mouse, hover actions.
+/// - **Tabs** — native window tabs and browser tabs.
+///
+/// Global hotkeys live under Shortcuts, the look under Appearance, per-app
+/// rules under Apps, and the Apple Events consent browser tabs need under
+/// Privacy.
 @MainActor
-final class BehaviorSettingsViewController: SettingsTabViewController {
+final class SwitcherPanesViewController: SettingsTabViewController {
 
-    // Display
-    private let displayMonitorPopup = NSPopUpButton(frame: .zero, pullsDown: false)
-    private let displayModes: [SwitcherDisplayMode] = SwitcherDisplayMode.allCases
+    /// Which of the three panes this instance builds.
+    enum Pane { case switcher, controls, tabs }
+
+    private let pane: Pane
+
+    init(pane: Pane) {
+        self.pane = pane
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    // Timing
     private let delaySlider = NSSlider()
     private let delayValueField = NSTextField()
     private let titleRefreshSlider = NSSlider()
@@ -52,6 +69,10 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
     private let browserTabLimitField = NSTextField()
     private let browserIconOnTabsSwitch = NSSwitch()
     private let browserTabMRUSwitch = NSSwitch()
+    private let browserTabPreviewsSwitch = NSSwitch()
+    /// Kept so the row can visibly lock (dim + tooltip) while its prerequisite
+    /// "Type-to-filter search" — owned by the Controls pane — is off.
+    private var searchTabsRow: SettingsRowView?
 
     // Search
     private let letterHintsSwitch = NSSwitch()
@@ -97,71 +118,52 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
     private var cancellables = Set<AnyCancellable>()
 
     override func setupContent() {
-        // Display section — which monitor the switcher panel opens on (graduated
-        // from Experimental once stable).
-        let display = addSection(title: String(localized: "Display"), anchor: SettingsAnchor.display)
-        displayMonitorPopup.controlSize = .small
-        displayMonitorPopup.translatesAutoresizingMaskIntoConstraints = false
-        displayMonitorPopup.setContentHuggingPriority(.required, for: .horizontal)
-        displayMonitorPopup.removeAllItems()
-        displayMonitorPopup.addItems(withTitles: displayModes.map(\.displayName))
-        displayMonitorPopup.target = self
-        displayMonitorPopup.action = #selector(displayModeChanged)
-        addRow(to: display, title: String(localized: "Show switcher on"),
-               subtitle: String(localized: "Choose which monitor the switcher opens on when you have more than one display."),
-               accessory: displayMonitorPopup, searchItemID: SearchID.displayMonitor)
+        switch pane {
+        case .switcher:
+            addGlobalDefaultNote()
+            buildContentsSection()
+            buildTimingSection()
+        case .controls:
+            addGlobalDefaultNote()
+            buildKeyboardSection()
+            buildLetterJumpSection()
+            buildSearchSection()
+            buildMouseSection()
+        case .tabs:
+            buildNativeTabsSection()
+            buildBrowserTabsSection()
+        }
+    }
 
-        // Quick-switch delay — moved here from Appearance: it changes *when* the
-        // panel appears (timing), not how it looks.
+    /// Timing — when the panel appears and how fast its titles catch up. Both
+    /// are about *when*, not how it looks, so they sit here and not under
+    /// Appearance.
+    private func buildTimingSection() {
+        let timing = addSection(title: String(localized: "Timing"), anchor: SettingsAnchor.timing)
+
         let quickSwitchDelayTitle = String(localized: "Quick-switch delay")
-        delaySlider.minValue = Double(Preferences.revealDelayRange.lowerBound)
-        delaySlider.maxValue = Double(Preferences.revealDelayRange.upperBound)
-        delaySlider.isContinuous = true
-        delaySlider.controlSize = .small
-        delaySlider.target = self
-        delaySlider.action = #selector(delayChanged(_:))
-        delaySlider.translatesAutoresizingMaskIntoConstraints = false
-        delaySlider.setAccessibilityLabel(quickSwitchDelayTitle)
-        configureIntegerField(delayValueField,
-                              action: #selector(delayValueCommitted(_:)),
-                              accessibilityLabel: quickSwitchDelayTitle)
-        let delayStack = NSStackView(views: [delaySlider, unitInput(for: delayValueField, unit: "ms")])
-        delayStack.orientation = .horizontal
-        delayStack.spacing = 8
-        delayStack.alignment = .centerY
-        NSLayoutConstraint.activate([
-            delaySlider.widthAnchor.constraint(equalToConstant: 140),
-        ])
-        addRow(to: display, title: quickSwitchDelayTitle,
+        let delayStack = makeValueSlider(delaySlider, field: delayValueField,
+                                         range: Preferences.revealDelayRange, unit: "ms",
+                                         label: quickSwitchDelayTitle,
+                                         sliderAction: #selector(delayChanged(_:)),
+                                         fieldAction: #selector(delayValueCommitted(_:)))
+        addRow(to: timing, title: quickSwitchDelayTitle,
                subtitle: String(localized: "Tap to switch instantly; hold longer to open the switcher."),
                accessory: delayStack, searchItemID: SearchID.quickSwitchDelay)
 
-        // Title refresh interval — how quickly titles in the open switcher
-        // catch up after an app renames a window (browser page load, terminal).
         let titleRefreshDelayTitle = String(localized: "Title refresh delay")
-        titleRefreshSlider.minValue = Double(Preferences.titleRefreshIntervalRange.lowerBound)
-        titleRefreshSlider.maxValue = Double(Preferences.titleRefreshIntervalRange.upperBound)
-        titleRefreshSlider.isContinuous = true
-        titleRefreshSlider.controlSize = .small
-        titleRefreshSlider.target = self
-        titleRefreshSlider.action = #selector(titleRefreshChanged(_:))
-        titleRefreshSlider.translatesAutoresizingMaskIntoConstraints = false
-        titleRefreshSlider.setAccessibilityLabel(titleRefreshDelayTitle)
-        configureIntegerField(titleRefreshValueField,
-                              action: #selector(titleRefreshValueCommitted(_:)),
-                              accessibilityLabel: titleRefreshDelayTitle)
-        let titleRefreshStack = NSStackView(views: [titleRefreshSlider, unitInput(for: titleRefreshValueField, unit: "ms")])
-        titleRefreshStack.orientation = .horizontal
-        titleRefreshStack.spacing = 8
-        titleRefreshStack.alignment = .centerY
-        NSLayoutConstraint.activate([
-            titleRefreshSlider.widthAnchor.constraint(equalToConstant: 140),
-        ])
-        addRow(to: display, title: titleRefreshDelayTitle,
+        let titleRefreshStack = makeValueSlider(titleRefreshSlider, field: titleRefreshValueField,
+                                                range: Preferences.titleRefreshIntervalRange, unit: "ms",
+                                                label: titleRefreshDelayTitle,
+                                                sliderAction: #selector(titleRefreshChanged(_:)),
+                                                fieldAction: #selector(titleRefreshValueCommitted(_:)))
+        addRow(to: timing, title: titleRefreshDelayTitle,
                subtitle: String(localized: "How quickly window titles in the open switcher update after an app changes them. Lower is more responsive; higher saves work when titles change rapidly."),
                accessory: titleRefreshStack, searchItemID: SearchID.titleRefreshInterval)
+    }
 
-        // Contents section — what kinds of windows/apps appear in the switcher.
+    /// Contents — what kinds of windows/apps appear in the switcher.
+    private func buildContentsSection() {
         let contents = addSection(title: String(localized: "Contents"), anchor: SettingsAnchor.contents)
         configureSwitch(minimizedSwitch, action: #selector(toggleMinimized(_:)))
         addRow(to: contents, title: String(localized: "Show minimized windows"), accessory: minimizedSwitch,
@@ -216,12 +218,13 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
         addRow(to: contents, title: recentlyClosedLimitTitle,
                subtitle: String(localized: "How many recently closed items to list."),
                accessory: recentlyClosedLimitField, searchItemID: SearchID.recentlyClosedLimit)
+    }
 
-        // Tabs section — how windows that use native system tabs (Finder,
-        // Terminal, TextEdit, …) are surfaced, plus the browser-tab rows
-        // (expansion, per-window cap, icon badge, recency) and the Apple Events
-        // consent those need. The Peek tabs key drills either kind.
-        let tabs = addSection(title: String(localized: "Tabs"), anchor: SettingsAnchor.tabs)
+    /// Native tabs — windows that use macOS system tabs (Finder, Terminal,
+    /// TextEdit, …). The Peek tabs key drills native and browser tabs alike, so
+    /// it heads the pane.
+    private func buildNativeTabsSection() {
+        let tabs = addSection(title: String(localized: "Native tabs"), anchor: SettingsAnchor.nativeTabs)
         configureSwitch(tabDrillSwitch, action: #selector(toggleTabDrill(_:)))
         tabDrillRow = addRow(to: tabs, title: String(localized: "Peek tabs"),
                              subtitle: Self.tabDrillSubtitle(),
@@ -230,9 +233,16 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
         addRow(to: tabs, title: String(localized: "Show tabs as separate entries"),
                subtitle: String(localized: "List each tab of a native-tab window (Finder, Terminal, TextEdit, …) as its own row instead of one collapsed window. Off keeps one row per window — peek its tabs instead."),
                accessory: expandTabsSwitch, searchItemID: SearchID.expandTabs)
+    }
+
+    /// Browser tabs — expansion, per-window cap, icon badge, recency, previews
+    /// and search. All of it rides on the Apple Events consent granted under
+    /// Privacy › Permissions.
+    private func buildBrowserTabsSection() {
+        let tabs = addSection(title: String(localized: "Browser tabs"), anchor: SettingsAnchor.browserTabs)
         configureSwitch(expandBrowserTabsSwitch, action: #selector(toggleExpandBrowserTabs(_:)))
         addRow(to: tabs, title: String(localized: "Show browser tabs as separate entries"),
-               subtitle: String(localized: "List each tab of a browser window (Safari, Chrome, Arc, Brave, Edge, …) as its own row alongside the other windows, instead of one collapsed window. Needs Apple Events access (below); off keeps one row per window — peek its tabs instead."),
+               subtitle: String(localized: "List each tab of a browser window (Safari, Chrome, Arc, Brave, Edge, …) as its own row alongside the other windows, instead of one collapsed window. Needs Apple Events access, granted under Privacy › Permissions; off keeps one row per window — peek its tabs instead."),
                accessory: expandBrowserTabsSwitch, searchItemID: SearchID.expandBrowserTabs)
         let browserTabLimitTitle = String(localized: "Browser tabs to show")
         configureIntegerField(browserTabLimitField,
@@ -249,44 +259,39 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
         addRow(to: tabs, title: String(localized: "Track browser tabs in recency"),
                subtitle: String(localized: "With “Show browser tabs as separate entries” and the “Most recent (windows)” sort order on, ⌘Tab returns to the tab you last used, not just the last window. Needs always-on monitoring of your browsers, so it costs a little energy."),
                accessory: browserTabMRUSwitch, searchItemID: SearchID.browserTabMRU)
+        configureSwitch(browserTabPreviewsSwitch, action: #selector(toggleBrowserTabPreviews(_:)))
+        addRow(to: tabs, title: String(localized: "Browser tab previews"),
+               subtitle: String(localized: "Capture the active browser tab for the Previews layout. Background tabs use an earlier cached image or their favicon."),
+               accessory: browserTabPreviewsSwitch, searchItemID: SearchID.browserTabPreviews)
+        configureSwitch(searchTabsSwitch, action: #selector(toggleSearchExpandsTabs(_:)))
+        searchTabsRow = addRow(to: tabs, title: String(localized: "Search browser tabs"),
+               subtitle: String(localized: "Searching matches any browser tab by its title, not just each window's active tab. Matching tabs appear as temporary rows while the search field is active and disappear when you leave search. Not needed if “Show browser tabs as separate entries” already lists every tab."),
+               accessory: searchTabsSwitch, searchItemID: SearchID.searchExpandsBrowserTabs)
+    }
 
-        let grantButton = NSButton(title: String(localized: "Check access…"), target: self, action: #selector(grantBrowserPermissions))
-        grantButton.bezelStyle = .rounded
-        grantButton.controlSize = .small
-        addRow(to: tabs, title: String(localized: "Browser tab access"),
-               subtitle: String(localized: "Browsers need Apple Events consent to list their tabs. Click to check each running browser (Safari, Chrome, Arc, Brave, Edge…) — macOS prompts for consent where it's still missing. Must be done with this window open."),
-               accessory: grantButton, searchItemID: SearchID.tabPermissions)
-
-        // Search section — type-to-filter behavior.
-        let search = addSection(title: String(localized: "Search"), anchor: SettingsAnchor.search)
+    /// Letter jump — typing a letter to hop straight to a row.
+    private func buildLetterJumpSection() {
+        let jump = addSection(title: String(localized: "Letter jump"), anchor: SettingsAnchor.letterJump)
         configureSwitch(letterHintsSwitch, action: #selector(toggleLetterHints(_:)))
-        letterHintsRow = addRow(to: search, title: String(localized: "Letter hints"),
+        letterHintsRow = addRow(to: jump, title: String(localized: "Letter hints"),
                subtitle: Self.letterHintsSubtitle(),
                accessory: letterHintsSwitch, searchItemID: SearchID.letterHints)
 
         let letterTimeoutTitle = String(localized: "Letter chain timeout")
-        letterTimeoutSlider.minValue = Double(Preferences.letterChainTimeoutRange.lowerBound)
-        letterTimeoutSlider.maxValue = Double(Preferences.letterChainTimeoutRange.upperBound)
-        letterTimeoutSlider.isContinuous = true
-        letterTimeoutSlider.controlSize = .small
-        letterTimeoutSlider.target = self
-        letterTimeoutSlider.action = #selector(letterTimeoutChanged(_:))
-        letterTimeoutSlider.translatesAutoresizingMaskIntoConstraints = false
-        letterTimeoutSlider.setAccessibilityLabel(letterTimeoutTitle)
-        configureIntegerField(letterTimeoutValueField,
-                              action: #selector(letterTimeoutValueCommitted(_:)),
-                              accessibilityLabel: letterTimeoutTitle)
-        let letterTimeoutStack = NSStackView(views: [letterTimeoutSlider, unitInput(for: letterTimeoutValueField, unit: "ms")])
-        letterTimeoutStack.orientation = .horizontal
-        letterTimeoutStack.spacing = 8
-        letterTimeoutStack.alignment = .centerY
-        NSLayoutConstraint.activate([
-            letterTimeoutSlider.widthAnchor.constraint(equalToConstant: 140),
-        ])
-        addRow(to: search, title: letterTimeoutTitle,
+        let letterTimeoutStack = makeValueSlider(letterTimeoutSlider, field: letterTimeoutValueField,
+                                                 range: Preferences.letterChainTimeoutRange, unit: "ms",
+                                                 label: letterTimeoutTitle,
+                                                 sliderAction: #selector(letterTimeoutChanged(_:)),
+                                                 fieldAction: #selector(letterTimeoutValueCommitted(_:)))
+        addRow(to: jump, title: letterTimeoutTitle,
                subtitle: String(localized: "How long a typed letter sequence stays active. When it expires, the highlight clears and the list returns to its original order."),
                accessory: letterTimeoutStack, searchItemID: SearchID.letterChainTimeout)
+    }
 
+    /// Search — type-to-filter behavior. “Search browser tabs” lives with the
+    /// other browser-tab rows under Tabs.
+    private func buildSearchSection() {
+        let search = addSection(title: String(localized: "Search"), anchor: SettingsAnchor.search)
         configureSwitch(fuzzySwitch, action: #selector(toggleFuzzy(_:)))
         fuzzyRow = addRow(to: search, title: String(localized: "Type-to-filter search"),
                subtitle: Self.fuzzySubtitle(),
@@ -299,23 +304,14 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
         addRow(to: search, title: String(localized: "Launch apps from search"),
                subtitle: String(localized: "Also show matching apps that aren't running yet."),
                accessory: launcherSwitch, searchItemID: SearchID.launcher)
-        configureSwitch(searchTabsSwitch, action: #selector(toggleSearchExpandsTabs(_:)))
-        addRow(to: search, title: String(localized: "Search browser tabs"),
-               subtitle: String(localized: "Searching matches any browser tab by its title, not just each window's active tab. Matching tabs appear as temporary rows while the search field is active and disappear when you leave search. Not needed if “Show browser tabs as separate entries” already lists every tab."),
-               accessory: searchTabsSwitch, searchItemID: SearchID.searchExpandsBrowserTabs)
-
-        searchModePopup.controlSize = .small
-        searchModePopup.translatesAutoresizingMaskIntoConstraints = false
-        searchModePopup.setContentHuggingPriority(.required, for: .horizontal)
-        searchModePopup.removeAllItems()
-        searchModePopup.addItems(withTitles: searchDismissModes.map(\.displayName))
-        searchModePopup.target = self
-        searchModePopup.action = #selector(searchModeChanged)
+        configurePopup(searchModePopup, titles: searchDismissModes.map(\.displayName), action: #selector(searchModeChanged))
         addRow(to: search, title: String(localized: "When searching"),
                subtitle: String(localized: "Hold ⌘: release to pick. Stay open: pick with Return or the mouse."),
                accessory: searchModePopup, searchItemID: SearchID.searchMode)
+    }
 
-        // Keyboard section — key-driven ways to move and commit the selection.
+    /// Keyboard — key-driven ways to move and commit the selection.
+    private func buildKeyboardSection() {
         let keyboard = addSection(title: String(localized: "Keyboard"), anchor: SettingsAnchor.keyboard)
         configureSwitch(stayOpenSwitch, action: #selector(toggleStayOpen(_:)))
         addRow(to: keyboard, title: String(localized: "Stay open after releasing the modifier"),
@@ -338,8 +334,11 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
                subtitle: String(localized: "Use h / j / k / l like the arrow keys while the switcher is open. h overrides the Hide binding and j / k / l override letter-jump; search mode still types those letters."),
                accessory: vimNavSwitch, searchItemID: SearchID.vimNavigation)
 
-        // Mouse section — pointer-driven selection, dismissal, scrolling, and the
-        // hover action buttons (formerly their own section).
+    }
+
+    /// Mouse — pointer-driven selection, dismissal and scrolling, then the
+    /// hover action buttons in their own section.
+    private func buildMouseSection() {
         let mouse = addSection(title: String(localized: "Mouse"), anchor: SettingsAnchor.mouse)
         configureSwitch(scrollSwitch, action: #selector(toggleScroll(_:)))
         addRow(to: mouse, title: String(localized: "Switch with mouse scroll"),
@@ -356,57 +355,49 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
         configureSwitch(hoverSelectSwitch, action: #selector(toggleHoverSelect(_:)))
         addRow(to: mouse, title: String(localized: "Select window on hover"),
                subtitle: String(localized: "Move the selection to the row your pointer is over. Off keeps the keyboard selection put so the mouse can't change it by accident."),
-               accessory: hoverSelectSwitch)
+               accessory: hoverSelectSwitch, searchItemID: SearchID.selectOnHover)
         configureSwitch(clickSelectSwitch, action: #selector(toggleClickSelect(_:)))
         addRow(to: mouse, title: String(localized: "Select window on click"),
                subtitle: String(localized: "Click a row to switch to that window. Off ignores clicks inside the switcher so the mouse can't pick a window — the tab strip and hover actions still work."),
-               accessory: clickSelectSwitch)
+               accessory: clickSelectSwitch, searchItemID: SearchID.selectOnClick)
 
         // Hover actions — buttons revealed on a row under the pointer.
-        addDivider(to: mouse)
+        let hover = addSection(title: String(localized: "Hover actions"), anchor: SettingsAnchor.hoverActions)
         configureSwitch(hoverSwitch, action: #selector(toggleHover(_:)))
-        addRow(to: mouse, title: String(localized: "Action buttons on hover"),
+        addRow(to: hover, title: String(localized: "Action buttons on hover"),
                subtitle: String(localized: "Reveal quick buttons on the row your pointer is over."),
                accessory: hoverSwitch, searchItemID: SearchID.hoverActions)
         configureSwitch(hoverCloseSwitch, action: #selector(toggleHoverClose(_:)))
-        addRow(to: mouse, title: String(localized: "Close window"), accessory: hoverCloseSwitch)
+        addRow(to: hover, title: String(localized: "Close window"), accessory: hoverCloseSwitch)
         configureSwitch(hoverMinimizeSwitch, action: #selector(toggleHoverMinimize(_:)))
-        addRow(to: mouse, title: String(localized: "Minimize window"), accessory: hoverMinimizeSwitch)
+        addRow(to: hover, title: String(localized: "Minimize window"), accessory: hoverMinimizeSwitch)
         configureSwitch(hoverMaximizeSwitch, action: #selector(toggleHoverMaximize(_:)))
-        addRow(to: mouse, title: String(localized: "Zoom window"), accessory: hoverMaximizeSwitch)
+        addRow(to: hover, title: String(localized: "Zoom window"), accessory: hoverMaximizeSwitch)
         configureSwitch(hoverHideSwitch, action: #selector(toggleHoverHide(_:)))
-        addRow(to: mouse, title: String(localized: "Hide app"), accessory: hoverHideSwitch)
+        addRow(to: hover, title: String(localized: "Hide app"), accessory: hoverHideSwitch)
         configureSwitch(hoverQuitSwitch, action: #selector(toggleHoverQuit(_:)))
-        addRow(to: mouse, title: String(localized: "Quit app"), accessory: hoverQuitSwitch)
+        addRow(to: hover, title: String(localized: "Quit app"), accessory: hoverQuitSwitch)
         configureSwitch(hoverForceQuitSwitch, action: #selector(toggleHoverForceQuit(_:)))
-        addRow(to: mouse, title: String(localized: "Force quit app"),
+        addRow(to: hover, title: String(localized: "Force quit app"),
                subtitle: String(localized: "Sends SIGKILL — for hung apps that ignore Quit. ⌘+⌥+Q always works regardless."),
                accessory: hoverForceQuitSwitch)
-
-        // Per-app rules (hide / ⌘Tab) and pinned apps now live in the Apps tab.
-    }
-
-    private func configureSwitch(_ toggle: NSSwitch, action: Selector) {
-        toggle.controlSize = .small
-        toggle.target = self
-        toggle.action = action
-    }
-
-    private func configurePopup(_ popup: NSPopUpButton, titles: [String], action: Selector) {
-        popup.controlSize = .small
-        popup.translatesAutoresizingMaskIntoConstraints = false
-        popup.setContentHuggingPriority(.required, for: .horizontal)
-        popup.removeAllItems()
-        popup.addItems(withTitles: titles)
-        popup.target = self
-        popup.action = action
     }
 
     override func viewWillAppear() {
         super.viewWillAppear()
+        // Every control below belongs to exactly one pane, and only that pane's
+        // controls were ever added to a view. Sync and subscribe per pane so a
+        // preference change wakes one handler, not three.
+        switch pane {
+        case .switcher: syncSwitcherPane()
+        case .controls: syncControlsPane()
+        case .tabs: syncTabsPane()
+        }
+    }
 
+    /// Contents and Timing.
+    private func syncSwitcherPane() {
         let prefs = Preferences.shared
-        if let i = displayModes.firstIndex(of: prefs.switcherDisplayMode) { displayMonitorPopup.selectItem(at: i) }
         applyDelay(prefs.revealDelayMs)
         applyTitleRefresh(prefs.titleRefreshIntervalMs)
         minimizedSwitch.state = prefs.showMinimizedWindows ? .on : .off
@@ -417,59 +408,15 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
         syncSinkMinimizedRow()
         windowlessSwitch.state = prefs.showWindowlessApps ? .on : .off
         applicationsOnlySwitch.state = prefs.applicationsOnly ? .on : .off
+        windowDrillSwitch.state = prefs.windowDrillEnabled ? .on : .off
         badgesSwitch.state = prefs.showUnreadBadges ? .on : .off
-        if let i = spaceScopes.firstIndex(of: prefs.spaceScope) { spaceScopePopup.selectItem(at: i) }
+        if let index = spaceScopes.firstIndex(of: prefs.spaceScope) { spaceScopePopup.selectItem(at: index) }
+        instantSpaceRowSwitch.state = prefs.instantSpaceSwitch ? .on : .off
         selectSortOrder(prefs.sortOrder)
         recentlyClosedSwitch.state = prefs.showRecentlyClosed ? .on : .off
         applyRecentlyClosedLimit(prefs.recentlyClosedLimit)
         recentlyClosedLimitField.isEnabled = prefs.showRecentlyClosed
-        tabDrillSwitch.state = prefs.tabDrillEnabled ? .on : .off
-        tabDrillRow?.update(subtitle: Self.tabDrillSubtitle())
-        windowDrillSwitch.state = prefs.windowDrillEnabled ? .on : .off
-        expandTabsSwitch.state = prefs.expandTabsAsWindows ? .on : .off
-        expandBrowserTabsSwitch.state = prefs.expandBrowserTabsAsWindows ? .on : .off
-        applyBrowserTabLimit(prefs.browserTabRowLimit)
-        browserIconOnTabsSwitch.state = prefs.showBrowserIconOnTabs ? .on : .off
-        browserTabMRUSwitch.state = prefs.browserTabMRU ? .on : .off
-        syncBrowserTabRows()
-        instantSpaceRowSwitch.state = prefs.instantSpaceSwitch ? .on : .off
-        letterHintsSwitch.state = prefs.letterHintsEnabled ? .on : .off
-        letterHintsRow?.update(subtitle: Self.letterHintsSubtitle())
-        fuzzyRow?.update(subtitle: Self.fuzzySubtitle())
-        applyLetterTimeout(prefs.letterChainTimeoutMs)
-        letterTimeoutSlider.isEnabled = prefs.letterHintsEnabled
-        letterTimeoutValueField.isEnabled = prefs.letterHintsEnabled
-        fuzzySwitch.state = prefs.fuzzySearchEnabled ? .on : .off
-        rankResultsSwitch.state = prefs.fuzzySearchRankBestMatchFirst ? .on : .off
-        launcherSwitch.state = prefs.searchIncludesLaunchableApps ? .on : .off
-        searchTabsSwitch.state = prefs.searchExpandsBrowserTabs ? .on : .off
-        selectSearchMode(prefs.searchDismissMode)
-        syncSearchOptionRows()
-        stayOpenSwitch.state = prefs.stayOpenOnRelease ? .on : .off
-        stayOpenQuickTapSwitch.state = prefs.stayOpenOnQuickTap ? .on : .off
-        syncStayOpenQuickTapRow()
-        shiftTapBackSwitch.state = prefs.shiftTapStepsBackward ? .on : .off
-        backtickReverseSwitch.state = prefs.backtickReversesAppSwitching ? .on : .off
-        scrollSwitch.state = prefs.scrollToSwitch ? .on : .off
-        scrollReverseSwitch.state = prefs.scrollReverseDirection ? .on : .off
-        scrollReverseSwitch.isEnabled = prefs.scrollToSwitch
-        clickDismissSwitch.state = prefs.clickOutsideToDismiss ? .on : .off
-        vimNavSwitch.state = prefs.vimNavigationEnabled ? .on : .off
-        hoverSelectSwitch.state = prefs.mouseHoverSelectionEnabled ? .on : .off
-        clickSelectSwitch.state = prefs.mouseClickSelectionEnabled ? .on : .off
-        hoverSwitch.state = prefs.hoverActionsEnabled ? .on : .off
-        hoverCloseSwitch.state = prefs.hoverShowClose ? .on : .off
-        hoverMinimizeSwitch.state = prefs.hoverShowMinimize ? .on : .off
-        hoverMaximizeSwitch.state = prefs.hoverShowMaximize ? .on : .off
-        hoverHideSwitch.state = prefs.hoverShowHide ? .on : .off
-        hoverQuitSwitch.state = prefs.hoverShowQuit ? .on : .off
-        hoverForceQuitSwitch.state = prefs.hoverShowForceQuit ? .on : .off
-        setHoverSubOptionsEnabled(prefs.hoverActionsEnabled)
 
-        prefs.$searchDismissMode
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] in self?.selectSearchMode($0) }
-            .store(in: &cancellables)
         // Each sink row's prerequisite can also flip from outside this pane (a
         // settings import or the config.json watcher), which would leave it
         // enabled with nothing left to sink.
@@ -487,19 +434,8 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
                 self?.syncSinkMinimizedRow()
             }
             .store(in: &cancellables)
-        prefs.$fuzzySearchEnabled
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] in
-                self?.fuzzySwitch.state = $0 ? .on : .off
-                self?.syncSearchOptionRows()
-            }
-            .store(in: &cancellables)
-        // Keep the sliders in sync if the values change underneath us (e.g. a
-        // settings import calls reloadFromDefaults while this pane is open).
-        prefs.$letterChainTimeoutMs
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] in self?.applyLetterTimeout($0) }
-            .store(in: &cancellables)
+        // Keep the sliders and fields in sync if the values change underneath
+        // us (e.g. a settings import calls reloadFromDefaults while open).
         prefs.$revealDelayMs
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.applyDelay($0) }
@@ -512,10 +448,77 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.applyRecentlyClosedLimit($0) }
             .store(in: &cancellables)
-        prefs.$browserTabRowLimit
+    }
+
+    /// Keyboard, Letter jump, Search, Mouse and Hover actions.
+    private func syncControlsPane() {
+        let prefs = Preferences.shared
+        stayOpenSwitch.state = prefs.stayOpenOnRelease ? .on : .off
+        stayOpenQuickTapSwitch.state = prefs.stayOpenOnQuickTap ? .on : .off
+        syncStayOpenQuickTapRow()
+        shiftTapBackSwitch.state = prefs.shiftTapStepsBackward ? .on : .off
+        backtickReverseSwitch.state = prefs.backtickReversesAppSwitching ? .on : .off
+        vimNavSwitch.state = prefs.vimNavigationEnabled ? .on : .off
+
+        letterHintsSwitch.state = prefs.letterHintsEnabled ? .on : .off
+        letterHintsRow?.update(subtitle: Self.letterHintsSubtitle())
+        applyLetterTimeout(prefs.letterChainTimeoutMs)
+        letterTimeoutSlider.isEnabled = prefs.letterHintsEnabled
+        letterTimeoutValueField.isEnabled = prefs.letterHintsEnabled
+
+        fuzzySwitch.state = prefs.fuzzySearchEnabled ? .on : .off
+        fuzzyRow?.update(subtitle: Self.fuzzySubtitle())
+        rankResultsSwitch.state = prefs.fuzzySearchRankBestMatchFirst ? .on : .off
+        launcherSwitch.state = prefs.searchIncludesLaunchableApps ? .on : .off
+        selectSearchMode(prefs.searchDismissMode)
+        syncSearchOptionRows()
+
+        scrollSwitch.state = prefs.scrollToSwitch ? .on : .off
+        scrollReverseSwitch.state = prefs.scrollReverseDirection ? .on : .off
+        scrollReverseSwitch.isEnabled = prefs.scrollToSwitch
+        clickDismissSwitch.state = prefs.clickOutsideToDismiss ? .on : .off
+        hoverSelectSwitch.state = prefs.mouseHoverSelectionEnabled ? .on : .off
+        clickSelectSwitch.state = prefs.mouseClickSelectionEnabled ? .on : .off
+        hoverSwitch.state = prefs.hoverActionsEnabled ? .on : .off
+        hoverCloseSwitch.state = prefs.hoverShowClose ? .on : .off
+        hoverMinimizeSwitch.state = prefs.hoverShowMinimize ? .on : .off
+        hoverMaximizeSwitch.state = prefs.hoverShowMaximize ? .on : .off
+        hoverHideSwitch.state = prefs.hoverShowHide ? .on : .off
+        hoverQuitSwitch.state = prefs.hoverShowQuit ? .on : .off
+        hoverForceQuitSwitch.state = prefs.hoverShowForceQuit ? .on : .off
+        setHoverSubOptionsEnabled(prefs.hoverActionsEnabled)
+
+        prefs.$searchDismissMode
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] in self?.applyBrowserTabLimit($0) }
+            .sink { [weak self] in self?.selectSearchMode($0) }
             .store(in: &cancellables)
+        prefs.$fuzzySearchEnabled
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in
+                self?.fuzzySwitch.state = $0 ? .on : .off
+                self?.syncSearchOptionRows()
+            }
+            .store(in: &cancellables)
+        prefs.$letterChainTimeoutMs
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.applyLetterTimeout($0) }
+            .store(in: &cancellables)
+    }
+
+    /// Native tabs and Browser tabs.
+    private func syncTabsPane() {
+        let prefs = Preferences.shared
+        tabDrillSwitch.state = prefs.tabDrillEnabled ? .on : .off
+        tabDrillRow?.update(subtitle: Self.tabDrillSubtitle())
+        expandTabsSwitch.state = prefs.expandTabsAsWindows ? .on : .off
+        expandBrowserTabsSwitch.state = prefs.expandBrowserTabsAsWindows ? .on : .off
+        applyBrowserTabLimit(prefs.browserTabRowLimit)
+        browserIconOnTabsSwitch.state = prefs.showBrowserIconOnTabs ? .on : .off
+        browserTabMRUSwitch.state = prefs.browserTabMRU ? .on : .off
+        browserTabPreviewsSwitch.state = prefs.browserTabPreviews ? .on : .off
+        searchTabsSwitch.state = prefs.searchExpandsBrowserTabs ? .on : .off
+        syncBrowserTabRows()
+
         prefs.$expandBrowserTabsAsWindows
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in
@@ -523,17 +526,25 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
                 self?.syncBrowserTabRows()
             }
             .store(in: &cancellables)
+        // "Search browser tabs" is gated on type-to-filter instead, and that
+        // switch lives a pane away under Controls — so watch it from here too.
+        prefs.$fuzzySearchEnabled
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.syncBrowserTabRows() }
+            .store(in: &cancellables)
+        prefs.$browserTabRowLimit
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.applyBrowserTabLimit($0) }
+            .store(in: &cancellables)
+        prefs.$browserTabPreviews
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.browserTabPreviewsSwitch.state = $0 ? .on : .off }
+            .store(in: &cancellables)
     }
 
     override func viewWillDisappear() {
         super.viewWillDisappear()
         cancellables.removeAll()
-    }
-
-    @objc private func displayModeChanged() {
-        let idx = displayMonitorPopup.indexOfSelectedItem
-        guard displayModes.indices.contains(idx) else { return }
-        Preferences.shared.switcherDisplayMode = displayModes[idx]
     }
 
     @objc private func delayChanged(_ sender: NSSlider) {
@@ -650,49 +661,12 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
         Preferences.shared.browserTabMRU = (sender.state == .on)
     }
 
+    @objc private func toggleBrowserTabPreviews(_ sender: NSSwitch) {
+        Preferences.shared.browserTabPreviews = (sender.state == .on)
+    }
+
     @objc private func toggleInstantSpace(_ sender: NSSwitch) {
         Preferences.shared.instantSpaceSwitch = (sender.state == .on)
-    }
-
-    @objc private func grantBrowserPermissions() {
-        BrowserTabs.requestPermissionForRunningBrowsers { [weak self] granted, denied in
-            self?.showBrowserPermissionOutcome(granted: granted, denied: denied)
-        }
-    }
-
-    /// macOS shows the Apple Events consent prompt only once per browser, so
-    /// on every later click the button would do nothing visible (#147). Spell
-    /// out what happened instead — and when consent was declined earlier, the
-    /// only remedy is the Automation pane (the entry is listed under
-    /// "osascript", which sends our tab scripts).
-    private func showBrowserPermissionOutcome(granted: [String], denied: [String]) {
-        let alert = NSAlert()
-        if granted.isEmpty && denied.isEmpty {
-            alert.alertStyle = .informational
-            alert.messageText = String(localized: "No supported browser is running")
-            alert.informativeText = String(localized: "Open a supported browser (Safari, Chrome, Arc, Brave, Edge, Vivaldi, Opera, Dia…) and click the button again.")
-            alert.addButton(withTitle: String(localized: "OK"))
-        } else if denied.isEmpty {
-            alert.alertStyle = .informational
-            alert.messageText = String(localized: "Browser tab access is working")
-            alert.informativeText = String(localized: "Tabs can be listed for: \(granted.joined(separator: ", ")).")
-            alert.addButton(withTitle: String(localized: "OK"))
-        } else {
-            alert.alertStyle = .warning
-            alert.messageText = String(localized: "Automation permission needed")
-            alert.informativeText = String(localized: "Tab access failed for: \(denied.joined(separator: ", ")). This usually means Automation consent was declined earlier — macOS asks only once and never prompts again. Check the browsers under \"osascript\" in System Settings → Privacy & Security → Automation.")
-            alert.addButton(withTitle: String(localized: "Open System Settings"))
-            alert.addButton(withTitle: String(localized: "Cancel"))
-        }
-        let openSettings = { (response: NSApplication.ModalResponse) in
-            guard !denied.isEmpty, response == .alertFirstButtonReturn else { return }
-            AccessibilityCheck.openSystemSettings(anchor: "Privacy_Automation")
-        }
-        if let window = view.window {
-            alert.beginSheetModal(for: window, completionHandler: openSettings)
-        } else {
-            openSettings(alert.runModal())
-        }
     }
 
     @objc private func toggleLetterHints(_ sender: NSSwitch) {
@@ -730,15 +704,15 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
         syncSearchOptionRows()
     }
 
-    /// The four rows below "Type-to-filter search" only do anything once a
+    /// The three rows below "Type-to-filter search" only do anything once a
     /// search is running, and `enterSearch()` refuses to start one while
     /// type-to-filter is off — so disable them rather than leave live-looking
-    /// dead controls.
+    /// dead controls. A fourth, "Search browser tabs", hangs off the same
+    /// prerequisite from the Tabs pane; `syncBrowserTabRows` handles that one.
     private func syncSearchOptionRows() {
         let on = Preferences.shared.fuzzySearchEnabled
         rankResultsSwitch.isEnabled = on
         launcherSwitch.isEnabled = on
-        searchTabsSwitch.isEnabled = on
         searchModePopup.isEnabled = on
     }
 
@@ -764,14 +738,11 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
     }
 
     /// Quick-tap stay-open only takes effect while stay-open itself is on
-    /// (#91). A grayed switch alone doesn't say *why* it is locked, so dim the
-    /// whole row and name the missing prerequisite in a tooltip.
+    /// (#91).
     private func syncStayOpenQuickTapRow() {
-        let on = Preferences.shared.stayOpenOnRelease
-        stayOpenQuickTapSwitch.isEnabled = on
-        stayOpenQuickTapRow?.alphaValue = on ? 1 : 0.45
-        stayOpenQuickTapRow?.toolTip = on ? nil
-            : String(localized: "Turn on \u{201C}Stay open after releasing the modifier\u{201D} above first.")
+        lockRow(stayOpenQuickTapRow, control: stayOpenQuickTapSwitch,
+                unlocked: Preferences.shared.stayOpenOnRelease,
+                hint: String(localized: "Turn on \u{201C}Stay open after releasing the modifier\u{201D} above first."))
     }
 
     @objc private func toggleStayOpenQuickTap(_ sender: NSSwitch) {
@@ -859,7 +830,7 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
     }
 
     private func selectSearchMode(_ mode: SearchDismissMode) {
-        if let i = searchDismissModes.firstIndex(of: mode) { searchModePopup.selectItem(at: i) }
+        if let index = searchDismissModes.firstIndex(of: mode) { searchModePopup.selectItem(at: index) }
     }
 
     // MARK: - Contents
@@ -874,15 +845,11 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
         syncSinkHiddenRow()
     }
 
-    /// Moving hidden apps to the bottom only matters while they're shown at
-    /// all. Dim the whole row and name the missing prerequisite in a tooltip,
-    /// mirroring `syncStayOpenQuickTapRow`.
+    /// Moving hidden apps to the bottom only matters while they're shown at all.
     private func syncSinkHiddenRow() {
-        let on = Preferences.shared.showHiddenApps
-        sinkHiddenSwitch.isEnabled = on
-        sinkHiddenRow?.alphaValue = on ? 1 : 0.45
-        sinkHiddenRow?.toolTip = on ? nil
-            : String(localized: "Turn on \u{201C}Show hidden apps\u{201D} above first.")
+        lockRow(sinkHiddenRow, control: sinkHiddenSwitch,
+                unlocked: Preferences.shared.showHiddenApps,
+                hint: String(localized: "Turn on \u{201C}Show hidden apps\u{201D} above first."))
     }
 
     /// Both rows below the browser-tab switch are dead without it: the cap has
@@ -891,18 +858,33 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
     /// effect. The prerequisite can also flip from outside this pane, so this
     /// runs from a sink too.
     private func syncBrowserTabRows() {
-        let on = Preferences.shared.expandBrowserTabsAsWindows
-        browserTabLimitField.isEnabled = on
-        browserTabMRUSwitch.isEnabled = on
+        // These two sit directly under their prerequisite, so the dependency
+        // reads off the layout and a plain gray switch explains itself.
+        let expanded = Preferences.shared.expandBrowserTabsAsWindows
+        browserTabLimitField.isEnabled = expanded
+        browserTabMRUSwitch.isEnabled = expanded
+
+        // "Search browser tabs" hangs off type-to-filter instead, which lives a
+        // pane away under Controls — so name it in the tooltip.
+        lockRow(searchTabsRow, control: searchTabsSwitch,
+                unlocked: Preferences.shared.fuzzySearchEnabled,
+                hint: String(localized: "Turn on \u{201C}Type-to-filter search\u{201D} under Controls first."))
     }
 
     /// Same gate for the minimized sink, keyed on its own prerequisite.
     private func syncSinkMinimizedRow() {
-        let on = Preferences.shared.showMinimizedWindows
-        sinkMinimizedSwitch.isEnabled = on
-        sinkMinimizedRow?.alphaValue = on ? 1 : 0.45
-        sinkMinimizedRow?.toolTip = on ? nil
-            : String(localized: "Turn on \u{201C}Show minimized windows\u{201D} above first.")
+        lockRow(sinkMinimizedRow, control: sinkMinimizedSwitch,
+                unlocked: Preferences.shared.showMinimizedWindows,
+                hint: String(localized: "Turn on \u{201C}Show minimized windows\u{201D} above first."))
+    }
+
+    /// Locks a row whose control is dead until some other preference is on. A
+    /// grayed switch alone doesn't say *why*, so dim the whole row and name the
+    /// missing prerequisite in a tooltip.
+    private func lockRow(_ row: SettingsRowView?, control: NSControl, unlocked: Bool, hint: String) {
+        control.isEnabled = unlocked
+        row?.alphaValue = unlocked ? 1 : 0.45
+        row?.toolTip = unlocked ? nil : hint
     }
 
     @objc private func toggleSinkHidden(_ sender: NSSwitch) {
@@ -942,7 +924,7 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
     }
 
     private func selectSortOrder(_ order: SwitcherSortOrder) {
-        if let i = sortOrders.firstIndex(of: order) { sortOrderPopup.selectItem(at: i) }
+        if let index = sortOrders.firstIndex(of: order) { sortOrderPopup.selectItem(at: index) }
     }
 
     @objc private func toggleRecentlyClosed(_ sender: NSSwitch) {

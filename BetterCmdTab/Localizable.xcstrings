@@ -954,40 +954,6 @@
         }
       }
     },
-    "Arrange the highlighted window" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Markiertes Fenster anordnen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Organizar la ventana resaltada"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Organiser la fenêtre en surbrillance"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rozmieść podświetlone okno"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "排列高亮窗口"
-          }
-        }
-      }
-    },
     "Arrange window" : {
       "localizations" : {
         "de" : {
@@ -1529,6 +1495,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "浏览器标签页预览"
+          }
+        }
+      }
+    },
+    "Browser tabs" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Browser-Tabs"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pestañas del navegador"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Onglets du navigateur"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Karty przeglądarki"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "浏览器标签页"
           }
         }
       }
@@ -2452,6 +2453,41 @@
         }
       }
     },
+    "Controls" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steuerung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controles"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commandes"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sterowanie"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "操作方式"
+          }
+        }
+      }
+    },
     "Controls whether this app shows up in the switcher.\n\n• Always — always listed.\n• With open windows — listed only while it has at least one open window.\n• Never — never listed (hidden from the switcher)." : {
       "localizations" : {
         "de" : {
@@ -2894,6 +2930,41 @@
         }
       }
     },
+    "Defaults for every shortcut" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Standards für jeden Kurzbefehl"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valores predeterminados de todos los atajos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réglages par défaut de tous les raccourcis"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ustawienia domyślne każdego skrótu"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有快捷键的默认设置"
+          }
+        }
+      }
+    },
     "Direct activation" : {
       "localizations" : {
         "de" : {
@@ -2958,74 +3029,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "直接激活 %lld"
-          }
-        }
-      }
-    },
-    "Direct activation hotkeys" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tastaturkurzbefehle zur Direktaktivierung"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Teclas de activación directa"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Raccourcis d’activation directe"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Klawisze bezpośredniej aktywacji"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "直接激活热键"
-          }
-        }
-      }
-    },
-    "Display" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bildschirm"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pantalla"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Écran"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ekran"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "显示器"
           }
         }
       }
@@ -3298,40 +3301,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "将浏览器标签页展开为窗口"
-          }
-        }
-      }
-    },
-    "Experimental" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Experimentell"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Experimental"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Expérimental"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Eksperymentalne"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "实验性"
           }
         }
       }
@@ -4697,6 +4666,41 @@
         }
       }
     },
+    "Hover actions" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktionen beim Daraufzeigen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acciones al pasar el cursor"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actions au survol"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Akcje po najechaniu"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "悬停操作"
+          }
+        }
+      }
+    },
     "How far to slide to move one app. Higher means a shorter slide steps further." : {
       "localizations" : {
         "de" : {
@@ -5956,6 +5960,41 @@
         }
       }
     },
+    "Letter jump" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buchstabensprung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salto por letra"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saut par lettre"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skok literą"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "字母跳转"
+          }
+        }
+      }
+    },
     "Lift your fingers to switch to the highlighted app. When off, pick with a click or Return." : {
       "localizations" : {
         "de" : {
@@ -6092,36 +6131,36 @@
         }
       }
     },
-    "List each tab of a browser window (Safari, Chrome, Arc, Brave, Edge, …) as its own row alongside the other windows, instead of one collapsed window. Needs Apple Events access (below); off keeps one row per window — peek its tabs instead." : {
+    "List each tab of a browser window (Safari, Chrome, Arc, Brave, Edge, …) as its own row alongside the other windows, instead of one collapsed window. Needs Apple Events access, granted under Privacy › Permissions; off keeps one row per window — peek its tabs instead." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Listet jeden Tab eines Browserfensters (Safari, Chrome, Arc, Brave, Edge, …) als eigene Zeile neben den anderen Fenstern auf, statt eines zusammengefassten Fensters. Erfordert Apple-Events-Zugriff (unten); aus zeigt eine Zeile pro Fenster — Tabs stattdessen einblenden."
+            "value" : "Listet jeden Tab eines Browserfensters (Safari, Chrome, Arc, Brave, Edge, …) als eigene Zeile neben den anderen Fenstern auf, statt eines zusammengefassten Fensters. Erfordert Apple-Events-Zugriff, den du unter „Datenschutz › Berechtigungen“ erteilst; aus zeigt eine Zeile pro Fenster — Tabs stattdessen einblenden."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Muestra cada pestaña de una ventana del navegador (Safari, Chrome, Arc, Brave, Edge, …) como su propia fila junto a las demás ventanas, en lugar de una ventana contraída. Necesita acceso a Apple Events (abajo); desactivado mantiene una fila por ventana — muestra sus pestañas en su lugar."
+            "value" : "Muestra cada pestaña de una ventana del navegador (Safari, Chrome, Arc, Brave, Edge, …) como su propia fila junto a las demás ventanas, en lugar de una ventana contraída. Necesita acceso a Apple Events, que se concede en «Privacidad › Permisos»; desactivado mantiene una fila por ventana — muestra sus pestañas en su lugar."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Affiche chaque onglet d’une fenêtre de navigateur (Safari, Chrome, Arc, Brave, Edge, …) sur sa propre ligne, aux côtés des autres fenêtres, au lieu d’une seule fenêtre regroupée. Nécessite l’accès Apple Events (ci-dessous) ; désactivé, garde une ligne par fenêtre — affichez plutôt ses onglets."
+            "value" : "Affiche chaque onglet d’une fenêtre de navigateur (Safari, Chrome, Arc, Brave, Edge, …) sur sa propre ligne, aux côtés des autres fenêtres, au lieu d’une seule fenêtre regroupée. Nécessite l’accès Apple Events, accordé dans « Confidentialité › Autorisations » ; désactivé, garde une ligne par fenêtre — affichez plutôt ses onglets."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pokazuje każdą kartę okna przeglądarki (Safari, Chrome, Arc, Brave, Edge, …) jako osobny wiersz obok pozostałych okien, zamiast jednego zwiniętego okna. Wymaga dostępu Apple Events (poniżej); wyłączone zachowuje jeden wiersz na okno — zamiast tego podejrzyj jego karty."
+            "value" : "Pokazuje każdą kartę okna przeglądarki (Safari, Chrome, Arc, Brave, Edge, …) jako osobny wiersz obok pozostałych okien, zamiast jednego zwiniętego okna. Wymaga dostępu Apple Events, przyznawanego w sekcji „Prywatność › Uprawnienia”; wyłączone zachowuje jeden wiersz na okno — zamiast tego podejrzyj jego karty."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将浏览器窗口（Safari、Chrome、Arc、Brave、Edge…）的每个标签页作为独立行显示，而不是折叠成一个窗口。需要下方的 Apple Events 权限；关闭时每个窗口保留一行 — 可改为预览其标签页。"
+            "value" : "将浏览器窗口（Safari、Chrome、Arc、Brave、Edge…）的每个标签页作为独立行显示，而不是折叠成一个窗口。需要 Apple Events 权限，可在“隐私 › 权限”中授予；关闭时每个窗口保留一行 — 可改为预览其标签页。"
           }
         }
       }
@@ -6292,6 +6331,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在网格和预览布局中加粗高亮项的标题。关闭时仅将其提亮。"
+          }
+        }
+      }
+    },
+    "Many of these can be overridden per shortcut under Profiles." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vieles davon lässt sich unter „Profile“ pro Kurzbefehl überschreiben."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muchas de ellas pueden anularse por atajo en «Perfiles»."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beaucoup d'entre elles peuvent être remplacées par raccourci dans « Profils »."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wiele z nich można nadpisać dla pojedynczego skrótu w sekcji „Profile”."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其中许多可在“配置文件”中按快捷键单独覆盖。"
           }
         }
       }
@@ -7007,6 +7081,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "将选择移到指针所在的行。关闭时保持键盘选择不变，避免鼠标误改。"
+          }
+        }
+      }
+    },
+    "Native tabs" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Native Tabs"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pestañas nativas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Onglets natifs"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Karty systemowe"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原生标签页"
           }
         }
       }
@@ -9229,7 +9338,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erfordert macOS 14 oder neuer. Miniaturen werden bei jedem \u00d6ffnen des Umschalters einmal aufgenommen."
+            "value" : "Erfordert macOS 14 oder neuer. Miniaturen werden bei jedem Öffnen des Umschalters einmal aufgenommen."
           }
         },
         "es" : {
@@ -9241,19 +9350,19 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "N\u00e9cessite macOS 14 ou version ult\u00e9rieure. Les miniatures sont captur\u00e9es une fois \u00e0 chaque ouverture du s\u00e9lecteur."
+            "value" : "Nécessite macOS 14 ou version ultérieure. Les miniatures sont capturées une fois à chaque ouverture du sélecteur."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Wymaga macOS 14 lub nowszego. Miniatury s\u0105 przechwytywane raz przy ka\u017cdym otwarciu prze\u0142\u0105cznika."
+            "value" : "Wymaga macOS 14 lub nowszego. Miniatury są przechwytywane raz przy każdym otwarciu przełącznika."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\u9700\u8981 macOS 14 \u6216\u66f4\u9ad8\u7248\u672c\u3002\u6bcf\u6b21\u6253\u5f00\u5207\u6362\u5668\u65f6\u7f29\u7565\u56fe\u53ea\u6355\u83b7\u4e00\u6b21\u3002"
+            "value" : "需要 macOS 14 或更高版本。每次打开切换器时缩略图只捕获一次。"
           }
         }
       }
@@ -10276,6 +10385,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "快捷键 %lld"
+          }
+        }
+      }
+    },
+    "Shortcuts" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kurzbefehle"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atajos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Raccourcis"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skróty"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快捷键"
           }
         }
       }
@@ -11878,6 +12022,41 @@
         }
       }
     },
+    "Switcher" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Umschalter"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conmutador"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sélecteur"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przełącznik"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切换器"
+          }
+        }
+      }
+    },
     "Switcher shortcuts" : {
       "localizations" : {
         "de" : {
@@ -12626,6 +12805,41 @@
         }
       }
     },
+    "Timing" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeitverhalten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiempos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Délais"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Czasy"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "时间控制"
+          }
+        }
+      }
+    },
     "Title alignment" : {
       "localizations" : {
         "de" : {
@@ -12928,6 +13142,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请先开启上方的“松开修饰键后保持打开”。"
+          }
+        }
+      }
+    },
+    "Turn on “Type-to-filter search” under Controls first." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktiviere zuerst „Suche durch Tippen filtern“ unter „Steuerung“."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Primero activa «Búsqueda al escribir» en «Controles»."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activez d'abord « Recherche par saisie » dans « Commandes »."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Najpierw włącz „Wyszukiwanie przez pisanie” w sekcji „Sterowanie”."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先在“操作方式”中开启“输入筛选搜索”。"
           }
         }
       }
@@ -13812,6 +14061,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "缩放窗口"
+          }
+        }
+      }
+    },
+    "the Open search key" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„Suche öffnen“"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Abrir búsqueda»"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« Ouvrir la recherche »"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„Otwórz wyszukiwanie”"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“打开搜索”"
           }
         }
       }

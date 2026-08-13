@@ -64,9 +64,9 @@
         "title": "Sygnały i pasek menu",
         "blurb": "Dźwięk, haptyka, ikona paska menu i prywatność udostępniania ekranu."
       },
-      "experimental": {
-        "title": "Eksperymentalne",
-        "blurb": "Domyślnie wyłączone ustawienia odpowiadające panelowi Eksperymentalne. Mogą się zmienić lub zniknąć między wydaniami."
+      "trackpadSwipe": {
+        "title": "Przesunięcie po gładziku",
+        "blurb": "Gest trzema palcami na gładziku i jego zachowanie. Domyślnie wyłączony; włączysz go w Skróty › Przesunięcie po gładziku. Te opcje mogą się zmienić lub zniknąć między wydaniami."
       },
       "legacy": {
         "title": "Przestarzałe",

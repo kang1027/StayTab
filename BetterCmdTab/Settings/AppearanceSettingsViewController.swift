@@ -2,9 +2,13 @@ import AppKit
 import BetterSettings
 import Combine
 
+/// Appearance pane — where the panel opens and how it looks: layout, label
+/// text, and the panel chrome. What it *lists* lives under Switcher.
 @MainActor
 final class AppearanceSettingsViewController: SettingsTabViewController {
 
+    private let displayMonitorPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let displayModes: [SwitcherDisplayMode] = SwitcherDisplayMode.allCases
     private var layoutRadio: SettingsRadioGroupView!
     private var appearanceRadio: SettingsRadioGroupView!
     private var titleAlignmentRadio: SettingsRadioGroupView!
@@ -17,7 +21,6 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
     private let fontSizePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let fontFacePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let gridSingleRowSwitch = NSSwitch()
-    private let browserTabPreviewSwitch = NSSwitch()
     private let livePreviewSwitch = NSSwitch()
     private let windowTitleSwitch = NSSwitch()
     private let appNamesSwitch = NSSwitch()
@@ -46,9 +49,18 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
     private let gridValues: [Int] = [0, 2, 3, 4, 5, 6] // 0 = automatic
 
     override func setupContent() {
+        // Most of this pane has a matching `ShortcutOverride` field, so it needs
+        // the global-defaults note more than Switcher or Controls do.
+        addGlobalDefaultNote()
+
         // Layout section — the panel's shape: which layout, how big, how many
         // grid columns.
         let layout = addSection(title: String(localized: "Layout"), anchor: SettingsAnchor.appearanceLayout)
+
+        configurePopup(displayMonitorPopup, titles: displayModes.map(\.displayName), action: #selector(displayModeChanged))
+        addRow(to: layout, title: String(localized: "Show switcher on"),
+               subtitle: String(localized: "Choose which monitor the switcher opens on when you have more than one display."),
+               accessory: displayMonitorPopup, searchItemID: SearchID.displayMonitor)
 
         layoutRadio = makeLayoutRadio()
         addRow(to: layout, title: String(localized: "Layout"), accessory: layoutRadio, searchItemID: SearchID.layout)
@@ -108,25 +120,6 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
         addRow(to: layout, title: String(localized: "Single row"),
                subtitle: String(localized: "Shrink the icons to keep every window on one line instead of starting a second row."),
                accessory: gridSingleRowSwitch, searchItemID: SearchID.gridSingleRow)
-
-        // Previews section — what the Previews layout puts inside each tile.
-        let previews = addSection(title: String(localized: "Previews"), anchor: SettingsAnchor.appearancePreviews)
-
-        configureSwitch(browserTabPreviewSwitch, action: #selector(toggleBrowserTabPreviews(_:)))
-        addRow(to: previews, title: String(localized: "Browser tab previews"),
-               subtitle: String(localized: "Capture the active browser tab for the Previews layout. Background tabs use an earlier cached image or their favicon."),
-               accessory: browserTabPreviewSwitch, searchItemID: SearchID.browserTabPreviews)
-
-        configureSwitch(livePreviewSwitch, action: #selector(toggleLivePreviews(_:)))
-        // Live refresh rides on the macOS 14 ScreenCaptureKit still-image API;
-        // on macOS 13 the toggle would be inert, so say why it is unavailable.
-        let liveAvailable = if #available(macOS 14.0, *) { true } else { false }
-        addRow(to: previews, title: String(localized: "Live window previews"),
-               subtitle: liveAvailable
-                   ? String(localized: "In the Previews layout, thumbnails keep refreshing while the switcher is open, so they show what is happening in each window right now. Uses extra CPU and GPU while the panel is up.")
-                   : String(localized: "Requires macOS 14 or later. Thumbnails are captured once each time the switcher opens."),
-               accessory: livePreviewSwitch, searchItemID: SearchID.livePreviews)
-        livePreviewSwitch.isEnabled = liveAvailable
 
         // Labels section — the text on each row/tile.
         let labels = addSection(title: String(localized: "Labels"), anchor: SettingsAnchor.appearanceLabels)
@@ -215,6 +208,17 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
                subtitle: String(localized: "Panel, tiles and tab strip glide between states. Off, or macOS Reduce Motion, switches instantly."),
                accessory: animationsSwitch, searchItemID: SearchID.animations)
 
+        configureSwitch(livePreviewSwitch, action: #selector(toggleLivePreviews(_:)))
+        // Live refresh rides on the macOS 14 ScreenCaptureKit still-image API;
+        // on macOS 13 the toggle would be inert, so say why it is unavailable.
+        let liveAvailable = if #available(macOS 14.0, *) { true } else { false }
+        addRow(to: panel, title: String(localized: "Live window previews"),
+               subtitle: liveAvailable
+                   ? String(localized: "In the Previews layout, thumbnails keep refreshing while the switcher is open, so they show what is happening in each window right now. Uses extra CPU and GPU while the panel is up.")
+                   : String(localized: "Requires macOS 14 or later. Thumbnails are captured once each time the switcher opens."),
+               accessory: livePreviewSwitch, searchItemID: SearchID.livePreviews)
+        livePreviewSwitch.isEnabled = liveAvailable
+
         previewButton.title = String(localized: "Show Preview")
         previewButton.bezelStyle = .rounded
         previewButton.controlSize = .small
@@ -223,15 +227,9 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
         addRow(to: panel, title: String(localized: "Preview"),
                accessory: previewButton, searchItemID: SearchID.preview)
 
-        // The Contents options (what windows/apps the switcher lists) and the
-        // quick-switch delay now live under the Behavior tab — they decide what
-        // shows and when, not the look.
-    }
-
-    private func configureSwitch(_ toggle: NSSwitch, action: Selector) {
-        toggle.controlSize = .small
-        toggle.target = self
-        toggle.action = action
+        // What the switcher lists and when it appears lives under the Switcher
+        // tab; browser tab previews sit with the other browser-tab rows under
+        // Tabs.
     }
 
     /// Builds a horizontal slider + right-aligned monospaced value label. The
@@ -310,16 +308,6 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
         return group
     }
 
-    private func configurePopup(_ popup: NSPopUpButton, titles: [String], action: Selector) {
-        popup.controlSize = .small
-        popup.translatesAutoresizingMaskIntoConstraints = false
-        popup.setContentHuggingPriority(.required, for: .horizontal)
-        popup.removeAllItems()
-        popup.addItems(withTitles: titles)
-        popup.target = self
-        popup.action = action
-    }
-
     override func viewWillAppear() {
         super.viewWillAppear()
         syncFromPreferences()
@@ -348,10 +336,6 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
         prefs.$gridSingleRow
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.gridSingleRowSwitch.state = $0 ? .on : .off }
-            .store(in: &cancellables)
-        prefs.$browserTabPreviews
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] in self?.browserTabPreviewSwitch.state = $0 ? .on : .off }
             .store(in: &cancellables)
         prefs.$livePreviews
             .receive(on: DispatchQueue.main)
@@ -414,12 +398,14 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
 
     private func syncFromPreferences() {
         let prefs = Preferences.shared
+        if let index = displayModes.firstIndex(of: prefs.switcherDisplayMode) {
+            displayMonitorPopup.selectItem(at: index)
+        }
         selectLayout(prefs.switcherLayoutMode)
         applyScale(prefs.panelScalePercent)
         selectAppearance(prefs.panelAppearance)
         selectGrid(prefs.gridMaxColumns)
         gridSingleRowSwitch.state = prefs.gridSingleRow ? .on : .off
-        browserTabPreviewSwitch.state = prefs.browserTabPreviews ? .on : .off
         livePreviewSwitch.state = prefs.livePreviews ? .on : .off
         applyListWidth(prefs.listWidthPercent)
         windowTitleSwitch.state = prefs.showWindowTitleLabel ? .on : .off
@@ -512,8 +498,10 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
         Preferences.shared.gridSingleRow = (sender.state == .on)
     }
 
-    @objc private func toggleBrowserTabPreviews(_ sender: NSSwitch) {
-        Preferences.shared.browserTabPreviews = (sender.state == .on)
+    @objc private func displayModeChanged() {
+        let idx = displayMonitorPopup.indexOfSelectedItem
+        guard displayModes.indices.contains(idx) else { return }
+        Preferences.shared.switcherDisplayMode = displayModes[idx]
     }
 
     @objc private func toggleLivePreviews(_ sender: NSSwitch) {

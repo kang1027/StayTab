@@ -122,9 +122,12 @@ Data + control flow on the ⌘Tab hot path:
   one file for review). `AccessibilityCheck` gates on the AX permission. `Log` is the
   `os.Logger` wrapper — use `Log.*`, never `print`. Plus audio-activity, Dock-badge,
   symbolic-hotkey-guard, and launch-at-login helpers.
-- **Settings** (`Settings/`) — native AppKit settings window, one view controller per pane
-  (General, Switcher, Appearance, Apps, Shortcuts, Privacy, Experimental, About).
-  Fragile/new features go behind the off-by-default **Experimental** pane.
+- **Settings** (`Settings/`) — native AppKit settings window, ten panes registered in
+  `SettingsCatalog` (General, Profiles, Shortcuts, Switcher, Controls, Tabs, Apps,
+  Appearance, Privacy, About). One controller per pane, except that
+  `SwitcherPanesViewController` backs Switcher/Controls/Tabs from one `Pane` parameter
+  since they share every control and one `viewWillAppear` sync. Fragile/new features ship
+  off by default under a “These features are unstable” notice on their own section.
 
 ## Preferences, persistence & i18n
 

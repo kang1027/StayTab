@@ -22,19 +22,7 @@ final class PrivacySettingsViewController: SettingsTabViewController {
     }
 
     override func setupContent() {
-        // Screen-sharing section — hide the switcher panel from screen recording
-        // / sharing capture (Zoom, Meet, Teams, QuickTime, ScreenCaptureKit).
-        let sharing = addSection(title: String(localized: "Screen sharing"), anchor: SettingsAnchor.screenSharing)
-        configureSwitch(hideFromScreenSharingSwitch, action: #selector(toggleHideFromScreenSharing(_:)))
-        addRow(
-            to: sharing,
-            title: String(localized: "Don't look at my windows"),
-            subtitle: String(localized: "Hide the switcher from screen recordings and shared screens (Zoom, Meet, Teams). Needs macOS 14.6 or later."),
-            accessory: hideFromScreenSharingSwitch,
-            searchItemID: SearchID.hideFromScreenSharing
-        )
-
-        // Permissions section.
+        // Permissions first: everything else in the app is gated on these.
         let permissions = addSection(title: String(localized: "Permissions"), anchor: SettingsAnchor.permissions)
 
         addRow(
@@ -53,14 +41,34 @@ final class PrivacySettingsViewController: SettingsTabViewController {
             searchItemID: SearchID.fullDiskAccess
         )
 
+        // Apple Events consent for browser tabs — the third permission the app
+        // asks for, so it belongs here rather than beside the Tabs options it
+        // unlocks.
+        let grantButton = NSButton(title: String(localized: "Check access…"), target: self, action: #selector(grantBrowserPermissions))
+        grantButton.bezelStyle = .rounded
+        grantButton.controlSize = .small
+        addRow(
+            to: permissions,
+            title: String(localized: "Browser tab access"),
+            subtitle: String(localized: "Browsers need Apple Events consent to list their tabs. Click to check each running browser (Safari, Chrome, Arc, Brave, Edge…) — macOS prompts for consent where it's still missing. Must be done with this window open."),
+            accessory: grantButton,
+            searchItemID: SearchID.tabPermissions
+        )
+
+        // Screen-sharing section — hide the switcher panel from screen recording
+        // / sharing capture (Zoom, Meet, Teams, QuickTime, ScreenCaptureKit).
+        let sharing = addSection(title: String(localized: "Screen sharing"), anchor: SettingsAnchor.screenSharing)
+        configureSwitch(hideFromScreenSharingSwitch, action: #selector(toggleHideFromScreenSharing(_:)))
+        addRow(
+            to: sharing,
+            title: String(localized: "Don't look at my windows"),
+            subtitle: String(localized: "Hide the switcher from screen recordings and shared screens (Zoom, Meet, Teams). Needs macOS 14.6 or later."),
+            accessory: hideFromScreenSharingSwitch,
+            searchItemID: SearchID.hideFromScreenSharing
+        )
+
         // The Recovery section (restore macOS keyboard shortcuts) moved to the
         // General tab — it's troubleshooting, not privacy.
-    }
-
-    private func configureSwitch(_ toggle: NSSwitch, action: Selector) {
-        toggle.controlSize = .small
-        toggle.target = self
-        toggle.action = action
     }
 
     /// Status icon + grant button pair used by every permission row.
@@ -166,6 +174,46 @@ final class PrivacySettingsViewController: SettingsTabViewController {
             icon.contentTintColor = optional ? .secondaryLabelColor : .systemOrange
             button.isHidden = false
             button.title = String(localized: "Grant Access")
+        }
+    }
+    @objc private func grantBrowserPermissions() {
+        BrowserTabs.requestPermissionForRunningBrowsers { [weak self] granted, denied in
+            self?.showBrowserPermissionOutcome(granted: granted, denied: denied)
+        }
+    }
+
+    /// macOS shows the Apple Events consent prompt only once per browser, so
+    /// on every later click the button would do nothing visible (#147). Spell
+    /// out what happened instead — and when consent was declined earlier, the
+    /// only remedy is the Automation pane (the entry is listed under
+    /// "osascript", which sends our tab scripts).
+    private func showBrowserPermissionOutcome(granted: [String], denied: [String]) {
+        let alert = NSAlert()
+        if granted.isEmpty && denied.isEmpty {
+            alert.alertStyle = .informational
+            alert.messageText = String(localized: "No supported browser is running")
+            alert.informativeText = String(localized: "Open a supported browser (Safari, Chrome, Arc, Brave, Edge, Vivaldi, Opera, Dia…) and click the button again.")
+            alert.addButton(withTitle: String(localized: "OK"))
+        } else if denied.isEmpty {
+            alert.alertStyle = .informational
+            alert.messageText = String(localized: "Browser tab access is working")
+            alert.informativeText = String(localized: "Tabs can be listed for: \(granted.joined(separator: ", ")).")
+            alert.addButton(withTitle: String(localized: "OK"))
+        } else {
+            alert.alertStyle = .warning
+            alert.messageText = String(localized: "Automation permission needed")
+            alert.informativeText = String(localized: "Tab access failed for: \(denied.joined(separator: ", ")). This usually means Automation consent was declined earlier — macOS asks only once and never prompts again. Check the browsers under \"osascript\" in System Settings → Privacy & Security → Automation.")
+            alert.addButton(withTitle: String(localized: "Open System Settings"))
+            alert.addButton(withTitle: String(localized: "Cancel"))
+        }
+        let openSettings = { (response: NSApplication.ModalResponse) in
+            guard !denied.isEmpty, response == .alertFirstButtonReturn else { return }
+            AccessibilityCheck.openSystemSettings(anchor: "Privacy_Automation")
+        }
+        if let window = view.window {
+            alert.beginSheetModal(for: window, completionHandler: openSettings)
+        } else {
+            openSettings(alert.runModal())
         }
     }
 }

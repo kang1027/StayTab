@@ -1,6 +1,5 @@
 import AppKit
 import BetterSettings
-import BetterShortcuts
 import Combine
 
 /// Settings tab gathering per-app configuration: the "App rules" list (hide /
@@ -35,11 +34,6 @@ final class AppsSettingsViewController: SettingsTabViewController {
     private var appsSheet: AppsPickerSheetWindowController?
     private var addSheet: AppsPickerSheetWindowController?
 
-    // Direct-activation slots: a "choose app" button + shortcut recorder per slot
-    // (a global hotkey that jumps straight to a chosen app, bypassing the switcher).
-    private var directButtons: [NSButton] = []
-    private var directSlotSheet: AppsPickerSheetWindowController?
-
     private var cancellables = Set<AnyCancellable>()
 
     override func setupContent() {
@@ -60,29 +54,6 @@ final class AppsSettingsViewController: SettingsTabViewController {
         register(section: block, anchor: SettingsAnchor.appRules)
         register(searchTarget: rulesCard, itemID: SearchID.exceptions)
         rebuildRulesCard()
-
-        // Direct activation — global hotkeys that focus (and launch) a chosen app,
-        // bypassing the switcher. App-targeted, so it lives with the per-app config.
-        let direct = addSection(title: String(localized: "Direct activation"), anchor: SettingsAnchor.directActivation)
-        addRow(
-            to: direct,
-            title: String(localized: "Jump straight to an app"),
-            subtitle: String(localized: "Give a shortcut to one app — it focuses that app, opening it first if needed."),
-            searchItemID: SearchID.directActivation
-        )
-        for (index, name) in BetterShortcuts.Name.directActivate.enumerated() {
-            let recorder = BetterShortcuts.RecorderCocoa(for: name, policy: .reservedRejecting)
-            let button = NSButton(title: String(localized: "Choose…"), target: self, action: #selector(chooseDirectApp(_:)))
-            button.bezelStyle = .rounded
-            button.controlSize = .small
-            button.tag = index
-            let stack = NSStackView(views: [button, recorder])
-            stack.orientation = .horizontal
-            stack.spacing = 8
-            stack.alignment = .centerY
-            addRow(to: direct, title: String(localized: "Slot \(index + 1)"), accessory: stack)
-            directButtons.append(button)
-        }
 
         // Pinned apps — a titled group above a reorderable card. Drag rows to set
         // the order pinned apps appear at the front of the switcher; "Add App…"
@@ -138,52 +109,6 @@ final class AppsSettingsViewController: SettingsTabViewController {
         let addRow = AddAppRowView()
         addRow.onClick = { [weak self] in self?.managePinned() }
         pinnedCard.addContent(addRow)
-    }
-
-    // MARK: - Direct activation slots
-
-    /// Sync each slot's "choose app" button to its stored bundle ID.
-    private func refreshDirectSlots() {
-        let bindings = Preferences.shared.directActivationBindings
-        for (index, button) in directButtons.enumerated() {
-            let bundleID = bindings.indices.contains(index) ? bindings[index] : ""
-            if bundleID.isEmpty {
-                button.title = String(localized: "Choose…")
-                button.image = nil
-            } else {
-                let info = Self.appInfo(for: bundleID)
-                button.title = info.name
-                info.icon.size = NSSize(width: 16, height: 16)
-                button.image = info.icon
-                button.imagePosition = .imageLeading
-            }
-        }
-    }
-
-    @objc private func chooseDirectApp(_ sender: NSButton) {
-        let slot = sender.tag
-        guard let window = view.window, directSlotSheet == nil else { return }
-        let current = Preferences.shared.directActivationBindings
-        let selected: Set<String> = (current.indices.contains(slot) && !current[slot].isEmpty) ? [current[slot]] : []
-        let controller = AppsPickerSheetWindowController(
-            title: String(localized: "Activate App"),
-            prompt: String(localized: "Choose the app this shortcut focuses."),
-            selectedBundleIDs: selected,
-            singleSelection: true,
-            confirmTitle: String(localized: "Choose")
-        ) { selection in
-            var bindings = Preferences.shared.directActivationBindings
-            while bindings.count <= slot { bindings.append("") }
-            bindings[slot] = selection.sorted().first ?? ""
-            Preferences.shared.directActivationBindings = bindings
-        }
-        controller.onDidDismiss = { [weak self] in
-            self?.directSlotSheet = nil
-            self?.refreshDirectSlots()
-        }
-        directSlotSheet = controller
-        trackForRelease(controller)
-        controller.present(asSheetFor: window)
     }
 
     private func makeGroupHeader(title: String, description: String) -> NSView {
@@ -317,7 +242,6 @@ final class AppsSettingsViewController: SettingsTabViewController {
             exceptions = current
             rebuildRulesCard()
         }
-        refreshDirectSlots()
         // Same stale-snapshot guard for the pin order (Import / other panes).
         if Preferences.shared.pinnedBundleIDs != pinned {
             pinned = Preferences.shared.pinnedBundleIDs

@@ -64,9 +64,9 @@
         "title": "Feedback & menu bar",
         "blurb": "Sound, haptics, the menu-bar icon and screen-sharing privacy."
       },
-      "experimental": {
-        "title": "Experimental",
-        "blurb": "Off by default and matching the Experimental settings pane. These can change or disappear between releases."
+      "trackpadSwipe": {
+        "title": "Trackpad swipe",
+        "blurb": "The three-finger trackpad gesture and how it behaves. Off by default; turn it on under Shortcuts › Trackpad swipe. These can change or disappear between releases."
       },
       "legacy": {
         "title": "Legacy",

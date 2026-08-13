@@ -37,9 +37,7 @@ final class GeneralSettingsViewController: SettingsTabViewController {
     override func setupContent() {
         // Startup section
         let startup = addSection(title: String(localized: "Startup"), anchor: SettingsAnchor.startup)
-        launchSwitch.controlSize = .small
-        launchSwitch.target = self
-        launchSwitch.action = #selector(toggleLaunchAtLogin(_:))
+        configureSwitch(launchSwitch, action: #selector(toggleLaunchAtLogin(_:)))
         addRow(
             to: startup,
             title: String(localized: "Launch at login"),
@@ -67,6 +65,8 @@ final class GeneralSettingsViewController: SettingsTabViewController {
             accessory: hapticSwitch,
             searchItemID: SearchID.haptic
         )
+        // Wired by hand rather than with `configurePopup`: `rebuildSoundMenu`
+        // owns this menu's items and refills it as sounds change.
         soundPopup.controlSize = .small
         soundPopup.target = self
         soundPopup.action = #selector(changeSound(_:))
@@ -85,12 +85,7 @@ final class GeneralSettingsViewController: SettingsTabViewController {
         // Updates section
         let updates = addSection(title: String(localized: "Updates"), anchor: SettingsAnchor.updates)
 
-        for cadence in updateCadences {
-            intervalPopUp.addItem(withTitle: cadence.title)
-        }
-        intervalPopUp.controlSize = .small
-        intervalPopUp.target = self
-        intervalPopUp.action = #selector(changeInterval(_:))
+        configurePopup(intervalPopUp, titles: updateCadences.map(\.title), action: #selector(changeInterval(_:)))
         addRow(
             to: updates,
             title: String(localized: "Check for updates"),
@@ -99,9 +94,7 @@ final class GeneralSettingsViewController: SettingsTabViewController {
             searchItemID: SearchID.updateInterval
         )
 
-        betaSwitch.controlSize = .small
-        betaSwitch.target = self
-        betaSwitch.action = #selector(toggleBeta(_:))
+        configureSwitch(betaSwitch, action: #selector(toggleBeta(_:)))
         addRow(
             to: updates,
             title: String(localized: "Include beta releases"),
@@ -167,12 +160,6 @@ final class GeneralSettingsViewController: SettingsTabViewController {
         button.controlSize = .small
         button.target = self
         button.action = action
-    }
-
-    private func configureSwitch(_ toggle: NSSwitch, action: Selector) {
-        toggle.controlSize = .small
-        toggle.target = self
-        toggle.action = action
     }
 
     override func viewWillAppear() {
