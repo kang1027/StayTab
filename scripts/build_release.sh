@@ -970,7 +970,7 @@ if [[ $is_beta -eq 1 ]]; then
 elif [[ $auto_release -eq 1 ]]; then
 	echo "  ✅ Release ${RELEASE_TAG} already published."
 	echo "     https://github.com/rokartur/BetterCmdTab/releases/tag/${RELEASE_TAG}"
-	echo "  Homebrew cask auto-updates via .github/workflows/update-homebrew-cask.yml"
+	echo "  Homebrew: BrewTestBot opens the cask bump PR from its own livecheck."
 else
 	echo "  Run this to publish the release:"
 	echo ""
@@ -983,6 +983,6 @@ else
 	echo "      \"${ZIP_PATH}#${ZIP_NAME}\""
 	echo ""
 	echo "  Or re-run with --auto-release next time."
-	echo "  Homebrew cask auto-updates via .github/workflows/update-homebrew-cask.yml"
+	echo "  Homebrew: BrewTestBot opens the cask bump PR from its own livecheck."
 fi
 echo ""

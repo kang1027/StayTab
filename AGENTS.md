@@ -45,7 +45,7 @@ scripts/set_version.sh 26.5               # set MARKETING_VERSION, auto-commits 
 scripts/set_version.sh --show             # print current version & build
 scripts/build_release.sh                  # build + sign + notarize + dmg/zip → build/release/
 scripts/build_release.sh --beta           # beta build, auto-detects next beta.N from GitHub tags
-scripts/build_release.sh --auto-release   # after notarize, create the GitHub release (needs --notes or prompts)
+scripts/build_release.sh --auto-release   # after notarize, create the GitHub release (needs --notes "$(cat notes.md)" or prompts)
 scripts/build_release.sh --skip-notarization   # dev build, no notarize (refuses --auto-release)
 scripts/update-packages.sh                # bump SPM deps (clears Package.resolved, re-resolves)
 ```
@@ -59,13 +59,20 @@ and the `BetterCmdTabNotarization` notarytool keychain profile (see the script h
 ### Changelog format (the release body)
 
 The changelog *is* the GitHub Release body (no `CHANGELOG.md`). Pass it to
-`build_release.sh --auto-release --notes notes.md`, or write it after the fact with
+`build_release.sh --auto-release --notes "$(cat notes.md)"` — that flag takes the notes
+text, not a path, so an unquoted filename would become the release body. Or write it
+after the fact with
 `gh release create <tag> -R rokartur/BetterCmdTab --title "BetterCmdTab <version>" --notes-file notes.md`.
 Every tag is bare — no `v` prefix — for stable (`26.7`) and prereleases alike (`26.7-beta.3`,
 published with `--prerelease`); only historical stable tags through `v26.6.1` carry the prefix.
 `MAJOR` tracks the macOS year. Both Homebrew casks template their download URL on the tag, so
 the first bare stable release must also drop the `v` from `Casks/b/bettercmdtab.rb` (the
 `bettercmdtab@beta` cask is already bare) or `brew bump` lands a 404.
+
+Homebrew's own BrewTestBot autobumps both casks off their `livecheck` blocks, which read the
+version out of the DMG *asset filename*, not the tag. There is no cask workflow in this repo
+and there should not be one: a second bot would race BrewTestBot and need a token with push
+rights on a third-party repository. Cask upkeep is limited to landing template fixes upstream.
 
 Match the established BetterCmdTab body shape — this is an end-user app, so bullets are
 **user-facing and outcome-first**, not internal symbol names:

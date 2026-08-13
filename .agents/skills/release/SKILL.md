@@ -38,9 +38,12 @@ structure from that skill is mandatory.
 
 ## 4. Build, sign, notarize, publish
 
+`--notes` takes the notes **text**, not a path — pass the file through `cat`
+or the literal filename becomes the release body:
+
 ```bash
-scripts/build_release.sh --auto-release --notes notes.md          # stable
-scripts/build_release.sh --beta --auto-release --notes notes.md   # beta (published as prerelease)
+scripts/build_release.sh --auto-release --notes "$(cat notes.md)"          # stable
+scripts/build_release.sh --beta --auto-release --notes "$(cat notes.md)"   # beta (published as prerelease)
 ```
 
 Step 0 is `scripts/release_quality_gate.sh`: a Release-configuration compile
