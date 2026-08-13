@@ -3,6 +3,7 @@
 import { AnimatePresence, LayoutGroup, MotionConfig, motion, useReducedMotion } from "motion/react";
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+
 import snapshot from "../releases.json";
 import {
   channels,
@@ -544,7 +545,7 @@ function Features() {
           Features
         </h2>
         <span className="h-px flex-1 bg-line max-[560px]:hidden" aria-hidden />
-        <span className="shrink-0 text-[13px] tabular-nums text-dim">{FEATURE_COUNT}</span>
+        <span className="shrink-0 text-[13px] text-dim tabular-nums">{FEATURE_COUNT}</span>
       </div>
 
       <Tabs
@@ -707,7 +708,7 @@ function DownloadCta({
   const label = useScramble("Download.dmg", active, !reduce);
 
   return (
-    <div className="inline-flex max-w-full items-stretch overflow-hidden rounded-[9px] border border-line bg-[#111111] transition-colors duration-150 has-[a:hover]:border-accent has-[a:focus-visible]:border-accent">
+    <div className="inline-flex max-w-full items-stretch overflow-hidden rounded-[9px] border border-line bg-[#111111] transition-colors duration-150 has-[a:focus-visible]:border-accent has-[a:hover]:border-accent">
       <motion.a
         className="inline-flex cursor-pointer items-center gap-2 px-4 py-[7px] leading-normal text-text transition-[color,background-color] duration-150 hover:bg-accent/[0.08] hover:text-accent focus-visible:bg-accent/[0.08] focus-visible:text-accent"
         href={href}
@@ -889,7 +890,7 @@ function BrewCmd({ beta }: { beta: boolean }) {
       animate={{ borderColor: copied ? "var(--color-accent)" : "#222222" }}
       transition={{ duration: 0.3, ease: EASE }}
     >
-      <code className="block overflow-x-auto whitespace-nowrap px-3.5 py-[7px] font-mono leading-normal text-dim before:text-muted before:content-['$_']">
+      <code className="block overflow-x-auto px-3.5 py-[7px] font-mono leading-normal whitespace-nowrap text-dim before:text-muted before:content-['$_']">
         {BREW}
         {/* Only the suffix moves, so the command reads as one stable string:
             it slides its own width open instead of the whole box jumping. */}
