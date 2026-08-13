@@ -129,9 +129,8 @@ final class ConfigFile: @unchecked Sendable {
 
     // MARK: - Queue-confined
 
-    /// (Re)attach the watcher: the file itself when it exists, otherwise the
-    /// nearest existing parent directory so a file created while running is
-    /// picked up.
+    /// (Re)attach the watcher: the file itself when it exists, otherwise our own
+    /// `bettercmdtab/` directory so a file created while running is picked up.
     private func armWatcher() {
         source?.cancel()
         source = nil
@@ -158,10 +157,12 @@ final class ConfigFile: @unchecked Sendable {
             return
         }
 
+        // Only ever watch bettercmdtab/, never its parent: ~/.config is written
+        // constantly by unrelated tools, and each such write would wake this
+        // queue for a stat on behalf of a feature the user never enabled.
         let dir = Self.url.deletingLastPathComponent()
-        for candidate in [dir, dir.deletingLastPathComponent()] {
-            let dirFD = open(candidate.path, O_EVTONLY)
-            guard dirFD >= 0 else { continue }
+        let dirFD = open(dir.path, O_EVTONLY)
+        if dirFD >= 0 {
             let src = DispatchSource.makeFileSystemObjectSource(
                 fileDescriptor: dirFD, eventMask: .write, queue: queue)
             src.setCancelHandler { close(dirFD) }
@@ -174,11 +175,11 @@ final class ConfigFile: @unchecked Sendable {
             src.activate()
             return
         }
-        // ponytail: no watcher when neither $XDG_CONFIG_HOME/~/.config nor
-        // bettercmdtab/ exists — watching $HOME for ".config" to appear would
-        // fire on every dotfile write (polling through another door). Creating
-        // the chain externally mid-session needs a relaunch or the Create button.
-        Log.config.debug("config file and its directories absent; file-based config dormant")
+        // ponytail: no watcher when bettercmdtab/ itself is absent — watching a
+        // parent for it to appear would fire on every unrelated dotfile write
+        // (polling through another door). Creating the directory externally
+        // mid-session needs a relaunch or the Create button.
+        Log.config.debug("config directory absent; file-based config dormant")
     }
 
     /// Coalesce editor write bursts, then read + apply off the main thread.
@@ -213,7 +214,6 @@ final class ConfigFile: @unchecked Sendable {
         guard watchingFile,
               let data = try? Self.configData(),
               data != lastSyncedData else { return }
-        lastSyncedData = data
         // A key can appear mid-session (a preference written for the first
         // time); keep the schema in step with what we're about to write.
         syncSchemaLocked()
@@ -221,6 +221,10 @@ final class ConfigFile: @unchecked Sendable {
             // Resolve symlinks so the atomic write (temp + rename) replaces the
             // link's target, not the link itself (dotfiles setups).
             try data.write(to: Self.url.resolvingSymlinksInPath(), options: .atomic)
+            // Arm the echo guard only once the bytes are on disk. Arming it
+            // first would make a failed write look converged, and the next
+            // reload would re-import the stale file over the user's change.
+            lastSyncedData = data
         } catch {
             Log.config.warning("config write-back failed: \(error.localizedDescription, privacy: .public)")
         }
@@ -232,9 +236,9 @@ final class ConfigFile: @unchecked Sendable {
         guard watchingFile, let data = try? Preferences.settingsSchemaData() else { return }
         if lastSchemaData == nil { lastSchemaData = try? Data(contentsOf: Self.schemaURL) }
         guard data != lastSchemaData else { return }
-        lastSchemaData = data
         do {
             try data.write(to: Self.schemaURL.resolvingSymlinksInPath(), options: .atomic)
+            lastSchemaData = data
         } catch {
             Log.config.warning("config schema write failed: \(error.localizedDescription, privacy: .public)")
         }
