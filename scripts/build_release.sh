@@ -48,10 +48,11 @@ Options:
   --beta                Build as beta (pre-release). Auto-detects next beta.N from GitHub tags,
                         auto-bumps build number (timestamp), auto-cleans UpdaterDownloads cache.
   --stable              Build as stable release (default).
-  --auto-release        After build+notarize, auto-create GitHub pre-release on
-                        rokartur/BetterCmdTab with DMG+ZIP attached. Beta only.
+  --auto-release        After build+notarize, auto-create the GitHub release on
+                        rokartur/BetterCmdTab with DMG+ZIP attached. A beta is
+                        published as a pre-release, a stable one as latest.
   --notes TEXT          Release notes for --auto-release. Supports literal newlines
-                        when passed as one quoted argument. Beta only.
+                        when passed as one quoted argument.
                         When omitted on an interactive terminal, the script
                         prompts per category (Highlights, Added, Changed, Fixed,
                         Security, Removed, Known issues). Empty sections are
@@ -108,7 +109,6 @@ done
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_PATH="${REPO_ROOT}/BetterCmdTab.xcodeproj"
-INFO_PLIST="${REPO_ROOT}/BetterCmdTab/Info.plist"
 BUILD_DIR="${REPO_ROOT}/build/release"
 ARCHIVE_PATH="${BUILD_DIR}/BetterCmdTab.xcarchive"
 EXPORT_PATH="${BUILD_DIR}/export"
@@ -301,8 +301,8 @@ if [[ $skip_notarization -eq 0 ]]; then
 	echo "✅ Notarization credentials found"
 fi
 
-# Verify gh CLI auth if --auto-release requested (beta only)
-if [[ $is_beta -eq 1 ]] && [[ $auto_release -eq 1 ]]; then
+# Verify gh CLI auth if --auto-release requested
+if [[ $auto_release -eq 1 ]]; then
 	if ! command -v gh &>/dev/null; then
 		echo "❌ gh CLI not installed. Install with: brew install gh"
 		exit 1
@@ -350,7 +350,12 @@ if [[ ! -x "$QUALITY_GATE" ]]; then
 	exit 1
 fi
 
-_quality_gate_args=(--fail-on-high-risk-warnings --log-path "$QUALITY_GATE_LOG")
+# --clean is not optional here: the gate decides pass/fail by counting warning:
+# lines in the xcodebuild log, and Xcode does not re-emit warnings for files it
+# does not recompile. On warm DerivedData an incremental build logs nothing, so
+# without this the gate reports zero high-risk warnings for every build after the
+# first and waves through exactly the artifact it exists to stop.
+_quality_gate_args=(--clean --fail-on-high-risk-warnings --log-path "$QUALITY_GATE_LOG")
 [[ $is_beta -eq 1 ]] && _quality_gate_args+=(--skip-i18n)
 
 if ! "$QUALITY_GATE" "${_quality_gate_args[@]}"; then
@@ -408,6 +413,21 @@ if [[ $is_beta -eq 1 ]]; then
 	fi
 	BETA_TAG="${VERSION}-beta.${BETA_N}"
 	echo "   Beta tag: ${BETA_TAG} (previous: ${_last_beta:-none})"
+fi
+
+# What Step 12 publishes when --auto-release is set. Tags are bare on both
+# channels — no `v` prefix — because both Homebrew casks template their download
+# URL on the tag.
+if [[ $is_beta -eq 1 ]]; then
+	RELEASE_TAG="$BETA_TAG"
+	RELEASE_TITLE="BetterCmdTab ${VERSION}-beta.${BETA_N}"
+	RELEASE_KIND="pre-release"
+	RELEASE_DEFAULT_NOTES="Beta ${BETA_N} of BetterCmdTab ${VERSION}."
+else
+	RELEASE_TAG="$VERSION"
+	RELEASE_TITLE="BetterCmdTab ${VERSION}"
+	RELEASE_KIND="release"
+	RELEASE_DEFAULT_NOTES="BetterCmdTab ${VERSION}."
 fi
 
 # Compose artifact version: stable uses VERSION, beta appends -beta.N.
@@ -770,25 +790,26 @@ else
 	echo "⏭️  Skipping DMG notarization (--skip-notarization)"
 fi
 
-# ─── Step 12: Create GitHub pre-release (beta + --auto-release only) ────────
+# ─── Step 12: Create the GitHub release (--auto-release only) ──────────────
 #
-# Creates the release tag on the public repo (rokartur/BetterCmdTab), uploads
-# DMG+ZIP, marks as pre-release. --latest=false prevents this from displacing
-# the current stable release as the "Latest" pointer. Homebrew cask workflow
-# skips pre-releases by design, so no further action is needed.
+# Creates the release tag on the public repo (rokartur/BetterCmdTab) and uploads
+# DMG+ZIP. A beta is marked pre-release with --latest=false so it cannot displace
+# the current stable as the "Latest" pointer the updater reads; the Homebrew cask
+# workflow skips pre-releases by design. A stable release takes --latest, and the
+# cask workflow does pick it up.
 
-if [[ $is_beta -eq 1 ]] && [[ $auto_release -eq 1 ]]; then
-	step "Step 12: Create GitHub pre-release"
+if [[ $auto_release -eq 1 ]]; then
+	step "Step 12: Create GitHub ${RELEASE_KIND}"
 
 	if [[ $skip_notarization -eq 1 ]]; then
 		echo "⚠️  Refusing to publish a release built with --skip-notarization."
-		echo "   Re-run without --skip-notarization to publish ${BETA_TAG}."
+		echo "   Re-run without --skip-notarization to publish ${RELEASE_TAG}."
 		exit 1
 	fi
 
-	echo "📡 Publishing ${BETA_TAG} on rokartur/BetterCmdTab..."
+	echo "📡 Publishing ${RELEASE_TAG} on rokartur/BetterCmdTab..."
 
-	RELEASE_NOTES_FILE="${BUILD_DIR}/release-notes-${BETA_TAG}.md"
+	RELEASE_NOTES_FILE="${BUILD_DIR}/release-notes-${RELEASE_TAG}.md"
 
 	# Carry-over rule: if the newest GitHub release is a pre-release, treat it
 	# as an in-progress notes draft and prefill from it. If the newest release
@@ -828,7 +849,7 @@ if [[ $is_beta -eq 1 ]] && [[ $auto_release -eq 1 ]]; then
 		if [[ ! -s "$RELEASE_NOTES_FILE" ]]; then
 			echo "" >&2
 			echo "⚠️  No sections filled in. Falling back to default notes." >&2
-			printf "Beta %s of BetterCmdTab %s.\n" "$BETA_N" "$VERSION" >"$RELEASE_NOTES_FILE"
+			printf "%s\n" "$RELEASE_DEFAULT_NOTES" >"$RELEASE_NOTES_FILE"
 		fi
 		echo ""
 		echo "──── Final release notes ────"
@@ -843,7 +864,7 @@ if [[ $is_beta -eq 1 ]] && [[ $auto_release -eq 1 ]]; then
 		fi
 	else
 		# Non-interactive (CI / piped): keep prior fallback.
-		printf "Beta %s of BetterCmdTab %s.\n" "$BETA_N" "$VERSION" >"$RELEASE_NOTES_FILE"
+		printf "%s\n" "$RELEASE_DEFAULT_NOTES" >"$RELEASE_NOTES_FILE"
 	fi
 
 	# GitHub orders the releases page (and the /releases API the updater reads)
@@ -857,7 +878,7 @@ if [[ $is_beta -eq 1 ]] && [[ $auto_release -eq 1 ]]; then
 	[[ -n "$_pub_head" ]] && { _pub_tree=$(gh api "repos/rokartur/BetterCmdTab/git/commits/${_pub_head}" --jq '.tree.sha' 2>/dev/null) || _pub_tree=""; }
 	if [[ -n "$_pub_head" && -n "$_pub_tree" ]]; then
 		_pub_new=$(gh api -X POST repos/rokartur/BetterCmdTab/git/commits \
-			-f message="chore: release ${BETA_TAG}" \
+			-f message="chore: release ${RELEASE_TAG}" \
 			-f tree="$_pub_tree" \
 			-f "parents[]=${_pub_head}" --jq '.sha' 2>/dev/null) || _pub_new=""
 		if [[ -n "$_pub_new" ]] && gh api -X PATCH repos/rokartur/BetterCmdTab/git/refs/heads/main \
@@ -870,19 +891,29 @@ if [[ $is_beta -eq 1 ]] && [[ $auto_release -eq 1 ]]; then
 		echo "⚠️  Could not advance public main — tagging current HEAD; release may sort below older ones."
 	fi
 
-	gh release create "${BETA_TAG}" \
+	_release_flags=()
+	if [[ $is_beta -eq 1 ]]; then
+		_release_flags+=(--prerelease --latest=false)
+	else
+		_release_flags+=(--latest)
+	fi
+
+	gh release create "${RELEASE_TAG}" \
 		--repo rokartur/BetterCmdTab \
 		--target "$_release_target" \
-		--title "BetterCmdTab ${VERSION}-beta.${BETA_N}" \
+		--title "$RELEASE_TITLE" \
 		--notes-file "$RELEASE_NOTES_FILE" \
-		--prerelease \
-		--latest=false \
+		"${_release_flags[@]}" \
 		"${DMG_PATH}#${DMG_NAME}" \
 		"${ZIP_PATH}#${ZIP_NAME}"
 
-	echo "✅ Pre-release published: https://github.com/rokartur/BetterCmdTab/releases/tag/${BETA_TAG}"
+	echo "✅ Published ${RELEASE_KIND}: https://github.com/rokartur/BetterCmdTab/releases/tag/${RELEASE_TAG}"
 	echo "   Notes archived at: ${RELEASE_NOTES_FILE}"
-	echo "   (Homebrew cask workflow skips pre-releases by design.)"
+	if [[ $is_beta -eq 1 ]]; then
+		echo "   (Homebrew cask workflow skips pre-releases by design.)"
+	else
+		echo "   Confirm the Homebrew cask picked up ${RELEASE_TAG}."
+	fi
 fi
 
 # Cleanup transient artifacts.
@@ -920,8 +951,8 @@ echo ""
 echo "  Next steps:"
 if [[ $is_beta -eq 1 ]]; then
 	if [[ $auto_release -eq 1 ]]; then
-		echo "  ✅ Pre-release ${BETA_TAG} already published."
-		echo "     https://github.com/rokartur/BetterCmdTab/releases/tag/${BETA_TAG}"
+		echo "  ✅ Pre-release ${RELEASE_TAG} already published."
+		echo "     https://github.com/rokartur/BetterCmdTab/releases/tag/${RELEASE_TAG}"
 	else
 		echo "  Run this to publish the pre-release:"
 		echo ""
@@ -936,10 +967,22 @@ if [[ $is_beta -eq 1 ]]; then
 		echo "  Or re-run with --auto-release next time."
 	fi
 	echo "  Note: Homebrew cask workflow skips pre-releases by design."
+elif [[ $auto_release -eq 1 ]]; then
+	echo "  ✅ Release ${RELEASE_TAG} already published."
+	echo "     https://github.com/rokartur/BetterCmdTab/releases/tag/${RELEASE_TAG}"
+	echo "  Homebrew cask auto-updates via .github/workflows/update-homebrew-cask.yml"
 else
-	echo "  1. Create a release on GitHub with tag ${VERSION}"
-	echo "  2. Upload ${DMG_NAME} and ${ZIP_NAME}"
-	echo "  3. Make sure it's the 'Latest release' (not pre-release)"
+	echo "  Run this to publish the release:"
+	echo ""
+	echo "    gh release create ${RELEASE_TAG} \\"
+	echo "      --repo rokartur/BetterCmdTab \\"
+	echo "      --title \"${RELEASE_TITLE}\" \\"
+	echo "      --notes-file notes.md \\"
+	echo "      --latest \\"
+	echo "      \"${DMG_PATH}#${DMG_NAME}\" \\"
+	echo "      \"${ZIP_PATH}#${ZIP_NAME}\""
+	echo ""
+	echo "  Or re-run with --auto-release next time."
 	echo "  Homebrew cask auto-updates via .github/workflows/update-homebrew-cask.yml"
 fi
 echo ""

@@ -24,11 +24,13 @@ jobs:
       PINNED_PUBLIC_KEY: EdGQwfRFT04hggloIRmN2twIC/UIlM6yoAAzZ97jgcI=
     steps:
       - name: Select Xcode 16 (Swift 6 toolchain)
-        # BetterUpdater's Package.swift declares swift-tools-version 6.0;
-        # pin the toolchain so `swift build` doesn't fall back to 5.10.
+        # BetterUpdater's Package.swift declares swift-tools-version 6.0, so the
+        # toolchain is pinned to a major rather than tracking the runner image:
+        # a silent Xcode bump here would break `swift build` and publish a
+        # release with assets but no signed manifest for the in-app updater.
         uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
-          xcode-version: latest-stable
+          xcode-version: '16'
 
       - name: Download release assets
         env:
