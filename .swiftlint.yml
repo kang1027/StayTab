@@ -1,0 +1,29 @@
+# Goal: a clean run on a clean tree, so anything SwiftLint prints is a real finding.
+# Rules that only ever fire on code we write this way on purpose are off, reason inline.
+
+included:
+  - BetterCmdTab
+  - BetterCmdTabTests
+
+excluded:
+  - build
+  - web
+  - docs
+
+disabled_rules:
+  - trailing_comma # multi-line literals keep the trailing comma: one-line diffs when a case is added
+  - force_cast # `as! AXUIElement` after a CFGetTypeID check — CF bridging has no safe form
+  - file_length # AppKit controllers/views are long and linear, not complex
+  - type_body_length
+  - function_body_length
+  - cyclomatic_complexity # flat key/event dispatch switches
+  - function_parameter_count
+  - large_tuple
+  - multiple_closures_with_trailing_closure
+  - statement_position # `if cond { one statement }` / `else { … }` on the next line reads better than a wrapped one-liner
+  - line_length # every line over 200 chars is a String(localized:) copy block, not logic
+
+identifier_name:
+  min_length: 1 # i/x/y/dx in hot-path loops and geometry math
+  excluded:
+    - SQLITE_TRANSIENT # keeps the C constant's name

@@ -1,0 +1,12 @@
+# Nested config: SwiftLint replaces (not merges) a rule's options here, so every
+# rule this file touches is spelled out in full. Tests get shorthand the app doesn't.
+
+disabled_rules:
+  - force_try # `try!` in a test is the assertion — a throw should fail the test loudly
+
+identifier_name:
+  min_length: 1
+  validates_start_with_lowercase: off # window fixtures named after their diagram letter (F, G)
+
+type_name:
+  min_length: 1 # single-letter fixture aliases (M = SwitcherMetrics)
