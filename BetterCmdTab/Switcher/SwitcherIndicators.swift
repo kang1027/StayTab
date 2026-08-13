@@ -1,7 +1,10 @@
 import AppKit
 
-/// Sizing for the round count badge so it stays a fixed-diameter circle (never
-/// a pill, never oversized): the font shrinks to fit longer counts like "134".
+/// Sizing for the count badge in the list and grid layouts: circular at 1–2
+/// digits, widening into a fixed-height pill once the text outgrows the height.
+/// The previews layout sizes its own badge — it keeps a fixed-diameter circle
+/// over the thumbnail and shrinks the font instead — and shares only
+/// `centeredTextFrame` from here.
 @MainActor
 enum BadgeText {
     /// Size of a count badge: a circle (width == height) for short counts that

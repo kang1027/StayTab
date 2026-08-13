@@ -485,8 +485,7 @@ final class SwitcherPreviewItemView: NSView, SwitcherItemViewProtocol {
                 let by = round(rowMidY - badgeSize / 2)
                 badgePill.frame = NSRect(x: bx, y: by, width: badgeSize, height: badgeSize)
                 badgePill.layer?.cornerRadius = badgeSize / 2
-                let lineH = ceil(badgeFont.ascender - badgeFont.descender)
-                badgeLabel.frame = NSRect(x: 0, y: round((badgeSize - lineH) / 2), width: badgeSize, height: lineH)
+                badgeLabel.frame = BadgeText.centeredTextFrame(width: badgeSize, height: badgeSize, font: badgeFont)
             }
         }
 
