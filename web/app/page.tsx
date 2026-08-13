@@ -993,7 +993,7 @@ const configPresets: Array<{ id: string; label: string; blurb: string; json: str
 const docsLinks: Array<[string, string, string]> = [
   ["quick start", "Install, permissions, your first switch", "/"],
   ["config file", "How the live two-way sync works", "/configuration/"],
-  ["config reference", "All 85 keys, with types and defaults", "/config-reference/"],
+  ["config reference", "Every key, with types and defaults", "/config-reference/"],
   ["per-shortcut overrides", "A different switcher on every hotkey", "/overrides/"],
 ];
 

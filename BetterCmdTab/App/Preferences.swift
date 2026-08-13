@@ -1471,10 +1471,11 @@ final class Preferences: ObservableObject {
         }
     }
 
-    /// Tab drill-in: pressing `\` on a row whose window has a tab group reveals
-    /// a horizontal tab strip beneath the switcher so a specific tab can be
-    /// picked. Native AX `AXTabs` for Finder/Terminal/…; AppleScript for
-    /// Safari/Chromium. Default on (graduated out of Experimental).
+    /// Tab drill-in: pressing the drill key on a row whose window has a tab group
+    /// reveals a horizontal tab strip beneath the switcher so a specific tab can
+    /// be picked. The key is the `.panelTabDrill` binding — `\` by default,
+    /// rebindable per shortcut target. Native AX `AXTabs` for Finder/Terminal/…;
+    /// AppleScript for Safari/Chromium. Default on.
     @Published var tabDrillEnabled: Bool {
         didSet {
             guard oldValue != tabDrillEnabled else { return }

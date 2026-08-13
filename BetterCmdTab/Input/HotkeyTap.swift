@@ -1279,8 +1279,8 @@ final class HotkeyTap: @unchecked Sendable {
                 // user is switching away from.
                 let special = specialKeys.withLock { $0 }
                 // Drill-in trigger. The controller no-ops if the highlighted row
-                // has no tab group or the experimental pref is off, so this is
-                // safe to always emit.
+                // has no tab group or tab drill-in is off, so this is safe to
+                // always emit.
                 if keyCode == special.tabDrill {
                     deliver(.enterTabDrill); return nil
                 }
