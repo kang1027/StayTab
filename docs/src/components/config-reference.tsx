@@ -1,3 +1,5 @@
+import { useTranslations } from 'next-intl';
+
 import {
   configSections,
   objectKey,
@@ -5,7 +7,6 @@ import {
   type ConfigKey,
   type SchemaFragment,
 } from '@/lib/config-reference';
-import { useTranslations } from 'next-intl';
 
 /** `50…150`, an exact item count, or nothing when the type is unconstrained. */
 function constraint(
@@ -97,9 +98,7 @@ export function ConfigReference() {
     <>
       {configSections().map((section) => (
         <section key={section.title}>
-          <h2 id={sectionSlug(section.title)}>
-            {t(`sections.${section.translationKey}.title`)}
-          </h2>
+          <h2 id={sectionSlug(section.title)}>{t(`sections.${section.translationKey}.title`)}</h2>
           <p>{t(`sections.${section.translationKey}.blurb`)}</p>
           <table>
             <thead>
@@ -165,11 +164,7 @@ export function ConfigObject({ name }: { name: string }) {
                 ) : null}
               </td>
               <td className="align-top whitespace-nowrap">
-                <Type
-                  fragment={properties[field]}
-                  anyLabel={anyLabel}
-                  exactItems={exactItems}
-                />
+                <Type fragment={properties[field]} anyLabel={anyLabel} exactItems={exactItems} />
               </td>
               <td className="align-top">
                 {properties[field].description}

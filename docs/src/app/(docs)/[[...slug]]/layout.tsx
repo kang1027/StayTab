@@ -1,12 +1,14 @@
-import { DocsProvider } from '@/components/docs-provider';
-import { baseOptions } from '@/lib/layout.shared';
-import { resolveLocalePath } from '@/lib/i18n';
-import { appName, docsBasePath, siteUrl } from '@/lib/shared';
-import { source } from '@/lib/source';
 import { DocsLayout } from 'fumadocs-ui/layouts/docs';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
+
+import { DocsProvider } from '@/components/docs-provider';
+import { resolveLocalePath } from '@/lib/i18n';
+import { baseOptions } from '@/lib/layout.shared';
+import { appName, docsBasePath, siteUrl } from '@/lib/shared';
+import { source } from '@/lib/source';
+
 import '../../global.css';
 
 type Props = {
@@ -49,9 +51,9 @@ export default async function Layout(props: Props) {
     // The root layout lives inside the optional catch-all so the static Polish
     // pages can set the document language without middleware or a duplicate tree.
     <html lang={locale} className="dark" suppressHydrationWarning>
-      <body className="flex flex-col min-h-screen">
+      <body className="flex min-h-screen flex-col">
         <DocsProvider locale={locale}>
-          <DocsLayout tree={source.getPageTree(locale)} {...(await baseOptions(locale))}>
+          <DocsLayout tree={source.getPageTree(locale)} {...await baseOptions(locale)}>
             {props.children}
           </DocsLayout>
         </DocsProvider>

@@ -165,11 +165,15 @@ switch are both disabled. Do not reintroduce a light palette in one place only.
 
 ```bash
 bun run lint
+bun run format:check
 bun run types:check
 bun run build
 ```
 
-All three must pass. `build` is the one that catches unknown icons, unregistered
+All four must pass (`bun run format` fixes the second).
+The formatter skips `content/` and this file: prose is wrapped by hand, and
+oxfmt rewraps paragraphs and aligns table pipes, which buries a one-word edit
+in a whole-paragraph diff and doubles the noise on every en/pl pair. `build` is the one that catches unknown icons, unregistered
 MDX components and broken links into generated anchors.
 
 Worth checking by eye on the built output:

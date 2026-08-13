@@ -1,7 +1,8 @@
-import type { Locale } from '@/lib/i18n';
 import type { TOCItemType } from 'fumadocs-core/toc';
-import schema from '@/data/config-schema.json';
 import { getTranslations } from 'next-intl/server';
+
+import schema from '@/data/config-schema.json';
+import type { Locale } from '@/lib/i18n';
 
 /**
  * The reference tables are built from `src/data/config-schema.json` — a verbatim
@@ -45,7 +46,13 @@ const sections: { title: string; keys: string[] }[] = [
   },
   {
     title: 'Layout',
-    keys: ['layoutMode', 'panelScalePercent', 'listWidthPercent', 'gridMaxColumns', 'gridSingleRow'],
+    keys: [
+      'layoutMode',
+      'panelScalePercent',
+      'listWidthPercent',
+      'gridMaxColumns',
+      'gridSingleRow',
+    ],
   },
   {
     title: 'Appearance',

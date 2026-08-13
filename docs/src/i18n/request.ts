@@ -1,5 +1,7 @@
-import { defaultLocale, isLocale } from '@/lib/i18n';
 import { getRequestConfig } from 'next-intl/server';
+
+import { defaultLocale, isLocale } from '@/lib/i18n';
+
 import english from './messages/en.json';
 import polish from './messages/pl.json';
 

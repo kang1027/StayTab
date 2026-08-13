@@ -1,5 +1,6 @@
-import { i18n } from '@/lib/i18n';
 import { uiTranslations as fumadocsUITranslations, type Translations } from 'fumadocs-ui/i18n';
+
+import { i18n } from '@/lib/i18n';
 
 const polish = {
   displayName: 'Polski',

@@ -1,11 +1,13 @@
-import { getPageImageUrl, source } from '@/lib/source';
-import { notFound } from 'next/navigation';
-import { ImageResponse } from 'next/og';
-import { generate as DefaultImage } from 'fumadocs-ui/og';
-import { appName } from '@/lib/shared';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+
+import { generate as DefaultImage } from 'fumadocs-ui/og';
+import { notFound } from 'next/navigation';
+import { ImageResponse } from 'next/og';
+
 import { resolveLocalePath } from '@/lib/i18n';
+import { appName } from '@/lib/shared';
+import { getPageImageUrl, source } from '@/lib/source';
 
 export const revalidate = false;
 // Static export already prerenders only generateStaticParams(); pinning this

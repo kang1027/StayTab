@@ -1,5 +1,6 @@
-import { canonicalizeLLMLinks, source } from '@/lib/source';
 import { llms } from 'fumadocs-core/source';
+
+import { canonicalizeLLMLinks, source } from '@/lib/source';
 
 export const revalidate = false;
 

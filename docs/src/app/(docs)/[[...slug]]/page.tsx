@@ -1,11 +1,4 @@
 import {
-  getPageAlternates,
-  getPageImageUrl,
-  getPageMarkdownUrl,
-  getPageUrl,
-  source,
-} from '@/lib/source';
-import {
   DocsBody,
   DocsDescription,
   DocsPage,
@@ -13,14 +6,22 @@ import {
   MarkdownCopyButton,
   ViewOptionsPopover,
 } from 'fumadocs-ui/layouts/docs/page';
-import { notFound } from 'next/navigation';
-import { getMDXComponents } from '@/components/mdx';
-import type { Metadata } from 'next';
 import { createRelativeLink } from 'fumadocs-ui/mdx';
-import { gitConfig } from '@/lib/shared';
+import type { Metadata } from 'next';
+import { setRequestLocale } from 'next-intl/server';
+import { notFound } from 'next/navigation';
+
+import { getMDXComponents } from '@/components/mdx';
 import { configReferenceToc } from '@/lib/config-reference';
 import { defaultLocale, localizedSegments, resolveLocalePath } from '@/lib/i18n';
-import { setRequestLocale } from 'next-intl/server';
+import { gitConfig } from '@/lib/shared';
+import {
+  getPageAlternates,
+  getPageImageUrl,
+  getPageMarkdownUrl,
+  getPageUrl,
+  source,
+} from '@/lib/source';
 
 /** Page whose ToC is generated rather than extracted from MDX headings. */
 const CONFIG_REFERENCE_SLUG = 'config-reference';
@@ -51,7 +52,7 @@ export default async function Page(props: Props) {
     <DocsPage toc={toc} full={page.data.full}>
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription className="mb-0">{page.data.description}</DocsDescription>
-      <div className="flex flex-row gap-2 items-center border-b pb-6">
+      <div className="flex flex-row items-center gap-2 border-b pb-6">
         <MarkdownCopyButton markdownUrl={markdownUrl} />
         <ViewOptionsPopover
           markdownUrl={markdownUrl}

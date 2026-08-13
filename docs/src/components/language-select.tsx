@@ -1,15 +1,11 @@
 'use client';
 
+import { buttonVariants } from 'fumadocs-ui/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from 'fumadocs-ui/components/ui/popover';
+import { useI18n } from 'fumadocs-ui/contexts/i18n';
+import type { LanguageSelectProps } from 'fumadocs-ui/layouts/shared/slots/language-select';
 import { Search } from 'lucide-react';
 import { useState } from 'react';
-import { useI18n } from 'fumadocs-ui/contexts/i18n';
-import { buttonVariants } from 'fumadocs-ui/components/ui/button';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from 'fumadocs-ui/components/ui/popover';
-import type { LanguageSelectProps } from 'fumadocs-ui/layouts/shared/slots/language-select';
 
 const labels = {
   en: {
@@ -50,12 +46,7 @@ export function SearchableLanguageSelect({
       <PopoverTrigger
         aria-label={copy.choose}
         className={({ open }) =>
-          [
-            buttonVariants({ variant }),
-            'gap-1.5 p-1.5',
-            open && 'bg-fd-accent',
-            className,
-          ]
+          [buttonVariants({ variant }), 'gap-1.5 p-1.5', open && 'bg-fd-accent', className]
             .filter(Boolean)
             .join(' ')
         }

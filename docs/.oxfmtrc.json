@@ -1,0 +1,9 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "singleQuote": true,
+  "sortImports": true,
+  "sortTailwindcss": {
+    "stylesheet": "src/app/global.css"
+  },
+  "ignorePatterns": ["content", "*.md", "src/data", ".source", "out"]
+}

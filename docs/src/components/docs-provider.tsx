@@ -1,11 +1,12 @@
 'use client';
 
-import { defaultLocale, isLocale, type Locale } from '@/lib/i18n';
-import { docsBasePath } from '@/lib/shared';
-import { uiTranslations } from '@/lib/ui-translations';
 import { i18nProvider } from 'fumadocs-ui/i18n';
 import { RootProvider } from 'fumadocs-ui/provider/next';
 import type { ReactNode } from 'react';
+
+import { defaultLocale, isLocale, type Locale } from '@/lib/i18n';
+import { docsBasePath } from '@/lib/shared';
+import { uiTranslations } from '@/lib/ui-translations';
 
 export function DocsProvider({ locale, children }: { locale: Locale; children: ReactNode }) {
   function changeLocale(nextLocale: string) {

@@ -1,6 +1,7 @@
-import { getLLMText, getPageMarkdownUrl, source } from '@/lib/source';
 import { notFound } from 'next/navigation';
+
 import { resolveLocalePath } from '@/lib/i18n';
+import { getLLMText, getPageMarkdownUrl, source } from '@/lib/source';
 
 export const revalidate = false;
 

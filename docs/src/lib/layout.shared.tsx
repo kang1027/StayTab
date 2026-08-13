@@ -1,9 +1,11 @@
-import { SearchableLanguageSelect } from '@/components/language-select';
-import { defaultLocale, type Locale } from '@/lib/i18n';
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
 import { LanguageSelectText } from 'fumadocs-ui/layouts/shared/slots/language-select';
 import { Download, Globe } from 'lucide-react';
 import { getTranslations } from 'next-intl/server';
+
+import { SearchableLanguageSelect } from '@/components/language-select';
+import { defaultLocale, type Locale } from '@/lib/i18n';
+
 import { appName, gitConfig, homeUrl, docsBasePath } from './shared';
 
 export async function baseOptions(locale: Locale): Promise<BaseLayoutProps> {
