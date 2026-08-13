@@ -55,9 +55,13 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
 
     // Search
     private let letterHintsSwitch = NSSwitch()
+    /// Kept so `viewWillAppear` can re-render the subtitle after a rebind.
+    private var letterHintsRow: SettingsRowView?
     private let letterTimeoutSlider = NSSlider()
     private let letterTimeoutValueField = NSTextField()
     private let fuzzySwitch = NSSwitch()
+    /// Kept so `viewWillAppear` can re-render the subtitle after a rebind.
+    private var fuzzyRow: SettingsRowView?
     private let rankResultsSwitch = NSSwitch()
     private let launcherSwitch = NSSwitch()
     private let searchTabsSwitch = NSSwitch()
@@ -256,8 +260,8 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
         // Search section — type-to-filter behavior.
         let search = addSection(title: String(localized: "Search"), anchor: SettingsAnchor.search)
         configureSwitch(letterHintsSwitch, action: #selector(toggleLetterHints(_:)))
-        addRow(to: search, title: String(localized: "Letter hints"),
-               subtitle: String(localized: "Show a letter on each window and jump to it by typing that letter. Turn it off to start typing and filter the list instead, without pressing / — bound action keys like ⌘W or ⌘Q still act on the highlighted window; press / first to type those letters."),
+        letterHintsRow = addRow(to: search, title: String(localized: "Letter hints"),
+               subtitle: Self.letterHintsSubtitle(),
                accessory: letterHintsSwitch, searchItemID: SearchID.letterHints)
 
         let letterTimeoutTitle = String(localized: "Letter chain timeout")
@@ -284,8 +288,8 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
                accessory: letterTimeoutStack, searchItemID: SearchID.letterChainTimeout)
 
         configureSwitch(fuzzySwitch, action: #selector(toggleFuzzy(_:)))
-        addRow(to: search, title: String(localized: "Type-to-filter search"),
-               subtitle: String(localized: "Press / in the switcher to filter by app or window name."),
+        fuzzyRow = addRow(to: search, title: String(localized: "Type-to-filter search"),
+               subtitle: Self.fuzzySubtitle(),
                accessory: fuzzySwitch, searchItemID: SearchID.fuzzy)
         configureSwitch(rankResultsSwitch, action: #selector(toggleRankResults(_:)))
         addRow(to: search, title: String(localized: "Rank search"),
@@ -430,6 +434,8 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
         syncBrowserTabRows()
         instantSpaceRowSwitch.state = prefs.instantSpaceSwitch ? .on : .off
         letterHintsSwitch.state = prefs.letterHintsEnabled ? .on : .off
+        letterHintsRow?.update(subtitle: Self.letterHintsSubtitle())
+        fuzzyRow?.update(subtitle: Self.fuzzySubtitle())
         applyLetterTimeout(prefs.letterChainTimeoutMs)
         letterTimeoutSlider.isEnabled = prefs.letterHintsEnabled
         letterTimeoutValueField.isEnabled = prefs.letterHintsEnabled
@@ -576,6 +582,22 @@ final class BehaviorSettingsViewController: SettingsTabViewController {
 
     /// Names the bound chord so the copy survives a rebind. Every profile has its
     /// own binding but this row is global, so it shows the ⌘Tab one.
+    /// The Open search key is rebindable, so name the live binding rather than
+    /// the `⌘/` default. Same per-profile caveat as `tabDrillSubtitle()`.
+    private static func searchChord() -> String {
+        BetterShortcuts.getShortcut(for: .panelSearch(for: SwitchTarget.switchApps.storageKey))?.description
+            ?? String(localized: "the Open search key")
+    }
+
+    private static func fuzzySubtitle() -> String {
+        String(localized: "Press \(searchChord()) in the switcher to filter by app or window name.")
+    }
+
+    private static func letterHintsSubtitle() -> String {
+        let chord = searchChord()
+        return String(localized: "Show a letter on each window and jump to it by typing that letter. Turn it off to start typing and filter the list instead, without pressing \(chord) — bound action keys like ⌘W or ⌘Q still act on the highlighted window; press \(chord) first to type those letters.")
+    }
+
     private static func tabDrillSubtitle() -> String {
         let chord = BetterShortcuts.getShortcut(for: .panelTabDrill(for: SwitchTarget.switchApps.storageKey))?.description
             ?? String(localized: "the Peek tabs key")
