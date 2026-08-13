@@ -44,7 +44,7 @@ final class CarbonHotkeyTrigger {
         // Carbon stores an unretained pointer to this instance in its event
         // handler. Normal shutdown uninstalls explicitly; this backstop makes a
         // controller teardown safe even when it bypasses that path.
-        MainActor.assumeIsolated { uninstall() }
+        tearDownOnMainActor { uninstall() }
     }
 
     /// Bumped on every `update(_:)` so a queued retry from a superseded call

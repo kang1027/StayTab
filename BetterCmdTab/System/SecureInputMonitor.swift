@@ -48,7 +48,7 @@ final class SecureInputMonitor {
         // The run loop retains its timers even though the callback holds self
         // weakly. Invalidate so a monitor released without `stop()` leaves no
         // orphan wakeup behind.
-        MainActor.assumeIsolated { stop() }
+        tearDownOnMainActor { stop() }
     }
 
     private func poll() {

@@ -65,7 +65,7 @@ final class AccessibilityWaiter {
     }
 
     nonisolated deinit {
-        MainActor.assumeIsolated { stop() }
+        tearDownOnMainActor { stop() }
     }
 
     private func poll() {

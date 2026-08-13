@@ -84,7 +84,7 @@ final class HoldModifierMonitor {
     }
 
     nonisolated deinit {
-        MainActor.assumeIsolated { stop() }
+        tearDownOnMainActor { stop() }
     }
 
     private func currentlyHeld() -> Bool {

@@ -59,7 +59,7 @@ final class WindowMRUTracker {
     }
 
     nonisolated deinit {
-        MainActor.assumeIsolated { stop() }
+        tearDownOnMainActor { stop() }
     }
 
     func bump(pid: pid_t, wid: CGWindowID) {

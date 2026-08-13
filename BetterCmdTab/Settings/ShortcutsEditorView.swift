@@ -48,7 +48,7 @@ final class ShortcutsEditorView: NSView {
     required init?(coder: NSCoder) { fatalError("init(coder:) not implemented") }
 
     nonisolated deinit {
-        MainActor.assumeIsolated {
+        tearDownOnMainActor {
             if let shortcutChangeObserver {
                 NotificationCenter.default.removeObserver(shortcutChangeObserver)
             }

@@ -274,7 +274,7 @@ final class DockBadgeObserver {
     nonisolated deinit {
         // Backstop — the owner brackets lifetime, so this normally runs already
         // torn down. Mirrors AppCatalogCache.deinit.
-        MainActor.assumeIsolated {
+        tearDownOnMainActor {
             if let observer {
                 for sub in subscriptions {
                     _ = AXObserverRemoveNotification(observer, sub.element, sub.name as CFString)

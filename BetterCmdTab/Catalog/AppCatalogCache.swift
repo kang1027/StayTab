@@ -786,7 +786,7 @@ final class AppCatalogCache {
     }
 
     nonisolated deinit {
-        MainActor.assumeIsolated {
+        tearDownOnMainActor {
             let nc = NSWorkspace.shared.notificationCenter
             for observer in observers { nc.removeObserver(observer) }
             for (_, observer) in axObservers {

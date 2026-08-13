@@ -1831,7 +1831,7 @@ final class SwitcherController: SwitcherViewDelegate {
     }
 
     nonisolated deinit {
-        MainActor.assumeIsolated { shutdown() }
+        tearDownOnMainActor { shutdown() }
     }
 
     /// User-invoked recovery (Privacy pane "Restore macOS keyboard shortcuts").

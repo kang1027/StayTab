@@ -30,7 +30,7 @@ final class MRUTracker {
     private var termObservers: [NSObjectProtocol] = []
 
     nonisolated deinit {
-        MainActor.assumeIsolated { stop() }
+        tearDownOnMainActor { stop() }
     }
 
     private func seedFromCurrent() {

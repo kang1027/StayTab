@@ -45,7 +45,7 @@ final class BrowserTabFocusObserver {
     init(tracker: BrowserTabMRUTracker) { self.tracker = tracker }
 
     nonisolated deinit {
-        MainActor.assumeIsolated {
+        tearDownOnMainActor {
             if enabled { stop() }
         }
     }

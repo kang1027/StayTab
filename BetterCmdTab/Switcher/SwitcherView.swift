@@ -172,7 +172,7 @@ final class SwitcherView: NSView {
     private var livePreviewTimer: Timer?
 
     nonisolated deinit {
-        MainActor.assumeIsolated { stopLivePreviewTimer() }
+        tearDownOnMainActor { stopLivePreviewTimer() }
     }
 
     private var highlightPrefix: String = ""

@@ -121,7 +121,7 @@ final class SwipeTrigger {
     }
 
     nonisolated deinit {
-        MainActor.assumeIsolated { uninstall() }
+        tearDownOnMainActor { uninstall() }
     }
 
     /// Called on the main actor from the contact callback once a swipe is
