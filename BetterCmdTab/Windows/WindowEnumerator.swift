@@ -106,17 +106,16 @@ enum WindowEnumerator {
     /// element id space. With CG hint + early-exit the scan typically stops
     /// well before this cap.
     private static let bruteForceLimit: UInt64 = 1024
-    /// Consecutive brute-scan ids allowed past the last newly-accepted window
-    /// before giving up. Guards the case where the CG hint contains a window id
-    /// the AX API can never resolve to an element (layer-0 composited overlays
-    /// etc.): the `isSubset` early-exit can then never fire, so without this
-    /// bound the loop probes all 1024 ids — each a ~0.025s AX IPC, up to ~25s
-    /// pinning a core, on every refresh/bump for that pid. AX ids for one app's
-    /// windows cluster tightly, so 256 is far above any real inter-window gap;
-    /// the budget only counts the *trailing* run after the last accept and
-    /// resets on every hit, so sparse-but-valid (and late-allocated fullscreen)
-    /// ids are never cut off — only an unbounded unresolvable tail is.
-    private static let bruteForceStaleBudget: UInt64 = 256
+    /// Wall-clock cap on the brute-force scan. Guards the case where the CG hint
+    /// contains a window id the AX API can never resolve to an element (layer-0
+    /// composited overlays etc.): the `isSubset` early-exit can then never fire,
+    /// so without this bound the loop probes all 1024 ids — each up to a 0.025s
+    /// AX IPC, seconds of a pinned core, on every refresh/bump for that pid.
+    /// Time is the honest bound because only *resolvable* ids cost an IPC: an
+    /// unused id returns nil instantly, so a sparse id space is cheap to sweep
+    /// in full (a 6-tab Ghostty spanning ids 57…623 scans all 1024 in ~20ms).
+    /// An id-gap budget cut those sparse-but-valid windows off instead.
+    private static let bruteForceTimeBudget: TimeInterval = 0.25
     private static let preFilterTimeout: Float = 0.025
     private static let confirmedTimeout: Float = 0.2
 
@@ -372,11 +371,7 @@ enum WindowEnumerator {
                 kAXStandardWindowSubrole as String,
                 kAXDialogSubrole as String,
             ]
-            // `axId` of the last iteration that produced a newly-accepted
-            // window; `nil` until the first accept so the stale-budget break
-            // never fires before any window is found (the rare all-unresolvable
-            // CG hint then still falls back to the full `bruteForceLimit` scan).
-            var lastAcceptedAxId: UInt64?
+            let deadline = ProcessInfo.processInfo.systemUptime + bruteForceTimeBudget
             for axId: UInt64 in 0..<bruteForceLimit {
                 // Early exit once every *coverable* CG-hint window is found.
                 // Known-uncoverable wids are excluded so a memoized unresolvable
@@ -386,12 +381,10 @@ enum WindowEnumerator {
                    expectedCGWindowIDs.subtracting(knownUncoverable).isSubset(of: seenByWid) {
                     break
                 }
-                // Wasted-work bound: once we have accepted at least one window
-                // but have run a full budget of ids past it with nothing new,
-                // the remaining ids are almost certainly unresolvable (an
-                // unresolvable CG id keeps `isSubset` from ever completing).
-                if let last = lastAcceptedAxId, axId - last > bruteForceStaleBudget {
-                    Log.switcher.debug("brute AX scan: stopping at id \(axId) for pid \(pid) — \(bruteForceStaleBudget) ids past last accept (\(seenByWid.count) found, CG hint not fully covered)")
+                // Wasted-work bound: an unresolvable CG id keeps `isSubset` from
+                // ever completing, so cap the sweep by the time it actually costs.
+                if ProcessInfo.processInfo.systemUptime > deadline {
+                    Log.switcher.debug("brute AX scan: stopping at id \(axId) for pid \(pid) — \(bruteForceTimeBudget)s budget spent (\(seenByWid.count) found, CG hint not fully covered)")
                     break
                 }
                 guard let e = PrivateAPI.axElement(pid: pid, axId: axId) else { continue }
@@ -429,12 +422,7 @@ enum WindowEnumerator {
                     }
                 }
 
-                let before = seenByWid.count
                 appendIfNew(e)
-                // `appendIfNew` grows `seenByWid` only on a genuine accept
-                // (new element, new non-zero wid). Use that as the hit signal
-                // so the stale budget measures the gap since real progress.
-                if seenByWid.count != before { lastAcceptedAxId = axId }
             }
         }
 
