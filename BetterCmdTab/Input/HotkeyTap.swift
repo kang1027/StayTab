@@ -877,7 +877,7 @@ final class HotkeyTap: @unchecked Sendable {
         let special = specialKeys.withLock { $0 }
         var collected: Set<Character> = []
         for keyCode in map.keys + [special.search, special.tabDrill] where keyCode >= 0 {
-            guard let ch = translate(keyCode: UInt16(keyCode)) else { continue }
+            guard let ch = translate(keyCode: keyCode) else { continue }
             let lower = Character(ch.lowercased())
             if lower.isLetter { collected.insert(lower) }
         }
@@ -933,7 +933,13 @@ final class HotkeyTap: @unchecked Sendable {
     /// `shift`/`option` mirror the physically held modifiers, so a chord
     /// resolves to the character it actually types — required for layouts where
     /// `/` or `\` need a modifier (French AZERTY `/` is ⇧:, issue #141).
-    private func translate(keyCode: UInt16, shift: Bool = false, option: Bool = false) -> Character? {
+    /// `keyCode` is taken as the raw `Int64` a CGEvent carries (or a stored
+    /// binding's), not as a `UInt16`: any process holding Accessibility can post
+    /// a synthetic event with an out-of-range keycode, and this runs on the tap
+    /// thread on every keystroke. Narrowing here makes that a `nil` instead of a
+    /// trap that would take the app down mid-⌘Tab.
+    private func translate(keyCode: Int64, shift: Bool = false, option: Bool = false) -> Character? {
+        guard let virtualKey = UInt16(exactly: keyCode) else { return nil }
         let snapshot = layoutData.withLock { $0 }
         guard let data = snapshot else { return nil }
         return data.withUnsafeBytes { raw -> Character? in
@@ -944,7 +950,7 @@ final class HotkeyTap: @unchecked Sendable {
             var actualLen = 0
             let status = UCKeyTranslate(
                 base,
-                keyCode,
+                virtualKey,
                 UInt16(kUCKeyActionDown),
                 Self.carbonModifierKeyState(shift: shift, option: option),
                 UInt32(LMGetKbdType()),
@@ -1207,7 +1213,7 @@ final class HotkeyTap: @unchecked Sendable {
                     deliver(.exitTabDrill); return nil
                 }
                 if drillKey == Self.defaultTabDrillKey,
-                   let ch = translate(keyCode: UInt16(keyCode), shift: shiftHeld, option: optionHeld), ch == "\\" {
+                   let ch = translate(keyCode: keyCode, shift: shiftHeld, option: optionHeld), ch == "\\" {
                     deliver(.exitTabDrill); return nil
                 }
                 // Any other key while drilled is swallowed so it doesn't
@@ -1306,7 +1312,7 @@ final class HotkeyTap: @unchecked Sendable {
                         // and `/`/`\` keep their panel meaning wherever they
                         // live, as long as they are still the bound keys
                         // (issues #141, #169).
-                        if let ch = translate(keyCode: UInt16(keyCode), shift: shiftHeld, option: optionHeld),
+                        if let ch = translate(keyCode: keyCode, shift: shiftHeld, option: optionHeld),
                            let scalar = ch.unicodeScalars.first,
                            scalar.value >= 0x20, scalar.value != 0x7F {
                             if ch == "/", special.search == Self.defaultSearchKey {
@@ -1417,7 +1423,7 @@ final class HotkeyTap: @unchecked Sendable {
                             // branches below, so a keystroke is still translated
                             // at most once.
                             let vimOn = vimNavigationFlag.withLock { $0 }
-                            var typed: Character? = vimOn ? translate(keyCode: UInt16(keyCode)) : nil
+                            var typed: Character? = vimOn ? translate(keyCode: keyCode) : nil
                             if vimOn,
                                Self.onlyTriggerModifiersHeld(
                                    flags,
@@ -1455,7 +1461,7 @@ final class HotkeyTap: @unchecked Sendable {
                             // and the bare-translate check below. Only while the
                             // key is unrebound — see `defaultSearchKey`.
                             if shiftHeld || optionHeld,
-                               let ch = translate(keyCode: UInt16(keyCode), shift: shiftHeld, option: optionHeld) {
+                               let ch = translate(keyCode: keyCode, shift: shiftHeld, option: optionHeld) {
                                 if ch == "/", special.search == Self.defaultSearchKey {
                                     deliver(.toggleSearch); return nil
                                 }
@@ -1472,14 +1478,14 @@ final class HotkeyTap: @unchecked Sendable {
                             // `enterSearch` then sets search mode, after which the
                             // `isSearchingNow()` branch handles all input.
                             if typeToSearchFlag.withLock({ $0 }), !optionHeld, !controlHeld {
-                                if typed == nil { typed = translate(keyCode: UInt16(keyCode)) }
+                                if typed == nil { typed = translate(keyCode: keyCode) }
                                 if let ch = typed,
                                    let lower = Self.typeToSearchLetter(for: ch) {
                                     deliver(.letterInput(lower))
                                     return nil
                                 }
                             }
-                            if let letter = typed ?? translate(keyCode: UInt16(keyCode)) {
+                            if let letter = typed ?? translate(keyCode: keyCode) {
                                 // Layout-agnostic drill-in / search triggers:
                                 // regardless of where `\` and `/` live on the
                                 // physical keyboard (US, Polish, ISO/JIS), any

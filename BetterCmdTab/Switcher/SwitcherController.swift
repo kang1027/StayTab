@@ -2352,11 +2352,11 @@ final class SwitcherController: SwitcherViewDelegate {
         case .letterInputKey(let keyCode):
             // Secure-input Carbon path: resolve the keycode for the current
             // layout, matching the tap's plain letter-jump (lowercased).
-            if let ch = KeyboardLayout.character(for: UInt16(keyCode)) {
+            if let ch = KeyboardLayout.character(for: keyCode) {
                 handleLetter(Character(ch.lowercased()))
             }
         case .searchInputKey(let keyCode):
-            if let ch = KeyboardLayout.character(for: UInt16(keyCode)) {
+            if let ch = KeyboardLayout.character(for: keyCode) {
                 handleSearchInput(ch)
             }
         }

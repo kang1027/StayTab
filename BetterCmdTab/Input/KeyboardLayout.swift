@@ -23,7 +23,14 @@ enum KeyboardLayout {
 
     /// The character that `keyCode` produces with no modifiers on the current
     /// layout, or `nil` if it isn't a producing key (e.g. a pure modifier).
-    static func character(for keyCode: UInt16) -> Character? {
+    ///
+    /// Generic over the integer width because each caller holds a keycode in
+    /// whatever type its source hands over — a `CGKeyCode` from a layout scan, a
+    /// `UInt32` from a Carbon chord. A virtual keycode is a `UInt16`, so a value
+    /// that doesn't fit is not a key and answers `nil` instead of trapping the
+    /// caller on a narrowing conversion.
+    static func character(for keyCode: some BinaryInteger) -> Character? {
+        guard let virtualKey = UInt16(exactly: keyCode) else { return nil }
         ensureLoaded()
         guard let data = layoutData.withLock({ $0 }) else { return nil }
         return data.withUnsafeBytes { raw -> Character? in
@@ -34,7 +41,7 @@ enum KeyboardLayout {
             var actualLen = 0
             let status = UCKeyTranslate(
                 base,
-                keyCode,
+                virtualKey,
                 UInt16(kUCKeyActionDown),
                 0,
                 UInt32(LMGetKbdType()),
