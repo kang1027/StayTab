@@ -8,8 +8,8 @@ import UniformTypeIdentifiers
 final class GeneralSettingsViewController: SettingsTabViewController {
 
     private let launchSwitch = NSSwitch()
-    private let hideMenuBarSwitch = NSSwitch()
-    private let hapticSwitch = NSSwitch()
+    private let hideMenuBarSwitch = PreferenceSwitch(bind: \.hideMenuBarIcon)
+    private let hapticSwitch = PreferenceSwitch(bind: \.hapticOnCommit)
     private let soundPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let betaSwitch = NSSwitch()
     private let intervalPopUp = NSPopUpButton(frame: .zero, pullsDown: false)
@@ -46,7 +46,6 @@ final class GeneralSettingsViewController: SettingsTabViewController {
             searchItemID: SearchID.launchAtLogin
         )
 
-        configureSwitch(hideMenuBarSwitch, action: #selector(toggleHideMenuBarIcon(_:)))
         addRow(
             to: startup,
             title: String(localized: "Hide menu bar icon"),
@@ -57,7 +56,6 @@ final class GeneralSettingsViewController: SettingsTabViewController {
 
         // Feedback section — confirmation cues on commit.
         let feedback = addSection(title: String(localized: "Feedback"), anchor: SettingsAnchor.feedback)
-        configureSwitch(hapticSwitch, action: #selector(toggleHaptic(_:)))
         addRow(
             to: feedback,
             title: String(localized: "Haptic feedback on switch"),
@@ -170,8 +168,8 @@ final class GeneralSettingsViewController: SettingsTabViewController {
         applyLaunchState(LaunchAtLogin.shared.isEnabled)
 
         let prefs = Preferences.shared
-        hideMenuBarSwitch.state = prefs.hideMenuBarIcon ? .on : .off
-        hapticSwitch.state = prefs.hapticOnCommit ? .on : .off
+        hideMenuBarSwitch.sync()
+        hapticSwitch.sync()
         rebuildSoundMenu()
 
         let updater = GitHubUpdater.shared
@@ -194,12 +192,12 @@ final class GeneralSettingsViewController: SettingsTabViewController {
         // this pane (which hosts the Import button) is still on screen.
         prefs.$hideMenuBarIcon
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] in self?.hideMenuBarSwitch.state = $0 ? .on : .off }
+            .sink { [weak self] _ in self?.hideMenuBarSwitch.sync() }
             .store(in: &cancellables)
 
         prefs.$hapticOnCommit
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] in self?.hapticSwitch.state = $0 ? .on : .off }
+            .sink { [weak self] _ in self?.hapticSwitch.sync() }
             .store(in: &cancellables)
 
         prefs.$soundOnCommit
@@ -240,14 +238,6 @@ final class GeneralSettingsViewController: SettingsTabViewController {
         let idx = sender.indexOfSelectedItem
         guard updateCadences.indices.contains(idx) else { return }
         GitHubUpdater.shared.setCheckInterval(updateCadences[idx])
-    }
-
-    @objc private func toggleHideMenuBarIcon(_ sender: NSSwitch) {
-        Preferences.shared.hideMenuBarIcon = (sender.state == .on)
-    }
-
-    @objc private func toggleHaptic(_ sender: NSSwitch) {
-        Preferences.shared.hapticOnCommit = (sender.state == .on)
     }
 
     @objc private func changeSound(_ sender: NSPopUpButton) {

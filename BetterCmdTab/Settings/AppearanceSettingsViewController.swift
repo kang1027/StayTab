@@ -20,17 +20,17 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
     private let scaleValueField = NSTextField()
     private let fontSizePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let fontFacePopup = NSPopUpButton(frame: .zero, pullsDown: false)
-    private let gridSingleRowSwitch = NSSwitch()
-    private let livePreviewSwitch = NSSwitch()
-    private let windowTitleSwitch = NSSwitch()
-    private let appNamesSwitch = NSSwitch()
-    private let statusIconsSwitch = NSSwitch()
-    private let boldSelectedSwitch = NSSwitch()
+    private let gridSingleRowSwitch = PreferenceSwitch(bind: \.gridSingleRow)
+    private let livePreviewSwitch = PreferenceSwitch(bind: \.livePreviews)
+    private let windowTitleSwitch = PreferenceSwitch(bind: \.showWindowTitleLabel)
+    private let appNamesSwitch = PreferenceSwitch(bind: \.showApplicationNames)
+    private let statusIconsSwitch = PreferenceSwitch(bind: \.showWindowStatusIcons)
+    private let boldSelectedSwitch = PreferenceSwitch(bind: \.boldSelectedLabel)
     private let opacitySlider = NSSlider()
     private let opacityValueField = NSTextField()
     private let radiusSlider = NSSlider()
     private let radiusValueLabel = NSTextField(labelWithString: "")
-    private let animationsSwitch = NSSwitch()
+    private let animationsSwitch = PreferenceSwitch(bind: \.animationsEnabled)
     private let previewButton = NSButton()
 
     private var cancellables = Set<AnyCancellable>()
@@ -116,7 +116,6 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
                subtitle: String(localized: "Applies to the Grid and Previews layouts."),
                accessory: gridPopup, searchItemID: SearchID.gridColumns)
 
-        configureSwitch(gridSingleRowSwitch, action: #selector(toggleGridSingleRow(_:)))
         addRow(to: layout, title: String(localized: "Single row"),
                subtitle: String(localized: "Shrink the icons to keep every window on one line instead of starting a second row."),
                accessory: gridSingleRowSwitch, searchItemID: SearchID.gridSingleRow)
@@ -134,7 +133,6 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
                subtitle: String(localized: "Typeface for names and titles."),
                accessory: fontFacePopup, searchItemID: SearchID.fontFace)
 
-        configureSwitch(windowTitleSwitch, action: #selector(toggleWindowTitle(_:)))
         addRow(to: labels, title: String(localized: "Show window title"),
                subtitle: String(localized: "Show each window's title under the icon in the Grid and Previews layouts."),
                accessory: windowTitleSwitch, searchItemID: SearchID.windowTitle)
@@ -149,17 +147,14 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
                subtitle: String(localized: "Which part of a long title is shortened with an ellipsis."),
                accessory: truncationRadio, searchItemID: SearchID.titleTruncation)
 
-        configureSwitch(boldSelectedSwitch, action: #selector(toggleBoldSelected(_:)))
         addRow(to: labels, title: String(localized: "Bold selected title"),
                subtitle: String(localized: "Make the highlighted item's title bold in the Grid and Previews layouts. Off only brightens it."),
                accessory: boldSelectedSwitch, searchItemID: SearchID.boldSelected)
 
-        configureSwitch(appNamesSwitch, action: #selector(toggleApplicationNames(_:)))
         addRow(to: labels, title: String(localized: "Show application names"),
                subtitle: String(localized: "Hide the app name in every layout; identify apps by their icon."),
                accessory: appNamesSwitch, searchItemID: SearchID.applicationNames)
 
-        configureSwitch(statusIconsSwitch, action: #selector(toggleStatusIcons(_:)))
         addRow(to: labels, title: String(localized: "Show status icons"),
                subtitle: String(localized: "Mark hidden, minimized, full-screen and windowless entries with a small glyph. The audio, Launch and Reopen cues always show."),
                accessory: statusIconsSwitch, searchItemID: SearchID.windowStatusIcons)
@@ -203,12 +198,10 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
                subtitle: String(localized: "Rounding of the panel's corners. Automatic follows the panel size; Square turns rounding off."),
                accessory: radiusStack, searchItemID: SearchID.cornerRadius)
 
-        configureSwitch(animationsSwitch, action: #selector(toggleAnimations(_:)))
         addRow(to: panel, title: String(localized: "Animations"),
                subtitle: String(localized: "Panel, tiles and tab strip glide between states. Off, or macOS Reduce Motion, switches instantly."),
                accessory: animationsSwitch, searchItemID: SearchID.animations)
 
-        configureSwitch(livePreviewSwitch, action: #selector(toggleLivePreviews(_:)))
         // Live refresh rides on the macOS 14 ScreenCaptureKit still-image API;
         // on macOS 13 the toggle would be inert, so say why it is unavailable.
         let liveAvailable = if #available(macOS 14.0, *) { true } else { false }
@@ -335,15 +328,15 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
             .store(in: &cancellables)
         prefs.$gridSingleRow
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] in self?.gridSingleRowSwitch.state = $0 ? .on : .off }
+            .sink { [weak self] _ in self?.gridSingleRowSwitch.sync() }
             .store(in: &cancellables)
         prefs.$livePreviews
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] in self?.livePreviewSwitch.state = $0 ? .on : .off }
+            .sink { [weak self] _ in self?.livePreviewSwitch.sync() }
             .store(in: &cancellables)
         prefs.$showWindowTitleLabel
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] in self?.windowTitleSwitch.state = $0 ? .on : .off }
+            .sink { [weak self] _ in self?.windowTitleSwitch.sync() }
             .store(in: &cancellables)
         prefs.$previewTitleAlignment
             .receive(on: DispatchQueue.main)
@@ -363,15 +356,15 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
             .store(in: &cancellables)
         prefs.$boldSelectedLabel
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] in self?.boldSelectedSwitch.state = $0 ? .on : .off }
+            .sink { [weak self] _ in self?.boldSelectedSwitch.sync() }
             .store(in: &cancellables)
         prefs.$showApplicationNames
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] in self?.appNamesSwitch.state = $0 ? .on : .off }
+            .sink { [weak self] _ in self?.appNamesSwitch.sync() }
             .store(in: &cancellables)
         prefs.$showWindowStatusIcons
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] in self?.statusIconsSwitch.state = $0 ? .on : .off }
+            .sink { [weak self] _ in self?.statusIconsSwitch.sync() }
             .store(in: &cancellables)
         prefs.$panelOpacity
             .receive(on: DispatchQueue.main)
@@ -383,7 +376,7 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
             .store(in: &cancellables)
         prefs.$animationsEnabled
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] in self?.animationsSwitch.state = $0 ? .on : .off }
+            .sink { [weak self] _ in self?.animationsSwitch.sync() }
             .store(in: &cancellables)
         prefs.objectWillChange
             .sink { [weak self] in self?.schedulePreviewRefresh() }
@@ -405,18 +398,18 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
         applyScale(prefs.panelScalePercent)
         selectAppearance(prefs.panelAppearance)
         selectGrid(prefs.gridMaxColumns)
-        gridSingleRowSwitch.state = prefs.gridSingleRow ? .on : .off
-        livePreviewSwitch.state = prefs.livePreviews ? .on : .off
+        gridSingleRowSwitch.sync()
+        livePreviewSwitch.sync()
         applyListWidth(prefs.listWidthPercent)
-        windowTitleSwitch.state = prefs.showWindowTitleLabel ? .on : .off
+        windowTitleSwitch.sync()
         selectTitleAlignment(prefs.previewTitleAlignment)
         selectTruncationMode(prefs.titleTruncationMode)
         selectFontScale(prefs.fontScale)
         selectFontFace(prefs.fontFace)
-        boldSelectedSwitch.state = prefs.boldSelectedLabel ? .on : .off
-        appNamesSwitch.state = prefs.showApplicationNames ? .on : .off
-        statusIconsSwitch.state = prefs.showWindowStatusIcons ? .on : .off
-        animationsSwitch.state = prefs.animationsEnabled ? .on : .off
+        boldSelectedSwitch.sync()
+        appNamesSwitch.sync()
+        statusIconsSwitch.sync()
+        animationsSwitch.sync()
         applyOpacity(prefs.panelOpacity)
         applyRadius(prefs.panelCornerRadius)
     }
@@ -494,38 +487,10 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
         applyScale(clamped)
     }
 
-    @objc private func toggleGridSingleRow(_ sender: NSSwitch) {
-        Preferences.shared.gridSingleRow = (sender.state == .on)
-    }
-
     @objc private func displayModeChanged() {
         let idx = displayMonitorPopup.indexOfSelectedItem
         guard displayModes.indices.contains(idx) else { return }
         Preferences.shared.switcherDisplayMode = displayModes[idx]
-    }
-
-    @objc private func toggleLivePreviews(_ sender: NSSwitch) {
-        Preferences.shared.livePreviews = (sender.state == .on)
-    }
-
-    @objc private func toggleWindowTitle(_ sender: NSSwitch) {
-        Preferences.shared.showWindowTitleLabel = (sender.state == .on)
-    }
-
-    @objc private func toggleApplicationNames(_ sender: NSSwitch) {
-        Preferences.shared.showApplicationNames = (sender.state == .on)
-    }
-
-    @objc private func toggleStatusIcons(_ sender: NSSwitch) {
-        Preferences.shared.showWindowStatusIcons = (sender.state == .on)
-    }
-
-    @objc private func toggleAnimations(_ sender: NSSwitch) {
-        Preferences.shared.animationsEnabled = (sender.state == .on)
-    }
-
-    @objc private func toggleBoldSelected(_ sender: NSSwitch) {
-        Preferences.shared.boldSelectedLabel = (sender.state == .on)
     }
 
     private func selectTitleAlignment(_ alignment: PreviewTitleAlignment) {

@@ -113,3 +113,39 @@ extension SettingsTabViewController {
         return formatter
     }()
 }
+
+/// A switch wired straight to a `Preferences` flag: it declares which preference
+/// it edits at the point it is created, writes that flag when flipped, and reads
+/// it back on `sync()`.
+///
+/// Most settings toggles do nothing but store a `Bool`, and each one used to cost
+/// a `configureSwitch` call plus a one-line `@objc` trampoline in its pane. Reach
+/// for a plain `NSSwitch` + `configureSwitch(_:action:)` instead when flipping the
+/// toggle has to do more than store the value — prompt for a permission, enable a
+/// dependent row, refresh a list.
+final class PreferenceSwitch: NSSwitch {
+    private let preference: ReferenceWritableKeyPath<Preferences, Bool>
+
+    init(bind preference: ReferenceWritableKeyPath<Preferences, Bool>) {
+        self.preference = preference
+        super.init(frame: .zero)
+        controlSize = .small
+        // Self-targeting: `target` is a weak reference, so this is not a cycle,
+        // and it keeps the binding alive exactly as long as the control itself.
+        target = self
+        action = #selector(flip)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("PreferenceSwitch is code-only") }
+
+    /// Push the stored preference back into the control, for `viewWillAppear` and
+    /// for changes made outside this pane (a profile switch, an import).
+    func sync() {
+        state = Preferences.shared[keyPath: preference] ? .on : .off
+    }
+
+    @objc private func flip() {
+        Preferences.shared[keyPath: preference] = (state == .on)
+    }
+}

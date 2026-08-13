@@ -40,36 +40,36 @@ final class SwitcherPanesViewController: SettingsTabViewController {
     // these decide *which* windows show, which is behavior, not look).
     private let minimizedSwitch = NSSwitch()
     private let hiddenSwitch = NSSwitch()
-    private let sinkHiddenSwitch = NSSwitch()
-    private let sinkMinimizedSwitch = NSSwitch()
+    private let sinkHiddenSwitch = PreferenceSwitch(bind: \.sinkHiddenApps)
+    private let sinkMinimizedSwitch = PreferenceSwitch(bind: \.sinkMinimizedWindows)
     /// Kept so the row can visibly lock (dim + tooltip) while its prerequisite
     /// "Show hidden apps" is off — mirrors `stayOpenQuickTapRow`.
     private var sinkHiddenRow: SettingsRowView?
     /// Same, gated on "Show minimized windows" instead.
     private var sinkMinimizedRow: SettingsRowView?
-    private let windowlessSwitch = NSSwitch()
-    private let applicationsOnlySwitch = NSSwitch()
-    private let badgesSwitch = NSSwitch()
+    private let windowlessSwitch = PreferenceSwitch(bind: \.showWindowlessApps)
+    private let applicationsOnlySwitch = PreferenceSwitch(bind: \.applicationsOnly)
+    private let badgesSwitch = PreferenceSwitch(bind: \.showUnreadBadges)
     private let spaceScopePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let spaceScopes: [SpaceScope] = SpaceScope.allCases
     private let recentlyClosedSwitch = NSSwitch()
     private let recentlyClosedLimitField = NSTextField()
     private let sortOrderPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let sortOrders: [SwitcherSortOrder] = SwitcherSortOrder.allCases
-    private let instantSpaceRowSwitch = NSSwitch()
+    private let instantSpaceRowSwitch = PreferenceSwitch(bind: \.instantSpaceSwitch)
 
-    private let windowDrillSwitch = NSSwitch()
+    private let windowDrillSwitch = PreferenceSwitch(bind: \.windowDrillEnabled)
 
     // Tabs
     private let tabDrillSwitch = NSSwitch()
     /// Kept so `viewWillAppear` can re-render the subtitle after a rebind.
     private var tabDrillRow: SettingsRowView?
-    private let expandTabsSwitch = NSSwitch()
+    private let expandTabsSwitch = PreferenceSwitch(bind: \.expandTabsAsWindows)
     private let expandBrowserTabsSwitch = NSSwitch()
     private let browserTabLimitField = NSTextField()
-    private let browserIconOnTabsSwitch = NSSwitch()
-    private let browserTabMRUSwitch = NSSwitch()
-    private let browserTabPreviewsSwitch = NSSwitch()
+    private let browserIconOnTabsSwitch = PreferenceSwitch(bind: \.showBrowserIconOnTabs)
+    private let browserTabMRUSwitch = PreferenceSwitch(bind: \.browserTabMRU)
+    private let browserTabPreviewsSwitch = PreferenceSwitch(bind: \.browserTabPreviews)
     /// Kept so the row can visibly lock (dim + tooltip) while its prerequisite
     /// "Type-to-filter search" — owned by the Controls pane — is off.
     private var searchTabsRow: SettingsRowView?
@@ -83,37 +83,37 @@ final class SwitcherPanesViewController: SettingsTabViewController {
     private let fuzzySwitch = NSSwitch()
     /// Kept so `viewWillAppear` can re-render the subtitle after a rebind.
     private var fuzzyRow: SettingsRowView?
-    private let rankResultsSwitch = NSSwitch()
-    private let launcherSwitch = NSSwitch()
+    private let rankResultsSwitch = PreferenceSwitch(bind: \.fuzzySearchRankBestMatchFirst)
+    private let launcherSwitch = PreferenceSwitch(bind: \.searchIncludesLaunchableApps)
     private let searchTabsSwitch = NSSwitch()
     private let searchModePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let searchDismissModes: [SearchDismissMode] = SearchDismissMode.allCases
 
     // Keyboard
     private let stayOpenSwitch = NSSwitch()
-    private let stayOpenQuickTapSwitch = NSSwitch()
+    private let stayOpenQuickTapSwitch = PreferenceSwitch(bind: \.stayOpenOnQuickTap)
     /// Kept so the quick-tap row can visibly lock (dim + tooltip) while its
     /// prerequisite "Stay open after releasing the modifier" is off.
     private var stayOpenQuickTapRow: SettingsRowView?
-    private let shiftTapBackSwitch = NSSwitch()
-    private let backtickReverseSwitch = NSSwitch()
-    private let vimNavSwitch = NSSwitch()
+    private let shiftTapBackSwitch = PreferenceSwitch(bind: \.shiftTapStepsBackward)
+    private let backtickReverseSwitch = PreferenceSwitch(bind: \.backtickReversesAppSwitching)
+    private let vimNavSwitch = PreferenceSwitch(bind: \.vimNavigationEnabled)
 
     // Mouse
     private let scrollSwitch = NSSwitch()
-    private let scrollReverseSwitch = NSSwitch()
-    private let clickDismissSwitch = NSSwitch()
-    private let hoverSelectSwitch = NSSwitch()
-    private let clickSelectSwitch = NSSwitch()
+    private let scrollReverseSwitch = PreferenceSwitch(bind: \.scrollReverseDirection)
+    private let clickDismissSwitch = PreferenceSwitch(bind: \.clickOutsideToDismiss)
+    private let hoverSelectSwitch = PreferenceSwitch(bind: \.mouseHoverSelectionEnabled)
+    private let clickSelectSwitch = PreferenceSwitch(bind: \.mouseClickSelectionEnabled)
 
     // Mouse — hover actions
     private let hoverSwitch = NSSwitch()
-    private let hoverCloseSwitch = NSSwitch()
-    private let hoverMinimizeSwitch = NSSwitch()
-    private let hoverMaximizeSwitch = NSSwitch()
-    private let hoverHideSwitch = NSSwitch()
-    private let hoverQuitSwitch = NSSwitch()
-    private let hoverForceQuitSwitch = NSSwitch()
+    private let hoverCloseSwitch = PreferenceSwitch(bind: \.hoverShowClose)
+    private let hoverMinimizeSwitch = PreferenceSwitch(bind: \.hoverShowMinimize)
+    private let hoverMaximizeSwitch = PreferenceSwitch(bind: \.hoverShowMaximize)
+    private let hoverHideSwitch = PreferenceSwitch(bind: \.hoverShowHide)
+    private let hoverQuitSwitch = PreferenceSwitch(bind: \.hoverShowQuit)
+    private let hoverForceQuitSwitch = PreferenceSwitch(bind: \.hoverShowForceQuit)
 
     private var cancellables = Set<AnyCancellable>()
 
@@ -171,27 +171,21 @@ final class SwitcherPanesViewController: SettingsTabViewController {
         configureSwitch(hiddenSwitch, action: #selector(toggleHidden(_:)))
         addRow(to: contents, title: String(localized: "Show hidden apps"), accessory: hiddenSwitch,
                searchItemID: SearchID.showHidden)
-        configureSwitch(sinkHiddenSwitch, action: #selector(toggleSinkHidden(_:)))
         sinkHiddenRow = addRow(to: contents, title: String(localized: "Move hidden apps to the bottom"),
                subtitle: String(localized: "Groups hidden apps at the end of the list. Turn off to leave them in their normal position instead."),
                accessory: sinkHiddenSwitch, searchItemID: SearchID.sinkHiddenApps)
-        configureSwitch(sinkMinimizedSwitch, action: #selector(toggleSinkMinimized(_:)))
         sinkMinimizedRow = addRow(to: contents, title: String(localized: "Move minimized windows to the bottom"),
                subtitle: String(localized: "Groups minimized windows at the end of the list. Turn off to leave them in their most-recently-used position instead."),
                accessory: sinkMinimizedSwitch, searchItemID: SearchID.sinkMinimizedWindows)
-        configureSwitch(windowlessSwitch, action: #selector(toggleWindowless(_:)))
         addRow(to: contents, title: String(localized: "Show apps without windows"),
                subtitle: String(localized: "Running apps with no open windows."),
                accessory: windowlessSwitch, searchItemID: SearchID.showWindowless)
-        configureSwitch(applicationsOnlySwitch, action: #selector(toggleApplicationsOnly(_:)))
         addRow(to: contents, title: String(localized: "Applications only"),
                subtitle: String(localized: "Show one row per app instead of one per window — classic ⌘Tab."),
                accessory: applicationsOnlySwitch, searchItemID: SearchID.applicationsOnly)
-        configureSwitch(windowDrillSwitch, action: #selector(toggleWindowDrill(_:)))
         addRow(to: contents, title: String(localized: "Peek windows with ↓"),
                subtitle: String(localized: "In applications-only mode, press ↓ or \\ on an app with several windows to show its windows in a strip below the switcher and pick one."),
                accessory: windowDrillSwitch, searchItemID: SearchID.windowDrill)
-        configureSwitch(badgesSwitch, action: #selector(toggleBadges(_:)))
         addRow(to: contents, title: String(localized: "Show unread badges"),
                subtitle: String(localized: "Show each app's Dock badge count (e.g. Mail's unread mail) on its row."),
                accessory: badgesSwitch, searchItemID: SearchID.showBadges)
@@ -199,7 +193,6 @@ final class SwitcherPanesViewController: SettingsTabViewController {
         addRow(to: contents, title: String(localized: "Show windows from"),
                subtitle: String(localized: "All Spaces shows everything; Current Space only the Space you're viewing; Visible Spaces what's on screen across all your displays."),
                accessory: spaceScopePopup, searchItemID: SearchID.spaceScope)
-        configureSwitch(instantSpaceRowSwitch, action: #selector(toggleInstantSpace(_:)))
         addRow(to: contents, title: String(localized: "Switch Spaces without animation"),
                subtitle: String(localized: "Picking an app on another Space or in full screen jumps there instantly, with no slide animation. Applies to keyboard switching too."),
                accessory: instantSpaceRowSwitch, searchItemID: SearchID.instantSpace)
@@ -229,7 +222,6 @@ final class SwitcherPanesViewController: SettingsTabViewController {
         tabDrillRow = addRow(to: tabs, title: String(localized: "Peek tabs"),
                              subtitle: Self.tabDrillSubtitle(),
                              accessory: tabDrillSwitch, searchItemID: SearchID.tabDrill)
-        configureSwitch(expandTabsSwitch, action: #selector(toggleExpandTabs(_:)))
         addRow(to: tabs, title: String(localized: "Show tabs as separate entries"),
                subtitle: String(localized: "List each tab of a native-tab window (Finder, Terminal, TextEdit, …) as its own row instead of one collapsed window. Off keeps one row per window — peek its tabs instead."),
                accessory: expandTabsSwitch, searchItemID: SearchID.expandTabs)
@@ -251,15 +243,12 @@ final class SwitcherPanesViewController: SettingsTabViewController {
         addRow(to: tabs, title: browserTabLimitTitle,
                subtitle: String(localized: "At most this many tab entries per browser window (2–16), keeping the active tab visible. Set to 0 to show every tab."),
                accessory: browserTabLimitField, searchItemID: SearchID.browserTabLimit)
-        configureSwitch(browserIconOnTabsSwitch, action: #selector(toggleBrowserIconOnTabs(_:)))
         addRow(to: tabs, title: String(localized: "Show browser icon on tab entries"),
                subtitle: String(localized: "Badge each tab entry's favicon with the source browser's app icon, so you can tell which browser a tab belongs to when the same site is open in more than one."),
                accessory: browserIconOnTabsSwitch, searchItemID: SearchID.browserIconOnTabs)
-        configureSwitch(browserTabMRUSwitch, action: #selector(toggleBrowserTabMRU(_:)))
         addRow(to: tabs, title: String(localized: "Track browser tabs in recency"),
                subtitle: String(localized: "With “Show browser tabs as separate entries” and the “Most recent (windows)” sort order on, ⌘Tab returns to the tab you last used, not just the last window. Needs always-on monitoring of your browsers, so it costs a little energy."),
                accessory: browserTabMRUSwitch, searchItemID: SearchID.browserTabMRU)
-        configureSwitch(browserTabPreviewsSwitch, action: #selector(toggleBrowserTabPreviews(_:)))
         addRow(to: tabs, title: String(localized: "Browser tab previews"),
                subtitle: String(localized: "Capture the active browser tab for the Previews layout. Background tabs use an earlier cached image or their favicon."),
                accessory: browserTabPreviewsSwitch, searchItemID: SearchID.browserTabPreviews)
@@ -296,11 +285,9 @@ final class SwitcherPanesViewController: SettingsTabViewController {
         fuzzyRow = addRow(to: search, title: String(localized: "Type-to-filter search"),
                subtitle: Self.fuzzySubtitle(),
                accessory: fuzzySwitch, searchItemID: SearchID.fuzzy)
-        configureSwitch(rankResultsSwitch, action: #selector(toggleRankResults(_:)))
         addRow(to: search, title: String(localized: "Rank search"),
                subtitle: String(localized: "Order results by how well they match instead of by recent use, so the closest match is selected first."),
                accessory: rankResultsSwitch, searchItemID: SearchID.rankResults)
-        configureSwitch(launcherSwitch, action: #selector(toggleLauncher(_:)))
         addRow(to: search, title: String(localized: "Launch apps from search"),
                subtitle: String(localized: "Also show matching apps that aren't running yet."),
                accessory: launcherSwitch, searchItemID: SearchID.launcher)
@@ -317,19 +304,15 @@ final class SwitcherPanesViewController: SettingsTabViewController {
         addRow(to: keyboard, title: String(localized: "Stay open after releasing the modifier"),
                subtitle: String(localized: "Keep the switcher on screen when you let go of the trigger — pick with Return, a quick-jump letter, or the mouse; Esc dismisses. A quick tap still switches instantly."),
                accessory: stayOpenSwitch, searchItemID: SearchID.stayOpen)
-        configureSwitch(stayOpenQuickTapSwitch, action: #selector(toggleStayOpenQuickTap(_:)))
         stayOpenQuickTapRow = addRow(to: keyboard, title: String(localized: "Also stay open after a quick tap"),
                subtitle: String(localized: "Keep the switcher on screen even when the shortcut is pressed and released in one quick tap — for shortcuts mapped to mouse buttons or gestures. Requires \u{201C}Stay open after releasing the modifier\u{201D}."),
                accessory: stayOpenQuickTapSwitch, searchItemID: SearchID.stayOpenQuickTap)
-        configureSwitch(shiftTapBackSwitch, action: #selector(toggleShiftTapBack(_:)))
         addRow(to: keyboard, title: String(localized: "Tap Shift to step backwards"),
                subtitle: String(localized: "While the switcher is open, a tap of the Shift key steps the selection backwards and holding Shift keeps stepping back until you let go — just like a held Tab. Turn this off to step back only with Shift held as you press the switch key (⌘⇧Tab)."),
                accessory: shiftTapBackSwitch, searchItemID: SearchID.shiftTapBack)
-        configureSwitch(backtickReverseSwitch, action: #selector(toggleBacktickReverse(_:)))
         addRow(to: keyboard, title: String(localized: "Use window-switch shortcut to step backwards"),
                subtitle: String(localized: "While the app switcher is open, press your window-switch shortcut (⌘` by default) to move backwards through apps. Opening the switcher with that shortcut still cycles windows."),
                accessory: backtickReverseSwitch, searchItemID: SearchID.backtickReverse)
-        configureSwitch(vimNavSwitch, action: #selector(toggleVimNavigation(_:)))
         addRow(to: keyboard, title: String(localized: "Vim keys (h j k l)"),
                subtitle: String(localized: "Use h / j / k / l like the arrow keys while the switcher is open. h overrides the Hide binding and j / k / l override letter-jump; search mode still types those letters."),
                accessory: vimNavSwitch, searchItemID: SearchID.vimNavigation)
@@ -344,19 +327,15 @@ final class SwitcherPanesViewController: SettingsTabViewController {
         addRow(to: mouse, title: String(localized: "Switch with mouse scroll"),
                subtitle: String(localized: "Scroll up/down on a mouse wheel to move the selection while the switcher is open. Trackpads use the three-finger swipe instead."),
                accessory: scrollSwitch, searchItemID: SearchID.scroll)
-        configureSwitch(scrollReverseSwitch, action: #selector(toggleScrollReverse(_:)))
         addRow(to: mouse, title: String(localized: "Reverse scroll direction"),
                subtitle: String(localized: "Scroll up to move forward instead of down."),
                accessory: scrollReverseSwitch, searchItemID: SearchID.scrollReverse)
-        configureSwitch(clickDismissSwitch, action: #selector(toggleClickDismiss(_:)))
         addRow(to: mouse, title: String(localized: "Click outside to dismiss"),
                subtitle: String(localized: "Click anywhere outside the switcher to close it, leaving the current window focused."),
                accessory: clickDismissSwitch, searchItemID: SearchID.clickDismiss)
-        configureSwitch(hoverSelectSwitch, action: #selector(toggleHoverSelect(_:)))
         addRow(to: mouse, title: String(localized: "Select window on hover"),
                subtitle: String(localized: "Move the selection to the row your pointer is over. Off keeps the keyboard selection put so the mouse can't change it by accident."),
                accessory: hoverSelectSwitch, searchItemID: SearchID.selectOnHover)
-        configureSwitch(clickSelectSwitch, action: #selector(toggleClickSelect(_:)))
         addRow(to: mouse, title: String(localized: "Select window on click"),
                subtitle: String(localized: "Click a row to switch to that window. Off ignores clicks inside the switcher so the mouse can't pick a window — the tab strip and hover actions still work."),
                accessory: clickSelectSwitch, searchItemID: SearchID.selectOnClick)
@@ -367,17 +346,11 @@ final class SwitcherPanesViewController: SettingsTabViewController {
         addRow(to: hover, title: String(localized: "Action buttons on hover"),
                subtitle: String(localized: "Reveal quick buttons on the row your pointer is over."),
                accessory: hoverSwitch, searchItemID: SearchID.hoverActions)
-        configureSwitch(hoverCloseSwitch, action: #selector(toggleHoverClose(_:)))
         addRow(to: hover, title: String(localized: "Close window"), accessory: hoverCloseSwitch)
-        configureSwitch(hoverMinimizeSwitch, action: #selector(toggleHoverMinimize(_:)))
         addRow(to: hover, title: String(localized: "Minimize window"), accessory: hoverMinimizeSwitch)
-        configureSwitch(hoverMaximizeSwitch, action: #selector(toggleHoverMaximize(_:)))
         addRow(to: hover, title: String(localized: "Zoom window"), accessory: hoverMaximizeSwitch)
-        configureSwitch(hoverHideSwitch, action: #selector(toggleHoverHide(_:)))
         addRow(to: hover, title: String(localized: "Hide app"), accessory: hoverHideSwitch)
-        configureSwitch(hoverQuitSwitch, action: #selector(toggleHoverQuit(_:)))
         addRow(to: hover, title: String(localized: "Quit app"), accessory: hoverQuitSwitch)
-        configureSwitch(hoverForceQuitSwitch, action: #selector(toggleHoverForceQuit(_:)))
         addRow(to: hover, title: String(localized: "Force quit app"),
                subtitle: String(localized: "Sends SIGKILL — for hung apps that ignore Quit. ⌘+⌥+Q always works regardless."),
                accessory: hoverForceQuitSwitch)
@@ -402,16 +375,16 @@ final class SwitcherPanesViewController: SettingsTabViewController {
         applyTitleRefresh(prefs.titleRefreshIntervalMs)
         minimizedSwitch.state = prefs.showMinimizedWindows ? .on : .off
         hiddenSwitch.state = prefs.showHiddenApps ? .on : .off
-        sinkHiddenSwitch.state = prefs.sinkHiddenApps ? .on : .off
-        sinkMinimizedSwitch.state = prefs.sinkMinimizedWindows ? .on : .off
+        sinkHiddenSwitch.sync()
+        sinkMinimizedSwitch.sync()
         syncSinkHiddenRow()
         syncSinkMinimizedRow()
-        windowlessSwitch.state = prefs.showWindowlessApps ? .on : .off
-        applicationsOnlySwitch.state = prefs.applicationsOnly ? .on : .off
-        windowDrillSwitch.state = prefs.windowDrillEnabled ? .on : .off
-        badgesSwitch.state = prefs.showUnreadBadges ? .on : .off
+        windowlessSwitch.sync()
+        applicationsOnlySwitch.sync()
+        windowDrillSwitch.sync()
+        badgesSwitch.sync()
         if let index = spaceScopes.firstIndex(of: prefs.spaceScope) { spaceScopePopup.selectItem(at: index) }
-        instantSpaceRowSwitch.state = prefs.instantSpaceSwitch ? .on : .off
+        instantSpaceRowSwitch.sync()
         selectSortOrder(prefs.sortOrder)
         recentlyClosedSwitch.state = prefs.showRecentlyClosed ? .on : .off
         applyRecentlyClosedLimit(prefs.recentlyClosedLimit)
@@ -454,11 +427,11 @@ final class SwitcherPanesViewController: SettingsTabViewController {
     private func syncControlsPane() {
         let prefs = Preferences.shared
         stayOpenSwitch.state = prefs.stayOpenOnRelease ? .on : .off
-        stayOpenQuickTapSwitch.state = prefs.stayOpenOnQuickTap ? .on : .off
+        stayOpenQuickTapSwitch.sync()
         syncStayOpenQuickTapRow()
-        shiftTapBackSwitch.state = prefs.shiftTapStepsBackward ? .on : .off
-        backtickReverseSwitch.state = prefs.backtickReversesAppSwitching ? .on : .off
-        vimNavSwitch.state = prefs.vimNavigationEnabled ? .on : .off
+        shiftTapBackSwitch.sync()
+        backtickReverseSwitch.sync()
+        vimNavSwitch.sync()
 
         letterHintsSwitch.state = prefs.letterHintsEnabled ? .on : .off
         letterHintsRow?.update(subtitle: Self.letterHintsSubtitle())
@@ -468,24 +441,24 @@ final class SwitcherPanesViewController: SettingsTabViewController {
 
         fuzzySwitch.state = prefs.fuzzySearchEnabled ? .on : .off
         fuzzyRow?.update(subtitle: Self.fuzzySubtitle())
-        rankResultsSwitch.state = prefs.fuzzySearchRankBestMatchFirst ? .on : .off
-        launcherSwitch.state = prefs.searchIncludesLaunchableApps ? .on : .off
+        rankResultsSwitch.sync()
+        launcherSwitch.sync()
         selectSearchMode(prefs.searchDismissMode)
         syncSearchOptionRows()
 
         scrollSwitch.state = prefs.scrollToSwitch ? .on : .off
-        scrollReverseSwitch.state = prefs.scrollReverseDirection ? .on : .off
+        scrollReverseSwitch.sync()
         scrollReverseSwitch.isEnabled = prefs.scrollToSwitch
-        clickDismissSwitch.state = prefs.clickOutsideToDismiss ? .on : .off
-        hoverSelectSwitch.state = prefs.mouseHoverSelectionEnabled ? .on : .off
-        clickSelectSwitch.state = prefs.mouseClickSelectionEnabled ? .on : .off
+        clickDismissSwitch.sync()
+        hoverSelectSwitch.sync()
+        clickSelectSwitch.sync()
         hoverSwitch.state = prefs.hoverActionsEnabled ? .on : .off
-        hoverCloseSwitch.state = prefs.hoverShowClose ? .on : .off
-        hoverMinimizeSwitch.state = prefs.hoverShowMinimize ? .on : .off
-        hoverMaximizeSwitch.state = prefs.hoverShowMaximize ? .on : .off
-        hoverHideSwitch.state = prefs.hoverShowHide ? .on : .off
-        hoverQuitSwitch.state = prefs.hoverShowQuit ? .on : .off
-        hoverForceQuitSwitch.state = prefs.hoverShowForceQuit ? .on : .off
+        hoverCloseSwitch.sync()
+        hoverMinimizeSwitch.sync()
+        hoverMaximizeSwitch.sync()
+        hoverHideSwitch.sync()
+        hoverQuitSwitch.sync()
+        hoverForceQuitSwitch.sync()
         setHoverSubOptionsEnabled(prefs.hoverActionsEnabled)
 
         prefs.$searchDismissMode
@@ -510,12 +483,12 @@ final class SwitcherPanesViewController: SettingsTabViewController {
         let prefs = Preferences.shared
         tabDrillSwitch.state = prefs.tabDrillEnabled ? .on : .off
         tabDrillRow?.update(subtitle: Self.tabDrillSubtitle())
-        expandTabsSwitch.state = prefs.expandTabsAsWindows ? .on : .off
+        expandTabsSwitch.sync()
         expandBrowserTabsSwitch.state = prefs.expandBrowserTabsAsWindows ? .on : .off
         applyBrowserTabLimit(prefs.browserTabRowLimit)
-        browserIconOnTabsSwitch.state = prefs.showBrowserIconOnTabs ? .on : .off
-        browserTabMRUSwitch.state = prefs.browserTabMRU ? .on : .off
-        browserTabPreviewsSwitch.state = prefs.browserTabPreviews ? .on : .off
+        browserIconOnTabsSwitch.sync()
+        browserTabMRUSwitch.sync()
+        browserTabPreviewsSwitch.sync()
         searchTabsSwitch.state = prefs.searchExpandsBrowserTabs ? .on : .off
         syncBrowserTabRows()
 
@@ -538,7 +511,7 @@ final class SwitcherPanesViewController: SettingsTabViewController {
             .store(in: &cancellables)
         prefs.$browserTabPreviews
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] in self?.browserTabPreviewsSwitch.state = $0 ? .on : .off }
+            .sink { [weak self] _ in self?.browserTabPreviewsSwitch.sync() }
             .store(in: &cancellables)
     }
 
@@ -623,10 +596,6 @@ final class SwitcherPanesViewController: SettingsTabViewController {
         if on { BrowserTabs.requestPermissionForRunningBrowsers() }
     }
 
-    @objc private func toggleExpandTabs(_ sender: NSSwitch) {
-        Preferences.shared.expandTabsAsWindows = (sender.state == .on)
-    }
-
     @objc private func toggleExpandBrowserTabs(_ sender: NSSwitch) {
         let on = (sender.state == .on)
         Preferences.shared.expandBrowserTabsAsWindows = on
@@ -651,22 +620,6 @@ final class SwitcherPanesViewController: SettingsTabViewController {
         if browserTabLimitField.stringValue != text {
             browserTabLimitField.stringValue = text
         }
-    }
-
-    @objc private func toggleBrowserIconOnTabs(_ sender: NSSwitch) {
-        Preferences.shared.showBrowserIconOnTabs = (sender.state == .on)
-    }
-
-    @objc private func toggleBrowserTabMRU(_ sender: NSSwitch) {
-        Preferences.shared.browserTabMRU = (sender.state == .on)
-    }
-
-    @objc private func toggleBrowserTabPreviews(_ sender: NSSwitch) {
-        Preferences.shared.browserTabPreviews = (sender.state == .on)
-    }
-
-    @objc private func toggleInstantSpace(_ sender: NSSwitch) {
-        Preferences.shared.instantSpaceSwitch = (sender.state == .on)
     }
 
     @objc private func toggleLetterHints(_ sender: NSSwitch) {
@@ -716,14 +669,6 @@ final class SwitcherPanesViewController: SettingsTabViewController {
         searchModePopup.isEnabled = on
     }
 
-    @objc private func toggleRankResults(_ sender: NSSwitch) {
-        Preferences.shared.fuzzySearchRankBestMatchFirst = (sender.state == .on)
-    }
-
-    @objc private func toggleLauncher(_ sender: NSSwitch) {
-        Preferences.shared.searchIncludesLaunchableApps = (sender.state == .on)
-    }
-
     @objc private func toggleSearchExpandsTabs(_ sender: NSSwitch) {
         let on = (sender.state == .on)
         Preferences.shared.searchExpandsBrowserTabs = on
@@ -745,72 +690,16 @@ final class SwitcherPanesViewController: SettingsTabViewController {
                 hint: String(localized: "Turn on \u{201C}Stay open after releasing the modifier\u{201D} above first."))
     }
 
-    @objc private func toggleStayOpenQuickTap(_ sender: NSSwitch) {
-        Preferences.shared.stayOpenOnQuickTap = (sender.state == .on)
-    }
-
-    @objc private func toggleShiftTapBack(_ sender: NSSwitch) {
-        Preferences.shared.shiftTapStepsBackward = (sender.state == .on)
-    }
-
-    @objc private func toggleBacktickReverse(_ sender: NSSwitch) {
-        Preferences.shared.backtickReversesAppSwitching = (sender.state == .on)
-    }
-
     @objc private func toggleScroll(_ sender: NSSwitch) {
         let on = (sender.state == .on)
         Preferences.shared.scrollToSwitch = on
         scrollReverseSwitch.isEnabled = on
     }
 
-    @objc private func toggleScrollReverse(_ sender: NSSwitch) {
-        Preferences.shared.scrollReverseDirection = (sender.state == .on)
-    }
-
-    @objc private func toggleClickDismiss(_ sender: NSSwitch) {
-        Preferences.shared.clickOutsideToDismiss = (sender.state == .on)
-    }
-
-    @objc private func toggleVimNavigation(_ sender: NSSwitch) {
-        Preferences.shared.vimNavigationEnabled = (sender.state == .on)
-    }
-
-    @objc private func toggleHoverSelect(_ sender: NSSwitch) {
-        Preferences.shared.mouseHoverSelectionEnabled = (sender.state == .on)
-    }
-
-    @objc private func toggleClickSelect(_ sender: NSSwitch) {
-        Preferences.shared.mouseClickSelectionEnabled = (sender.state == .on)
-    }
-
     @objc private func toggleHover(_ sender: NSSwitch) {
         let on = (sender.state == .on)
         Preferences.shared.hoverActionsEnabled = on
         setHoverSubOptionsEnabled(on)
-    }
-
-    @objc private func toggleHoverClose(_ sender: NSSwitch) {
-        Preferences.shared.hoverShowClose = (sender.state == .on)
-    }
-
-    @objc private func toggleHoverMinimize(_ sender: NSSwitch) {
-        Preferences.shared.hoverShowMinimize = (sender.state == .on)
-    }
-
-    @objc private func toggleHoverMaximize(_ sender: NSSwitch) {
-        Preferences.shared.hoverShowMaximize = (sender.state == .on)
-    }
-
-    @objc private func toggleHoverHide(_ sender: NSSwitch) {
-        Preferences.shared.hoverShowHide = (sender.state == .on)
-    }
-
-    @objc private func toggleHoverQuit(_ sender: NSSwitch) {
-        Preferences.shared.hoverShowQuit = (sender.state == .on)
-    }
-
-    @objc private func toggleHoverForceQuit(_ sender: NSSwitch) {
-        Preferences.shared.hoverShowForceQuit = (sender.state == .on)
     }
 
     /// The per-button toggles only matter while hover actions are enabled.
@@ -885,30 +774,6 @@ final class SwitcherPanesViewController: SettingsTabViewController {
         control.isEnabled = unlocked
         row?.alphaValue = unlocked ? 1 : 0.45
         row?.toolTip = unlocked ? nil : hint
-    }
-
-    @objc private func toggleSinkHidden(_ sender: NSSwitch) {
-        Preferences.shared.sinkHiddenApps = (sender.state == .on)
-    }
-
-    @objc private func toggleSinkMinimized(_ sender: NSSwitch) {
-        Preferences.shared.sinkMinimizedWindows = (sender.state == .on)
-    }
-
-    @objc private func toggleWindowless(_ sender: NSSwitch) {
-        Preferences.shared.showWindowlessApps = (sender.state == .on)
-    }
-
-    @objc private func toggleApplicationsOnly(_ sender: NSSwitch) {
-        Preferences.shared.applicationsOnly = (sender.state == .on)
-    }
-
-    @objc private func toggleWindowDrill(_ sender: NSSwitch) {
-        Preferences.shared.windowDrillEnabled = (sender.state == .on)
-    }
-
-    @objc private func toggleBadges(_ sender: NSSwitch) {
-        Preferences.shared.showUnreadBadges = (sender.state == .on)
     }
 
     @objc private func spaceScopeChanged() {

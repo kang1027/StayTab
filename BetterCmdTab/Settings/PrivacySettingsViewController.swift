@@ -5,7 +5,7 @@ import BetterSettings
 @MainActor
 final class PrivacySettingsViewController: SettingsTabViewController {
 
-    private let hideFromScreenSharingSwitch = NSSwitch()
+    private let hideFromScreenSharingSwitch = PreferenceSwitch(bind: \.hideFromScreenSharing)
 
     private let permissionIcon = NSImageView()
     private let permissionButton = NSButton(title: "", target: nil, action: nil)
@@ -58,7 +58,6 @@ final class PrivacySettingsViewController: SettingsTabViewController {
         // Screen-sharing section — hide the switcher panel from screen recording
         // / sharing capture (Zoom, Meet, Teams, QuickTime, ScreenCaptureKit).
         let sharing = addSection(title: String(localized: "Screen sharing"), anchor: SettingsAnchor.screenSharing)
-        configureSwitch(hideFromScreenSharingSwitch, action: #selector(toggleHideFromScreenSharing(_:)))
         addRow(
             to: sharing,
             title: String(localized: "Don't look at my windows"),
@@ -98,7 +97,7 @@ final class PrivacySettingsViewController: SettingsTabViewController {
     override func viewWillAppear() {
         super.viewWillAppear()
 
-        hideFromScreenSharingSwitch.state = Preferences.shared.hideFromScreenSharing ? .on : .off
+        hideFromScreenSharingSwitch.sync()
 
         // Reactive accessibility status via BetterPermissions: yields the current value
         // immediately, then every change (TCC notification / app activation / adaptive
@@ -139,10 +138,6 @@ final class PrivacySettingsViewController: SettingsTabViewController {
     override func prepareForMemoryRelease() {
         cancelObservations()
         super.prepareForMemoryRelease()
-    }
-
-    @objc private func toggleHideFromScreenSharing(_ sender: NSSwitch) {
-        Preferences.shared.hideFromScreenSharing = (sender.state == .on)
     }
 
     @objc private func grantAccess() {

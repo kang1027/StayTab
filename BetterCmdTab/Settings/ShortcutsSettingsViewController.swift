@@ -14,14 +14,14 @@ final class ShortcutsSettingsViewController: SettingsTabViewController {
     private var directButtons: [NSButton] = []
     private var directSlotSheet: AppsPickerSheetWindowController?
 
-    private let cycleWidthsSwitch = NSSwitch()
+    private let cycleWidthsSwitch = PreferenceSwitch(bind: \.cycleTileWidths)
 
     // Trackpad swipe (experimental).
     private let swipeSwitch = NSSwitch()
     private let swipeModePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let swipeModes: [SwipeMode] = SwipeMode.allCases
-    private let reverseSwitch = NSSwitch()
-    private let commitSwitch = NSSwitch()
+    private let reverseSwitch = PreferenceSwitch(bind: \.swipeReverseDirection)
+    private let commitSwitch = PreferenceSwitch(bind: \.swipeCommitOnRelease)
     private let sensitivitySlider = NSSlider()
     private let sensitivityValueLabel = NSTextField(labelWithString: "")
 
@@ -75,7 +75,6 @@ final class ShortcutsSettingsViewController: SettingsTabViewController {
         for (name, title) in BetterShortcuts.Name.windowMgmt {
             addRow(to: arrange, title: title, accessory: BetterShortcuts.RecorderCocoa(for: name, policy: .reservedRejecting))
         }
-        configureSwitch(cycleWidthsSwitch, action: #selector(toggleCycleWidths(_:)))
         addRow(
             to: arrange,
             title: String(localized: "Cycle tile widths"),
@@ -136,11 +135,9 @@ final class ShortcutsSettingsViewController: SettingsTabViewController {
                subtitle: String(localized: "Open switcher: scrub through apps (commit with Return/click, Esc to cancel). Switch Spaces: jump to the Space on that side, one per step. Quick switch: flip to your last app, like a quick ⌘Tab tap — swipe again to flip back."),
                accessory: swipeModePopup, searchItemID: SearchID.swipeMode)
 
-        configureSwitch(reverseSwitch, action: #selector(toggleReverse(_:)))
         addRow(to: swipe, title: String(localized: "Reverse swipe direction"),
                subtitle: String(localized: "Slide right to move left and left to move right."),
                accessory: reverseSwitch, searchItemID: SearchID.reverseSwipe)
-        configureSwitch(commitSwitch, action: #selector(toggleCommit(_:)))
         addRow(to: swipe, title: String(localized: "Switch on release"),
                subtitle: String(localized: "Lift your fingers to switch to the highlighted app. When off, pick with a click or Return."),
                accessory: commitSwitch, searchItemID: SearchID.switchOnRelease)
@@ -182,13 +179,13 @@ final class ShortcutsSettingsViewController: SettingsTabViewController {
     override func viewWillAppear() {
         super.viewWillAppear()
         refreshDirectSlots()
-        cycleWidthsSwitch.state = Preferences.shared.cycleTileWidths ? .on : .off
+        cycleWidthsSwitch.sync()
 
         let prefs = Preferences.shared
         swipeSwitch.state = prefs.experimentalSwipeTrigger ? .on : .off
         if let index = swipeModes.firstIndex(of: prefs.swipeMode) { swipeModePopup.selectItem(at: index) }
-        reverseSwitch.state = prefs.swipeReverseDirection ? .on : .off
-        commitSwitch.state = prefs.swipeCommitOnRelease ? .on : .off
+        reverseSwitch.sync()
+        commitSwitch.sync()
         applySensitivity(prefs.swipeSensitivity)
         setSwipeSubOptionsEnabled(prefs.experimentalSwipeTrigger)
         // Another pane (e.g. Import settings) can rewrite the list while this
@@ -196,10 +193,6 @@ final class ShortcutsSettingsViewController: SettingsTabViewController {
         excludedHideAppsRow?.update(
             subtitle: Self.excludedHideDescription(Preferences.shared.hideAllExcludedBundleIDs.count)
         )
-    }
-
-    @objc private func toggleCycleWidths(_ sender: NSSwitch) {
-        Preferences.shared.cycleTileWidths = (sender.state == .on)
     }
 
     /// Subtitle for the "Keep apps visible" row: explains the empty state, else
@@ -294,14 +287,6 @@ final class ShortcutsSettingsViewController: SettingsTabViewController {
         guard swipeModes.indices.contains(idx) else { return }
         Preferences.shared.swipeMode = swipeModes[idx]
         setSwipeSubOptionsEnabled(Preferences.shared.experimentalSwipeTrigger)
-    }
-
-    @objc private func toggleReverse(_ sender: NSSwitch) {
-        Preferences.shared.swipeReverseDirection = (sender.state == .on)
-    }
-
-    @objc private func toggleCommit(_ sender: NSSwitch) {
-        Preferences.shared.swipeCommitOnRelease = (sender.state == .on)
     }
 
     @objc private func sensitivityChanged(_ sender: NSSlider) {
