@@ -3,12 +3,12 @@
   Source of web/public/og.jpeg (1200x630 Open Graph / ads image).
   Not part of the Next build - web/og/ is outside public/, so it never ships.
 
-  It is the homepage hero, scaled up: same left-aligned stack, same mono type,
-  same tokens as web/app/globals.css (bg #0a0a0a, text #ededed, dim #8a8a8a,
-  muted #6b6b6b, line #222, accent #3b82f6). Keep the two in sync - if the hero
-  headline or subtitle changes, change it here and re-render.
+  The product itself, no copy: the three switcher layouts from
+  web/public/screenshots/ on the site background (#0a0a0a), each cropped to its
+  panel. If those screenshots are re-shot, re-check the crop offsets below and
+  re-render.
 
-  Render (any Chromium; renders at 2x, then downscale so the mono text stays crisp):
+  Render (any Chromium; renders at 2x, then downscale so the panel text stays crisp):
 
     /Applications/Helium.app/Contents/MacOS/Helium --headless --disable-gpu \
       --force-device-scale-factor=2 --window-size=1200,630 \
@@ -37,99 +37,59 @@
   body {
     display: flex;
     flex-direction: column;
-    padding: 76px 88px 72px;
-    font-family: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Monaco, monospace;
-    color: #ededed;
-    -webkit-font-smoothing: antialiased;
-  }
-
-  /* The hero block sits optically centred; only the footer is pinned. */
-  .hero {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
     justify-content: center;
+    gap: 18px;
+    padding: 32px;
   }
 
-  .wordmark {
+  .row {
     display: flex;
-    align-items: center;
-    gap: 11px;
+    gap: 18px;
   }
 
-  .wordmark img {
-    width: 34px;
-    height: 34px;
-    border-radius: 9px;
+  /* Each card crops one 2000x1043 screenshot down to its switcher panel. The
+     image is oversized and pulled up/left by the crop origin, all in percentages
+     of the card so the layout stays resolution-independent. */
+  .card {
+    position: relative;
+    flex: 1;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 10px;
   }
 
-  .wordmark span {
-    font-size: 19px;
-    letter-spacing: 0.02em;
-    color: #6b6b6b;
+  .card img {
+    position: absolute;
   }
 
-  h1 {
-    margin-top: 34px;
-    font-size: 62px;
-    font-weight: 600;
-    line-height: 1.18;
-    letter-spacing: -0.02em;
+  /* previews: crop 1860x580 at (70, 231) */
+  .previews {
+    aspect-ratio: 1860 / 580;
   }
 
-  h1 .accent {
-    color: #3b82f6;
+  .previews img {
+    width: 107.527%;
+    left: -3.763%;
+    top: -39.828%;
   }
 
-  /* The hero caret, frozen on (it blinks on the site, an image can't). */
-  h1 .caret {
-    display: inline-block;
-    width: 16px;
-    height: 0.9em;
-    margin-left: 9px;
-    border-radius: 2px;
-    background: #3b82f6;
-    vertical-align: -0.06em;
+  /* grid & list: crop 1330x460 at (335, 291) */
+  .half {
+    aspect-ratio: 1330 / 460;
   }
 
-  p {
-    margin-top: 28px;
-    max-width: 44ch;
-    font-size: 23px;
-    line-height: 1.5;
-    color: #6b6b6b;
-  }
-
-  .foot {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 18px;
-    color: #8a8a8a;
-  }
-
-  .foot .site {
-    color: #ededed;
-  }
-
-  .foot .sep {
-    color: #222;
+  .half img {
+    width: 150.376%;
+    left: -25.188%;
+    top: -63.261%;
   }
 </style>
 
-<div class="hero">
-  <div class="wordmark">
-    <img src="../public/icon-56.png" alt="" />
-    <span>BetterCmdTab</span>
-  </div>
-
-  <h1>The <span class="accent">Cmd+Tab</span> macOS deserves.<span class="caret"></span></h1>
-
-  <p>A fast, native window switcher and app launcher. Free forever, zero telemetry, no subscription.</p>
+<div class="card previews">
+  <img src="../public/screenshots/preview.jpg" alt="" />
 </div>
 
-<div class="foot">
-  <span class="site">bettercmdtab.app</span>
-  <span class="sep">/</span>
-  <span>macOS 13+</span>
+<div class="row">
+  <div class="card half"><img src="../public/screenshots/grid.jpg" alt="" /></div>
+  <div class="card half"><img src="../public/screenshots/list.jpg" alt="" /></div>
 </div>
