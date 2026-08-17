@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "ignorePatterns": [".next", "out"],
-  "plugins": ["react", "typescript", "unicorn", "import", "nextjs"],
+  "ignorePatterns": ["out", ".tanstack", "src/routeTree.gen.ts"],
+  "plugins": ["react", "typescript", "unicorn", "import"],
   "categories": {
     "correctness": "error"
   },

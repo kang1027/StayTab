@@ -1,10 +1,9 @@
-"use client";
-
+import { createFileRoute } from "@tanstack/react-router";
 import { AnimatePresence, LayoutGroup, MotionConfig, motion, useReducedMotion } from "motion/react";
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import snapshot from "../releases.json";
+import snapshot from "../../releases.json";
 import {
   channels,
   FETCH_TIMEOUT,
@@ -15,7 +14,9 @@ import {
   RELEASES_URL,
   type Releases,
   writeCache,
-} from "./releases";
+} from "../releases";
+
+export const Route = createFileRoute("/")({ component: Home });
 
 const REPO = "https://github.com/rokartur/BetterCmdTab";
 
@@ -1203,7 +1204,7 @@ function Docs() {
 
 const downloadFmt = new Intl.NumberFormat("en-US");
 
-export default function Home() {
+function Home() {
   const { stable, beta, totalDownloads } = useReleases();
   const [channel, setChannel] = useState<"stable" | "beta">("stable");
   const sel = channel === "beta" && beta ? beta : stable;

@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "sortImports": true,
-  "sortTailwindcss": { "stylesheet": "app/globals.css" },
-  "ignorePatterns": ["og/og.html"]
+  "sortTailwindcss": { "stylesheet": "src/styles.css" },
+  "ignorePatterns": ["og/og.html", "src/routeTree.gen.ts"]
 }

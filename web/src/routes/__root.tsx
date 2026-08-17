@@ -1,7 +1,7 @@
-import type { Metadata, Viewport } from "next";
+import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
-import "./globals.css";
+import appCss from "../styles.css?url";
 
 const SITE = "https://bettercmdtab.app";
 const TITLE = "BetterCmdTab — a better Cmd+Tab window switcher for macOS";
@@ -13,79 +13,70 @@ const SOCIAL_DESCRIPTION =
   "A fast, native Cmd+Tab replacement for macOS: grid & list app switcher, fuzzy search & launch, and window cycling. Free, open-source, zero telemetry.";
 const IMAGE_ALT = "BetterCmdTab — a native window switcher and app launcher for macOS";
 
-export const metadata: Metadata = {
-  metadataBase: new URL(SITE),
-  title: TITLE,
-  description: DESCRIPTION,
-  applicationName: "BetterCmdTab",
-  authors: [{ name: "rokartur" }],
-  keywords: [
-    "macOS window switcher",
-    "Cmd+Tab replacement",
-    "app switcher macOS",
-    "alt-tab for mac",
-    "macOS app launcher",
-    "AltTab alternative",
-    "BetterCmdTab",
-  ],
-  alternates: {
-    canonical: "/",
-    languages: { en: "/", "x-default": "/" },
+// The homepage is the only route, so every tag below is a constant. Router
+// `head()` emits raw tags, so URLs that Next used to absolutise against
+// `metadataBase` (canonical, og:url, og:image) are spelled out against SITE.
+const meta = [
+  { charSet: "utf-8" },
+  { name: "viewport", content: "width=device-width, initial-scale=1" },
+  { title: TITLE },
+  { name: "description", content: DESCRIPTION },
+  { name: "application-name", content: "BetterCmdTab" },
+  { name: "author", content: "rokartur" },
+  {
+    name: "keywords",
+    content: [
+      "macOS window switcher",
+      "Cmd+Tab replacement",
+      "app switcher macOS",
+      "alt-tab for mac",
+      "macOS app launcher",
+      "AltTab alternative",
+      "BetterCmdTab",
+    ].join(", "),
   },
-  robots: {
-    index: true,
-    follow: true,
-    "max-image-preview": "large",
-    "max-snippet": -1,
-    "max-video-preview": -1,
+  {
+    name: "robots",
+    content: "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
   },
-  formatDetection: { telephone: false },
-  icons: {
-    icon: [
-      { url: "/favicon-32.png", type: "image/png", sizes: "32x32" },
-      { url: "/favicon-16.png", type: "image/png", sizes: "16x16" },
-    ],
-    apple: "/apple-touch-icon.png",
-  },
-  manifest: "/site.webmanifest",
-  appleWebApp: {
-    capable: true,
-    title: "BetterCmdTab",
-    statusBarStyle: "black-translucent",
-  },
-  // Next only emits the modern `mobile-web-app-capable`; keep the legacy
-  // Apple spelling for older iOS Safari.
-  other: { "apple-mobile-web-app-capable": "yes" },
-  openGraph: {
-    type: "website",
-    siteName: "BetterCmdTab",
-    title: TITLE,
-    description: SOCIAL_DESCRIPTION,
-    url: "/",
-    locale: "en_US",
-    images: [
-      {
-        url: "/og.jpeg",
-        secureUrl: `${SITE}/og.jpeg`,
-        type: "image/jpeg",
-        width: 1200,
-        height: 630,
-        alt: IMAGE_ALT,
-      },
-    ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: TITLE,
-    description: SOCIAL_DESCRIPTION,
-    images: [{ url: "/og.jpeg", alt: IMAGE_ALT }],
-  },
-};
+  { name: "format-detection", content: "telephone=no" },
+  { name: "color-scheme", content: "dark" },
+  { name: "theme-color", content: "#0a0a0a" },
+  { name: "mobile-web-app-capable", content: "yes" },
+  // The modern spelling above is what browsers read; keep the legacy Apple
+  // one for older iOS Safari.
+  { name: "apple-mobile-web-app-capable", content: "yes" },
+  { name: "apple-mobile-web-app-title", content: "BetterCmdTab" },
+  { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+  { property: "og:type", content: "website" },
+  { property: "og:site_name", content: "BetterCmdTab" },
+  { property: "og:title", content: TITLE },
+  { property: "og:description", content: SOCIAL_DESCRIPTION },
+  { property: "og:url", content: `${SITE}/` },
+  { property: "og:locale", content: "en_US" },
+  { property: "og:image", content: `${SITE}/og.jpeg` },
+  { property: "og:image:secure_url", content: `${SITE}/og.jpeg` },
+  { property: "og:image:type", content: "image/jpeg" },
+  { property: "og:image:width", content: "1200" },
+  { property: "og:image:height", content: "630" },
+  { property: "og:image:alt", content: IMAGE_ALT },
+  { name: "twitter:card", content: "summary_large_image" },
+  { name: "twitter:title", content: TITLE },
+  { name: "twitter:description", content: SOCIAL_DESCRIPTION },
+  { name: "twitter:image", content: `${SITE}/og.jpeg` },
+  { name: "twitter:image:alt", content: IMAGE_ALT },
+];
 
-export const viewport: Viewport = {
-  colorScheme: "dark",
-  themeColor: "#0a0a0a",
-};
+const links = [
+  { rel: "stylesheet", href: appCss },
+  { rel: "canonical", href: `${SITE}/` },
+  { rel: "alternate", hrefLang: "en", href: `${SITE}/` },
+  { rel: "alternate", hrefLang: "x-default", href: `${SITE}/` },
+  { rel: "icon", href: "/favicon-32.png", type: "image/png", sizes: "32x32" },
+  { rel: "icon", href: "/favicon-16.png", type: "image/png", sizes: "16x16" },
+  { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+  { rel: "manifest", href: "/site.webmanifest" },
+];
 
 // Kept in sync with the on-page FAQ in app/page.tsx. Google restricted FAQ
 // rich results to authoritative government and health sites in 2023, so this
@@ -222,23 +213,51 @@ const jsonLd = {
   ],
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export const Route = createRootRoute({
+  head: () => ({
+    meta,
+    links: [
+      ...links,
+      // LCP is the featured first screenshot, so preload it and let the <img>
+      // mark itself fetchpriority=high; the rest warm up the release lookup
+      // the page fires on mount.
+      { rel: "preload", as: "image", href: "/screenshots/preview.jpg", fetchPriority: "high" },
+      { rel: "preconnect", href: "https://api.github.com", crossOrigin: "" },
+      { rel: "dns-prefetch", href: "https://api.github.com" },
+      { rel: "dns-prefetch", href: "https://objects.githubusercontent.com" },
+    ],
+    scripts: [{ type: "application/ld+json", children: JSON.stringify(jsonLd) }],
+  }),
+  shellComponent: RootDocument,
+  notFoundComponent: NotFound,
+});
+
+// Rendered two ways that have to agree: prerendered into out/client/404.html
+// via the `/404` route (GitHub Pages serves that file for any unknown path),
+// and again by the router once the SPA hydrates on that same unknown path.
+export function NotFound() {
+  return (
+    <main className="mx-auto flex min-h-dvh max-w-[720px] flex-col justify-center gap-3 px-6">
+      <p className="m-0 font-mono text-[13px] text-muted">404</p>
+      <h1 className="m-0 text-[28px] leading-[1.18] font-semibold tracking-[-0.02em]">
+        This page does not exist.
+      </h1>
+      <p className="m-0 text-[15px] text-muted">
+        <a href="/">Back to BetterCmdTab</a> · <a href="/docs/">Documentation</a>
+      </p>
+    </main>
+  );
+}
+
+function RootDocument({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        <HeadContent />
+      </head>
       <body>
-        {/* React hoists these into <head>. LCP is the featured first
-            screenshot, so preload it and let the <img> mark itself
-            fetchpriority=high; the rest warm up the runtime release lookup. */}
-        <link rel="preload" as="image" href="/screenshots/preview.jpg" fetchPriority="high" />
-        <link rel="preconnect" href="https://api.github.com" crossOrigin="" />
-        <link rel="dns-prefetch" href="https://api.github.com" />
-        <link rel="dns-prefetch" href="https://objects.githubusercontent.com" />
-
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
         {children}
+        <Scripts />
       </body>
     </html>
   );

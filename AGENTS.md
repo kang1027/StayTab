@@ -178,8 +178,9 @@ to pick it up). Without that permission the switcher never boots and ⌘Tab does
 
 ## web/ and docs/
 
-The public site, two separate Next.js App Router static exports (React 19, oxlint/oxfmt) that share
-one origin: `web/` is the marketing page at `/`, `docs/` is the Fumadocs site built with
+The public site, two separate static exports (React 19, oxlint/oxfmt) that share one origin:
+`web/` is the marketing page at `/`, built with **TanStack Start** on Vite and prerendered
+(SSR at build time) to `web/out`; `docs/` is the Fumadocs site built with **Next.js** and
 `basePath: '/docs'`. `.github/workflows/deploy-pages.yml` merges the docs export into `web/out/docs`
 and publishes the result to GitHub Pages on `bettercmdtab.app`. Separate from the app; touch them
 only for the site, not app behavior.
@@ -187,11 +188,14 @@ only for the site, not app behavior.
 GitHub Pages serves files and nothing else — no rewrites, no redirects, no custom headers. Anything
 that would be a server rule has to be a property of the built tree instead:
 
-- Both apps set `trailingSlash: true`, so every page is `<slug>/index.html` and the slashed URL is
-  the one that exists. Canonicals, the sitemap and internal links all use that form; the bare form
-  is Pages' own 301, and pointing at it wastes a hop.
+- Every page is `<slug>/index.html` and the slashed URL is the one that exists — `docs/` sets
+  Next's `trailingSlash: true`, `web/` gets it from TanStack Start's prerender, which writes
+  subfolder indexes by default. Canonicals, the sitemap and internal links all use that form;
+  the bare form is Pages' own 301, and pointing at it wastes a hop. The one exception is
+  `web/out/404.html`, prerendered from the `/404` route with `autoSubfolderIndex: false`
+  because Pages only serves that exact filename.
 - `web/public/sitemap.xml` is hand-maintained. CI checks it both ways: every URL resolves to a real
   file, and every `docs/content/docs/*/*.mdx` is listed.
-- Next writes an RSC payload twin (`index.txt`, `__next._full.txt`) beside every page holding that
-  page's whole text. Pages cannot send `X-Robots-Tag`, so `web/public/robots.txt` disallows `*.txt$`
+- Next writes an RSC payload twin (`index.txt`, `__next._full.txt`) beside every docs page holding
+  that page's whole text. Pages cannot send `X-Robots-Tag`, so `web/public/robots.txt` disallows `*.txt$`
   and re-allows the two `llms*.txt` files. Do not relax that without a replacement.

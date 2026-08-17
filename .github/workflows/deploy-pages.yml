@@ -1,8 +1,9 @@
 name: Deploy site to GitHub Pages
 
 # Publishes bettercmdtab.app: the marketing site at / and the docs at /docs.
-# They are two separate Next static exports that share one origin, so the docs
-# export is merged into the marketing one before upload — the same merge the
+# They are two separate static exports — web/ (TanStack Start) and docs/ (Next)
+# — that share one origin, so the docs export is merged into the marketing one
+# before upload — the same merge the
 # `Verify the merged artifact` step in ci-site.yml checks on every PR.
 on:
   push:
