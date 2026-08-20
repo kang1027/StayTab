@@ -136,7 +136,12 @@ final class SwitcherController: SwitcherViewDelegate {
     private var searchExpandedFolded: [(app: String, title: String)] = []
     private var searchExpandedValid = false
     private var rows: [SwitcherRow] = []
-    private var labels: [String] = []
+    private var labels: [String] = [] {
+        didSet {
+            guard oldValue != labels else { return }
+            updateCustomJumpPrefixes()
+        }
+    }
     /// Hint letters to render on tiles — empty when the user disabled letter
     /// hints, so no per-window letter is drawn. The internal `labels` array is
     /// kept populated for search reordering regardless.
@@ -399,8 +404,11 @@ final class SwitcherController: SwitcherViewDelegate {
     /// `nil` until the launch push, so the first push always reaches the tap even
     /// when every key resolves to "cleared".
     private var lastSpecialPanelKeys: HotkeyTap.SpecialPanelKeys?
-    /// Layout-aware Carbon keycodes for the first character of active custom
-    /// two-key app jumps. Recomputed only when pins, mappings, or layout change.
+    /// Live first characters that belong to a multi-key jump. Automatic prefixes
+    /// are included while the panel is visible, so FI can beat a control bound to
+    /// F just like an explicit MA mapping beats Minimize on M.
+    private var jumpPrefixes = Set<Character>()
+    /// Layout-aware Carbon keycodes for the same live prefixes.
     private var customJumpPrefixKeyCodes = Set<UInt32>()
 
     /// Signatures of windows the user just closed locally. Any cache refresh
@@ -1364,15 +1372,25 @@ final class SwitcherController: SwitcherViewDelegate {
         return specs
     }
 
-    /// Push the explicit two-key prefix snapshot to both input paths. The tap
-    /// needs characters for live arbitration; the Secure Event Input survivor
-    /// needs layout-aware keycodes for Carbon chord precedence.
+    /// Push the current multi-key prefix snapshot to both input paths. While the
+    /// panel is visible the rendered labels are authoritative (including Auto);
+    /// outside it, keep the persisted custom snapshot warm for the next open.
     private func updateCustomJumpPrefixes() {
-        let prefixes = RowLabels.customChainPrefixes(
-            customLetters: Preferences.shared.appJumpLetters,
-            allowedBundleIDs: Set(Preferences.shared.pinnedBundleIDs),
-            reserved: RowLabels.reserved
-        )
+        let prefixes: Set<Character>
+        if phase == .visible {
+            prefixes = Set(labels.compactMap { label in
+                guard label.count > 1 else { return nil }
+                return label.first
+            })
+        } else {
+            prefixes = RowLabels.customChainPrefixes(
+                customLetters: Preferences.shared.appJumpLetters,
+                allowedBundleIDs: Set(Preferences.shared.pinnedBundleIDs),
+                reserved: RowLabels.reserved
+            )
+        }
+        guard prefixes != jumpPrefixes else { return }
+        jumpPrefixes = prefixes
         hotkey.setCustomJumpPrefixes(prefixes)
         let keyCodes = KeyboardLayout.keyCodes(for: prefixes)
         guard keyCodes != customJumpPrefixKeyCodes else { return }
@@ -2018,6 +2036,10 @@ final class SwitcherController: SwitcherViewDelegate {
             // action keys + letter-jump on this so a panel-less `.primed` never
             // swallows ⌘W/⌘Q/etc. from the focused app (issue #16).
             hotkey.setPanelPresented(newValue.presentsPanel)
+            // `labels` are prepared before the visible edge. Refresh here so
+            // automatic multi-key prefixes take ownership of any control key
+            // from the first frame the panel accepts input.
+            updateCustomJumpPrefixes()
             // Liveness ceiling on `.primed` (see `primedWatchdog`). Arm on entry,
             // tear down on every other edge — `reveal()` → `.visible` and any
             // commit/cancel → `.idle` both pass through here, so the normal fast
@@ -2513,13 +2535,22 @@ final class SwitcherController: SwitcherViewDelegate {
 
     private func scheduleLetterBufferReset() {
         letterBufferTimer?.invalidate()
+        let pendingSequence = letterBuffer
         let timer = Timer(timeInterval: letterChainTimeout, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated {
-                // Timeout elapsed: drop the prefix AND restore the pre-typing
-                // display — `resetLetterBuffer` clears the buffer and refreshes,
-                // so the highlight disappears and the rows return to the order
-                // they had before the letters were typed.
-                self?.resetLetterBuffer()
+                guard let self, self.phase == .visible,
+                      self.letterBuffer == pendingSequence else { return }
+                // A shorter mapping may also be a prefix of a longer one (SE /
+                // SET). Waiting gives the user time to finish the longer chain;
+                // if no next character arrives, commit the exact shorter match.
+                if let idx = self.labels.firstIndex(of: pendingSequence),
+                   self.rows.indices.contains(idx) {
+                    self.index = idx
+                    self.view.setSelectedIndex(idx)
+                    self.commit()
+                } else {
+                    self.resetLetterBuffer()
+                }
             }
         }
         RunLoop.main.add(timer, forMode: .common)

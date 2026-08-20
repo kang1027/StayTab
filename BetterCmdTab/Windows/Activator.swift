@@ -450,6 +450,16 @@ enum Activator {
         label: "BetterCmdTab.activation",
         qos: .userInitiated
     )
+    /// Verification reads must never sit in front of a newer user-requested
+    /// activation on `activationQueue`; a deaf AX app may use its full timeout.
+    private static let activationVerificationQueue = DispatchQueue(
+        label: "BetterCmdTab.activation.verify",
+        qos: .userInitiated
+    )
+    /// A busy Electron/Chromium accessibility server can consume this timeout
+    /// once per AX write. Keep each attempt short: the WindowServer raise is the
+    /// instant visual path, and bounded retries finish the keyboard-focus handoff.
+    private static let activationAXTimeout: Float = 0.06
 
     private static func beginActivation() -> UInt64 {
         activationGeneration.withLock { value in
@@ -510,19 +520,30 @@ enum Activator {
         // last-active window.
         activateProcess(app)
 
+        // Common case (already-visible window): make the target visible before
+        // entering the serial AX queue. A stale AX request from an earlier rapid
+        // switch can be inside its timeout right now; waiting behind it is what
+        // left the previous window on screen for up to a second. This SkyLight
+        // path does not need cooperation from the target app's AX server.
+        let raisedImmediately = !isMinimized && wid != 0 && !postedSpaceSwitch
+            && PrivateAPI.raiseWindow(pid: pid, wid: wid)
+
         let applyFocus: @Sendable () -> Void = {
             guard activationGeneration.withLock({ $0 == gen }) else { return }
-            AXUIElementSetMessagingTimeout(window, 0.2)
+            AXUIElementSetMessagingTimeout(window, activationAXTimeout)
+            defer { AXUIElementSetMessagingTimeout(window, 0) }
             if isMinimized {
                 AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
             }
             guard activationGeneration.withLock({ $0 == gen }) else { return }
-            AXUIElementPerformAction(window, kAXRaiseAction as CFString)
-            if wid != 0 && !postedSpaceSwitch {
+            if !raisedImmediately, wid != 0 && !postedSpaceSwitch {
                 PrivateAPI.raiseWindow(pid: pid, wid: wid)
             }
             guard activationGeneration.withLock({ $0 == gen }) else { return }
+            AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+            guard activationGeneration.withLock({ $0 == gen }) else { return }
             AXUIElementSetAttributeValue(window, kAXMainAttribute as CFString, kCFBooleanTrue)
+            guard activationGeneration.withLock({ $0 == gen }) else { return }
             AXUIElementSetAttributeValue(window, kAXFocusedAttribute as CFString, kCFBooleanTrue)
         }
         if pid == getpid() { applyFocus() } else { activationQueue.async(execute: applyFocus) }
@@ -554,8 +575,25 @@ enum Activator {
                     DispatchQueue.main.async { completion() }
                     return
                 }
+                AXUIElementSetMessagingTimeout(window, activationAXTimeout)
+                defer { AXUIElementSetMessagingTimeout(window, 0) }
+                if wid != 0 && !postedSpaceSwitch {
+                    PrivateAPI.raiseWindow(pid: pid, wid: wid)
+                }
+                guard activationGeneration.withLock({ $0 == gen }) else {
+                    DispatchQueue.main.async { completion() }
+                    return
+                }
                 AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+                guard activationGeneration.withLock({ $0 == gen }) else {
+                    DispatchQueue.main.async { completion() }
+                    return
+                }
                 AXUIElementSetAttributeValue(window, kAXMainAttribute as CFString, kCFBooleanTrue)
+                guard activationGeneration.withLock({ $0 == gen }) else {
+                    DispatchQueue.main.async { completion() }
+                    return
+                }
                 AXUIElementSetAttributeValue(window, kAXFocusedAttribute as CFString, kCFBooleanTrue)
                 if pid != getpid() {
                     verifyFocusSettled(
@@ -588,7 +626,7 @@ enum Activator {
         generation: UInt64,
         completion: @escaping @MainActor @Sendable () -> Void
     ) {
-        activationQueue.asyncAfter(deadline: .now() + 0.12) {
+        activationVerificationQueue.asyncAfter(deadline: .now() + 0.12) {
             guard activationGeneration.withLock({ $0 == generation }) else {
                 DispatchQueue.main.async { completion() }
                 return
@@ -621,9 +659,23 @@ enum Activator {
                         DispatchQueue.main.async { completion() }
                         return
                     }
-                    AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+                    AXUIElementSetMessagingTimeout(window, activationAXTimeout)
+                    defer { AXUIElementSetMessagingTimeout(window, 0) }
                     if wid != 0 { PrivateAPI.raiseWindow(pid: pid, wid: wid) }
+                    guard activationGeneration.withLock({ $0 == generation }) else {
+                        DispatchQueue.main.async { completion() }
+                        return
+                    }
+                    AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+                    guard activationGeneration.withLock({ $0 == generation }) else {
+                        DispatchQueue.main.async { completion() }
+                        return
+                    }
                     AXUIElementSetAttributeValue(window, kAXMainAttribute as CFString, kCFBooleanTrue)
+                    guard activationGeneration.withLock({ $0 == generation }) else {
+                        DispatchQueue.main.async { completion() }
+                        return
+                    }
                     AXUIElementSetAttributeValue(window, kAXFocusedAttribute as CFString, kCFBooleanTrue)
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) { completion() }
                 }
@@ -693,13 +745,19 @@ enum Activator {
         let postedSpaceSwitch = instantSpace && wid != 0 && PrivateAPI.switchToSpace(ofWindow: wid)
 
         activateProcess(app)
+        let raisedImmediately = !isMinimized && wid != 0 && !postedSpaceSwitch
+            && PrivateAPI.raiseWindow(pid: pid, wid: wid)
         let apply: @Sendable () -> Void = {
             guard activationGeneration.withLock({ $0 == gen }) else {
                 DispatchQueue.main.async { completion() }
                 return
             }
-            AXUIElementSetMessagingTimeout(window, 0.2)
-            AXUIElementSetMessagingTimeout(tab, 0.2)
+            AXUIElementSetMessagingTimeout(window, activationAXTimeout)
+            AXUIElementSetMessagingTimeout(tab, activationAXTimeout)
+            defer {
+                AXUIElementSetMessagingTimeout(window, 0)
+                AXUIElementSetMessagingTimeout(tab, 0)
+            }
             if isMinimized {
                 AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
             }
@@ -707,11 +765,23 @@ enum Activator {
                 DispatchQueue.main.async { completion() }
                 return
             }
-            AXUIElementPerformAction(window, kAXRaiseAction as CFString)
-            if wid != 0 && !postedSpaceSwitch {
+            if !raisedImmediately, wid != 0 && !postedSpaceSwitch {
                 PrivateAPI.raiseWindow(pid: pid, wid: wid)
             }
+            guard activationGeneration.withLock({ $0 == gen }) else {
+                DispatchQueue.main.async { completion() }
+                return
+            }
+            AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+            guard activationGeneration.withLock({ $0 == gen }) else {
+                DispatchQueue.main.async { completion() }
+                return
+            }
             AXUIElementSetAttributeValue(window, kAXMainAttribute as CFString, kCFBooleanTrue)
+            guard activationGeneration.withLock({ $0 == gen }) else {
+                DispatchQueue.main.async { completion() }
+                return
+            }
             AXUIElementSetAttributeValue(window, kAXFocusedAttribute as CFString, kCFBooleanTrue)
             guard activationGeneration.withLock({ $0 == gen }) else {
                 DispatchQueue.main.async { completion() }

@@ -81,10 +81,14 @@ struct JumpKeyAssignmentValidationTests {
         ) == .valid("7"))
     }
 
-    @Test("more than two characters is invalid")
+    @Test("three characters are accepted and four are invalid")
     func invalid() {
         #expect(JumpKeyAssignmentValidation.evaluate(
             rawValue: "123", bundleID: "chatgpt", assignments: assignments,
+            reservedLetters: reserved
+        ) == .valid("123"))
+        #expect(JumpKeyAssignmentValidation.evaluate(
+            rawValue: "1234", bundleID: "chatgpt", assignments: assignments,
             reservedLetters: reserved
         ) == .invalid)
     }
@@ -130,12 +134,12 @@ struct JumpKeyAssignmentValidationTests {
         ) == .conflict("d"))
     }
 
-    @Test("a one-key and two-key prefix pair conflicts")
-    func prefixConflict() {
+    @Test("a shorter key may prefix a longer key")
+    func prefixPair() {
         #expect(JumpKeyAssignmentValidation.evaluate(
             rawValue: "C7", bundleID: "docker", assignments: assignments,
             reservedLetters: reserved
-        ) == .conflict("c7"))
+        ) == .valid("c7"))
     }
 
     @Test("an unusable imported assignment does not block a valid chain")

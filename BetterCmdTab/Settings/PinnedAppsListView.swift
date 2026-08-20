@@ -22,7 +22,7 @@ enum JumpKeyAssignmentValidation: Equatable {
            reservedLetters.contains(character) {
             return .reserved(character)
         }
-        if sequence.count == 2, let character = sequence.last,
+        if sequence.count > 1, let character = sequence.last,
            reservedLetters.contains(character) {
             return .reserved(character)
         }
@@ -256,7 +256,7 @@ final class PinnedAppRowCellView: NSTableCellView, NSTextFieldDelegate {
         jumpLetterField.controlSize = .small
         jumpLetterField.bezelStyle = .roundedBezel
         jumpLetterField.maximumNumberOfLines = 1
-        jumpLetterField.toolTip = String(localized: "Jump key (one or two A–Z letters or 0–9 digits). Conflicting keys are unavailable.")
+        jumpLetterField.toolTip = String(localized: "Jump key (one to three A–Z letters or 0–9 digits). Conflicting keys are unavailable.")
         jumpLetterField.delegate = self
         jumpLetterField.setContentHuggingPriority(.required, for: .horizontal)
         jumpLetterField.setContentCompressionResistancePriority(.required, for: .horizontal)

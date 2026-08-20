@@ -162,7 +162,7 @@ private let kcVimK: UInt32 = 40
 ///     whether the letter keys are letter-jump or search input, and whether the
 ///     arrows step the selection or the tab strip.
 ///   - panelActions: the rebindable in-panel action keys (W/M/H/Q/F).
-///   - customJumpPrefixKeyCodes: first keys of explicit two-key jumps. These
+///   - customJumpPrefixKeyCodes: first keys of live multi-key jumps. These
 ///     letter-jump chords are registered ahead of switcher controls so MA/MU
 ///     can own M even while Minimize is bound there.
 ///   - searchKeyCode / tabDrillKeyCode: the rebindable search and tab-drill keys
@@ -170,7 +170,7 @@ private let kcVimK: UInt32 = 40
 ///     that recorder, which disables the key here too.
 ///   - vimNavigationEnabled: the opt-in vim h/j/k/l navigation preference. When
 ///     on, h/j/k/l are registered as arrow-motion chords ahead of panel actions
-///     and generic letter-jump, but after an explicit custom two-key prefix.
+///     and generic letter-jump, but after a live multi-key prefix.
 func computeNativeOverridePlan(
     trigger: TriggerSpec,
     secureInputActive: Bool,
@@ -269,7 +269,7 @@ func computeNativeOverridePlan(
             chords.append(ChordSpec(keyCode: kcDown, modifiers: mod, kind: .navDown))
             chords.append(ChordSpec(keyCode: kcLeft, modifiers: mod, kind: .navLeft))
             chords.append(ChordSpec(keyCode: kcRight, modifiers: mod, kind: .navRight))
-            // In normal mode, explicit two-key app jumps beat every switcher
+            // In normal mode, live multi-key app jumps beat every switcher
             // control on their first key. Search and tab-drill modes keep their
             // own input semantics and do not register these prefixes.
             if !searchActive {

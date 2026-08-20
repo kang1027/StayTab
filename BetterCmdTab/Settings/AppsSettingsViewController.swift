@@ -175,12 +175,12 @@ final class AppsSettingsViewController: SettingsTabViewController {
             color = .systemRed
             symbol = "exclamationmark.circle.fill"
         } else if reserved.isEmpty {
-            text = String(localized: "Jump keys use one or two A–Z letters or 0–9 digits.")
+            text = String(localized: "Jump keys use one to three A–Z letters or 0–9 digits.")
             color = .secondaryLabelColor
             symbol = "info.circle"
         } else {
             text = String(
-                format: String(localized: "Jump keys use one or two A–Z letters or 0–9 digits. Unavailable alone: %@. A two-key jump may start with one and takes priority over that switcher control."),
+                format: String(localized: "Jump keys use one to three A–Z letters or 0–9 digits. Unavailable alone: %@. A multi-key jump may start with one and takes priority over that switcher control."),
                 reserved
             )
             color = .secondaryLabelColor
@@ -322,7 +322,7 @@ final class AppsSettingsViewController: SettingsTabViewController {
             Preferences.shared.appJumpLetters = jumpLetters
             rebuildPinnedCard()
         case .invalid:
-            jumpKeyValidationMessage = String(localized: "Use one or two A–Z letters or 0–9 digits.")
+            jumpKeyValidationMessage = String(localized: "Use one to three A–Z letters or 0–9 digits.")
             NSSound.beep()
             rebuildPinnedCard()
         case let .reserved(letter):

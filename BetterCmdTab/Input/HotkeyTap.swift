@@ -418,8 +418,8 @@ final class HotkeyTap: @unchecked Sendable {
         initialState: ["w", "m", "h", "q", "f"]
     )
 
-    /// First characters of explicit two-key app jumps (for example the `m` in
-    /// MA/MU). An explicit chain owns its first key while the panel is open, even
+    /// First characters of live multi-key app jumps (for example the `m` in
+    /// MA/MU). A chain owns its first key while the panel is open, even
     /// when an in-panel action is bound there; the next character completes the
     /// chain. Pushed from the controller whenever pins or custom keys change.
     private let customJumpPrefixes = OSAllocatedUnfairLock<Set<Character>>(initialState: [])
@@ -870,7 +870,7 @@ final class HotkeyTap: @unchecked Sendable {
         recomputeReservedLetters()
     }
 
-    /// Replace the cold-path snapshot used to arbitrate custom two-key chains
+    /// Replace the cold-path snapshot used to arbitrate multi-key chains
     /// against rebindable in-panel actions. Read only while the panel is open.
     func setCustomJumpPrefixes(_ prefixes: Set<Character>) {
         customJumpPrefixes.withLock { $0 = prefixes }
@@ -1334,7 +1334,7 @@ final class HotkeyTap: @unchecked Sendable {
                     }
                     return nil
                 }
-                // An explicit two-key jump owns its first character while the
+                // A live multi-key jump owns its first character while the
                 // normal panel is visible. Resolve that precedence once here so
                 // it applies consistently to rebound search/tab-drill keys, vim
                 // navigation, and panel actions.
@@ -1468,7 +1468,7 @@ final class HotkeyTap: @unchecked Sendable {
                             // Vim navigation: h/j/k/l mirror the bare arrows.
                             // Opt-in because h overlaps the default Hide panel
                             // binding and j/k/l overlap letter-jump. An explicit
-                            // two-key jump prefix wins over vim and action keys;
+                            // multi-key jump prefix wins over vim and action keys;
                             // otherwise vim wins over both. The trigger's hold
                             // modifier(s) are intentionally NOT gated out: the
                             // panel is held open by whatever modifier the user
@@ -1508,7 +1508,7 @@ final class HotkeyTap: @unchecked Sendable {
                             // `isSearchingNow()` branch swallows everything
                             // printable) or clear the binding in Settings, which
                             // removes the key from this map and frees the letter
-                            // for the opener. An explicit two-key jump may start
+                            // for the opener. A multi-key jump may start
                             // on one of these keys (MA/MU over Minimize); while it
                             // is configured, the chain intentionally owns M.
                             if !customJumpOwnsKey,

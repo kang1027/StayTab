@@ -351,7 +351,7 @@ enum ConfigSchemaDocs {
             "array", "Bundle IDs pinned to the front of the switcher, in the order they appear.",
             item: ConfigItemSchema("string", pattern: bundleIDPattern)),
         "appJumpLetters": ConfigSettingDoc(
-            "object", "Custom one- or two-character A-Z/0-9 jump keys keyed by app bundle ID."),
+            "object", "Custom one- to three-character A-Z/0-9 jump keys keyed by app bundle ID."),
         "hideAllExcludedBundleIDs": ConfigSettingDoc(
             "array", "Bundle IDs the \"hide all windows\" shortcut leaves visible.",
             item: ConfigItemSchema("string", pattern: bundleIDPattern)),

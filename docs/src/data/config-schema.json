@@ -58,7 +58,7 @@
       "type" : "array"
     },
     "appJumpLetters" : {
-      "description" : "Custom one- or two-character A-Z/0-9 jump keys keyed by app bundle ID.",
+      "description" : "Custom one- to three-character A-Z/0-9 jump keys keyed by app bundle ID.",
       "type" : "object"
     },
     "applicationsOnly" : {

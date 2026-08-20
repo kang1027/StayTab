@@ -1034,7 +1034,7 @@ final class Preferences: ObservableObject {
     }
 
     /// Optional direct-jump key per bundle identifier. Values are persisted as
-    /// lower-case one- or two-character ASCII letter/digit sequences by the Apps
+    /// lower-case one- to three-character ASCII letter/digit sequences by the Apps
     /// settings editor; imported values are validated again by `RowLabels`.
     @Published var appJumpLetters: [String: String] {
         didSet {

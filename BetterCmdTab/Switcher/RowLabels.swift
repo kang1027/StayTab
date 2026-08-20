@@ -28,10 +28,6 @@ enum RowLabels {
         customLettersStore.withLock { $0 = letters }
     }
 
-    /// Full a–z pool for disambiguation suffixes; reserved letters are filtered
-    /// out at the point of use so the pool tracks the dynamic reservation.
-    static let suffixAlphabet: [Character] = Array("abcdefghijklmnopqrstuvwxyz")
-
     struct Input {
         let appName: String
         let windowTitle: String
@@ -79,10 +75,10 @@ enum RowLabels {
             return sequence
         }
 
-        // Imported config can bypass the settings editor. Drop every exact or
-        // prefix-conflicting sequence ("m" vs "ma") back to automatic so no
-        // displayed hint becomes impossible to commit. Shared prefixes of equal
-        // length ("ma" / "mu") are valid and handled by the letter buffer.
+        // Imported config can bypass the settings editor. Exact duplicates are
+        // ambiguous, so every owner of one falls back to automatic. Prefix pairs
+        // are valid: the shorter sequence commits when the input timer expires,
+        // while the longer one commits as soon as its final character arrives.
         var conflictingCustomIndices = Set<Int>()
         for i in preliminaryCustom.indices {
             guard let lhs = preliminaryCustom[i] else { continue }
@@ -98,51 +94,37 @@ enum RowLabels {
             conflictingCustomIndices.contains($0.offset) ? nil : $0.element
         }
 
-        // A user-assigned sequence owns its first character. Automatic hints
-        // skip that character so an unrelated single-key hint cannot become an
-        // uncommittable prefix of a custom two-key chain.
-        let customPrefixes = customByIndex.compactMap { $0?.first }
-        let automaticReserved = reserved.union(customPrefixes)
-
-        var firstLetterCount: [Character: Int] = [:]
-        var firstLetters = [Character?](repeating: nil, count: rows.count)
-        for i in 0..<rows.count {
-            guard customByIndex[i] == nil else { continue }
-            let c = firstAvailableLetter(rows[i].appName, reserved: automaticReserved)
-            firstLetters[i] = c
-            if let c { firstLetterCount[c, default: 0] += 1 }
-        }
-
+        // Explicit assignments reserve their complete sequences first. Automatic
+        // hints then claim the shortest free *name prefix* in row order, up to
+        // three characters. This keeps the result predictable and stable for the
+        // pinned roster: Kakao -> K; Figma -> FI when F is an action key; and if
+        // S then SE are already owned, Settings -> SET. Prefix pairs may coexist,
+        // but exact duplicates may not.
+        var used = Set(customByIndex.compactMap { $0 })
         for i in 0..<rows.count {
             if let custom = customByIndex[i] {
                 labels[i] = custom
                 continue
             }
-            guard let first = firstLetters[i] else {
-                labels[i] = ""
-                continue
-            }
-            if (firstLetterCount[first] ?? 0) == 1 {
-                labels[i] = String(first)
-            } else if let secondary = secondaryLetter(rows[i], skipping: first, reserved: reserved) {
-                labels[i] = String(first) + String(secondary)
-            } else {
-                labels[i] = String(first)
+            for candidate in automaticCandidates(rows[i].appName) {
+                guard isUsableCustomSequence(candidate, reserved: reserved),
+                      !used.contains(candidate) else { continue }
+                labels[i] = candidate
+                used.insert(candidate)
+                break
             }
         }
-
-        disambiguateDuplicates(&labels, reserved: reserved)
         return labels
     }
 
     /// Normalize the settings field and imported config value. A custom direct
-    /// jump accepts one or two ASCII letters/digits; automatic hints remain
-    /// letters.
+    /// jump accepts one to three ASCII letters/digits. Automatic hints use the
+    /// same character set and length ceiling.
     /// Action-key conflicts are checked separately against the live `reserved`
     /// set.
     static func normalizedCustomKey(_ raw: String) -> String? {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard (1...2).contains(trimmed.count),
+        guard (1...3).contains(trimmed.count),
               trimmed.allSatisfy(isDirectJumpCharacter) else { return nil }
         return trimmed
     }
@@ -155,9 +137,9 @@ enum RowLabels {
             || (ascii >= 0x30 && ascii <= 0x39)
     }
 
-    /// One-key custom jumps cannot claim an action key. A two-key chain may
+    /// One-key custom jumps cannot claim an action key. A multi-key chain may
     /// start with one: the explicit chain then owns that first key while the
-    /// switcher is open. Its second key must stay unreserved so the chain can
+    /// switcher is open. Its final key must stay unreserved so the chain can
     /// finish without being consumed by another panel action.
     static func isUsableCustomSequence(_ sequence: String, reserved: Set<Character>) -> Bool {
         guard let first = sequence.first else { return false }
@@ -166,13 +148,13 @@ enum RowLabels {
         return !reserved.contains(last)
     }
 
-    /// Exact duplicates and full-prefix pairs are ambiguous; equal-length
-    /// sequences with only a shared start ("ma" / "mu") are not.
+    /// Exact duplicates are ambiguous. Full-prefix pairs are valid because the
+    /// input timeout commits the shorter sequence when no further key arrives.
     static func sequencesConflict(_ lhs: String, _ rhs: String) -> Bool {
-        lhs == rhs || lhs.hasPrefix(rhs) || rhs.hasPrefix(lhs)
+        lhs == rhs
     }
 
-    /// First characters of live two-key custom chains. The input layer uses
+    /// First characters of live multi-key custom chains. The input layer uses
     /// this cold-path snapshot to let an explicit chain beat an action bound to
     /// the same first key (for example MA/MU over the default Minimize key M).
     static func customChainPrefixes(
@@ -187,7 +169,7 @@ enum RowLabels {
             return (bundleID, sequence)
         }
         return Set(sequences.compactMap { candidate in
-            guard candidate.sequence.count == 2 else { return nil }
+            guard candidate.sequence.count > 1 else { return nil }
             let conflicts = sequences.contains {
                 $0.bundleID != candidate.bundleID
                     && sequencesConflict(candidate.sequence, $0.sequence)
@@ -196,54 +178,18 @@ enum RowLabels {
         })
     }
 
-    private static func disambiguateDuplicates(_ labels: inout [String], reserved: Set<Character>) {
-        var groups: [String: [Int]] = [:]
-        for (i, l) in labels.enumerated() where !l.isEmpty {
-            groups[l, default: []].append(i)
-        }
-        for (base, indices) in groups where indices.count > 1 {
-            let groupSet = Set(indices)
-            var used = Set<String>()
-            for (j, l) in labels.enumerated() {
-                if groupSet.contains(j) { continue }
-                if !l.isEmpty { used.insert(l) }
-            }
-            for idx in indices {
-                for suffix in suffixAlphabet where !reserved.contains(suffix) {
-                    let candidate = base + String(suffix)
-                    if !used.contains(candidate) {
-                        labels[idx] = candidate
-                        used.insert(candidate)
-                        break
-                    }
-                }
-            }
-        }
-    }
-
-    private static func firstAvailableLetter(_ raw: String, reserved: Set<Character>) -> Character? {
+    /// Lower-case ASCII alphanumerics from the app name, preserving order and
+    /// dropping punctuation/spaces. Returns each leading prefix up to length 3.
+    private static func automaticCandidates(_ raw: String) -> [String] {
         let folded = raw.folding(options: .diacriticInsensitive, locale: nil).lowercased()
-        for c in folded {
-            if c.isASCII, c.isLetter, !reserved.contains(c) { return c }
+        var prefix = ""
+        var candidates: [String] = []
+        candidates.reserveCapacity(3)
+        for character in folded where isDirectJumpCharacter(character) {
+            prefix.append(character)
+            candidates.append(prefix)
+            if candidates.count == 3 { break }
         }
-        return nil
-    }
-
-    private static func secondaryLetter(_ row: Input, skipping first: Character, reserved: Set<Character>) -> Character? {
-        if !row.windowTitle.isEmpty {
-            let folded = row.windowTitle.folding(options: .diacriticInsensitive, locale: nil).lowercased()
-            for c in folded {
-                if c.isASCII, c.isLetter, c != first, !reserved.contains(c) { return c }
-            }
-        }
-        let appFolded = row.appName.folding(options: .diacriticInsensitive, locale: nil).lowercased()
-        var seenFirst = false
-        for c in appFolded {
-            if c.isASCII, c.isLetter, !reserved.contains(c) {
-                if !seenFirst { seenFirst = true; continue }
-                if c != first { return c }
-            }
-        }
-        return nil
+        return candidates
     }
 }

@@ -5279,104 +5279,104 @@
         }
       }
     },
-    "Jump key (one or two A–Z letters or 0–9 digits). Conflicting keys are unavailable." : {
+    "Jump key (one to three A–Z letters or 0–9 digits). Conflicting keys are unavailable." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sprungtaste (ein oder zwei Buchstaben von A bis Z oder Ziffern von 0 bis 9). Tasten mit Konflikten sind nicht verfügbar."
+            "value" : "Sprungtaste (ein bis drei Buchstaben von A bis Z oder Ziffern von 0 bis 9). Tasten mit Konflikten sind nicht verfügbar."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tecla de salto (una o dos letras de la A a la Z o dígitos del 0 al 9). Las teclas en conflicto no están disponibles."
+            "value" : "Tecla de salto (de uno a tres caracteres: letras de la A a la Z o dígitos del 0 al 9). Las teclas en conflicto no están disponibles."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Touche d’accès (une ou deux lettres de A à Z ou chiffres de 0 à 9). Les touches en conflit sont indisponibles."
+            "value" : "Touche d’accès (un à trois caractères : lettres de A à Z ou chiffres de 0 à 9). Les touches en conflit sont indisponibles."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Klawisz szybkiego wyboru (jedna lub dwie litery od A do Z albo cyfry od 0 do 9). Kolidujące klawisze są niedostępne."
+            "value" : "Klawisz szybkiego wyboru (od jednego do trzech znaków: litery od A do Z albo cyfry od 0 do 9). Kolidujące klawisze są niedostępne."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "跳转键（一个或两个 A–Z 字母或 0–9 数字）。冲突的按键不可用。"
+            "value" : "跳转键（一到三个 A–Z 字母或 0–9 数字）。冲突的按键不可用。"
           }
         }
       }
     },
-    "Jump keys use one or two A–Z letters or 0–9 digits." : {
+    "Jump keys use one to three A–Z letters or 0–9 digits." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sprungtasten verwenden ein oder zwei Buchstaben von A bis Z oder Ziffern von 0 bis 9."
+            "value" : "Sprungtasten verwenden ein bis drei Buchstaben von A bis Z oder Ziffern von 0 bis 9."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Las teclas de salto usan una o dos letras de la A a la Z o dígitos del 0 al 9."
+            "value" : "Las teclas de salto usan de uno a tres caracteres: letras de la A a la Z o dígitos del 0 al 9."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les touches d’accès utilisent une ou deux lettres de A à Z ou chiffres de 0 à 9."
+            "value" : "Les touches d’accès utilisent un à trois caractères : lettres de A à Z ou chiffres de 0 à 9."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Klawisze szybkiego wyboru używają jednej lub dwóch liter od A do Z albo cyfr od 0 do 9."
+            "value" : "Klawisze szybkiego wyboru używają od jednego do trzech znaków: liter od A do Z albo cyfr od 0 do 9."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "跳转键使用一个或两个 A–Z 字母或 0–9 数字。"
+            "value" : "跳转键使用一到三个 A–Z 字母或 0–9 数字。"
           }
         }
       }
     },
-    "Jump keys use one or two A–Z letters or 0–9 digits. Unavailable alone: %@. A two-key jump may start with one and takes priority over that switcher control." : {
+    "Jump keys use one to three A–Z letters or 0–9 digits. Unavailable alone: %@. A multi-key jump may start with one and takes priority over that switcher control." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sprungtasten verwenden ein oder zwei Buchstaben von A bis Z oder Ziffern von 0 bis 9. Einzeln nicht verfügbar: %@. Eine Zweierfolge darf damit beginnen und hat Vorrang vor dieser Umschaltersteuerung."
+            "value" : "Sprungtasten verwenden ein bis drei Buchstaben von A bis Z oder Ziffern von 0 bis 9. Einzeln nicht verfügbar: %@. Eine mehrstellige Folge darf damit beginnen und hat Vorrang vor dieser Umschaltersteuerung."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Las teclas de salto usan una o dos letras de la A a la Z o dígitos del 0 al 9. No disponibles por sí solas: %@. Una secuencia de dos teclas puede empezar con una de ellas y tiene prioridad sobre ese control del selector."
+            "value" : "Las teclas de salto usan de uno a tres caracteres: letras de la A a la Z o dígitos del 0 al 9. No disponibles por sí solos: %@. Una secuencia de varias teclas puede empezar con uno de ellos y tiene prioridad sobre ese control del selector."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les touches d’accès utilisent une ou deux lettres de A à Z ou chiffres de 0 à 9. Indisponibles seules : %@. Une séquence de deux touches peut commencer par l’une d’elles et prend alors la priorité sur cette commande du sélecteur."
+            "value" : "Les touches d’accès utilisent un à trois caractères : lettres de A à Z ou chiffres de 0 à 9. Indisponibles seuls : %@. Une séquence de plusieurs touches peut commencer par l’un d’eux et prend alors la priorité sur cette commande du sélecteur."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Klawisze szybkiego wyboru używają jednej lub dwóch liter od A do Z albo cyfr od 0 do 9. Niedostępne samodzielnie: %@. Sekwencja dwóch klawiszy może zaczynać się od jednego z nich i ma wtedy pierwszeństwo przed tym sterowaniem przełącznika."
+            "value" : "Klawisze szybkiego wyboru używają od jednego do trzech znaków: liter od A do Z albo cyfr od 0 do 9. Niedostępne samodzielnie: %@. Sekwencja wielu klawiszy może zaczynać się od jednego z nich i ma wtedy pierwszeństwo przed tym sterowaniem przełącznika."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "跳转键使用一个或两个 A–Z 字母或 0–9 数字。不能单独使用：%@。双键跳转可以其中一个键开头，并优先于对应的切换器控件。"
+            "value" : "跳转键使用一到三个 A–Z 字母或 0–9 数字。不能单独使用：%@。多键跳转可以其中一个键开头，并优先于对应的切换器控件。"
           }
         }
       }
@@ -13555,36 +13555,36 @@
         }
       }
     },
-    "Use one or two A–Z letters or 0–9 digits." : {
+    "Use one to three A–Z letters or 0–9 digits." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Verwende ein oder zwei Buchstaben von A bis Z oder Ziffern von 0 bis 9."
+            "value" : "Verwende ein bis drei Buchstaben von A bis Z oder Ziffern von 0 bis 9."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Usa una o dos letras de la A a la Z o dígitos del 0 al 9."
+            "value" : "Usa de uno a tres caracteres: letras de la A a la Z o dígitos del 0 al 9."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Utilisez une ou deux lettres de A à Z ou chiffres de 0 à 9."
+            "value" : "Utilisez un à trois caractères : lettres de A à Z ou chiffres de 0 à 9."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Użyj jednej lub dwóch liter od A do Z albo cyfr od 0 do 9."
+            "value" : "Użyj od jednego do trzech znaków: liter od A do Z albo cyfr od 0 do 9."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请使用一个或两个 A–Z 字母或 0–9 数字。"
+            "value" : "请使用一到三个 A–Z 字母或 0–9 数字。"
           }
         }
       }

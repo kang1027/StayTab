@@ -26,46 +26,40 @@ struct RowLabelsTests {
         #expect(labels == ["s", "t", "n"])
     }
 
-    @Test("colliding first letters expand to two-letter labels using app name fallback")
+    @Test("later collisions expand along the app-name prefix")
     func collisionViaAppName() {
         let labels = RowLabels.labels(forInputs: [
             input("Slack"),
             input("Safari")
         ])
-        // Both start with "s" → secondary letter from app name (Slack→l, Safari→a)
-        #expect(labels[0].first == "s")
-        #expect(labels[1].first == "s")
-        #expect(labels[0].count == 2)
-        #expect(labels[1].count == 2)
-        #expect(labels[0] != labels[1])
+        #expect(labels == ["s", "sa"])
     }
 
-    @Test("collision prefers window-title letter when available")
-    func collisionPrefersWindowTitle() {
+    @Test("window titles do not change app-prefix labels")
+    func collisionIgnoresWindowTitle() {
         let labels = RowLabels.labels(forInputs: [
             input("Safari", "GitHub"),
             input("Slack")
         ])
-        // "Safari" + window "GitHub" → secondary from "g" (first letter of title)
-        #expect(labels[0] == "sg")
+        #expect(labels == ["s", "sl"])
     }
 
-    @Test("reserved letters (w m h q) skipped when picking first letter")
-    func reservedFirstSkipped() {
+    @Test("a reserved first character expands to an app-name prefix")
+    func reservedFirstExpands() {
         let labels = RowLabels.labels(forInputs: [
-            input("Mail"),  // m is reserved → falls through to "a"
-            input("Word")   // w is reserved → falls through to "o"
+            input("Mail"),
+            input("Word")
         ])
-        #expect(labels == ["a", "o"])
+        #expect(labels == ["ma", "wo"])
     }
 
-    @Test("f is reserved (⌘F full screen) and never a letter-chain target")
-    func fReservedSkipped() {
+    @Test("Figma becomes FI when F is reserved")
+    func fReservedExpands() {
         let labels = RowLabels.labels(forInputs: [
-            input("Figma"),  // f is reserved → falls through to "i"
-            input("Notes")   // n
+            input("Figma"),
+            input("Notes")
         ])
-        #expect(labels == ["i", "n"])
+        #expect(labels == ["fi", "n"])
     }
 
     @Test("diacritics fold to ASCII counterparts")
@@ -80,25 +74,21 @@ struct RowLabelsTests {
         #expect(labels == ["c", "n"])
     }
 
-    @Test("name with no usable letters returns empty label")
-    func noLetters() {
+    @Test("automatic prefixes accept digits and ignore punctuation")
+    func digitsAndPunctuation() {
         let labels = RowLabels.labels(forInputs: [
             input("123 456"),
             input("---")
         ])
-        #expect(labels == ["", ""])
+        #expect(labels == ["1", ""])
     }
 
-    @Test("secondary letter skips reserved chars too")
-    func secondaryAvoidsReserved() {
-        // Both start with "s"; secondary from "smh" should skip 'm','h' (reserved) → 's' for both
-        // Edge case: when secondary candidates all reserved, falls back to single letter.
+    @Test("only the final prefix character must be free")
+    func finalCharacterMustBeFree() {
         let labels = RowLabels.labels(forInputs: [
             input("Smhw"),
             input("Sxy")
         ])
-        // First: 's', then 'm','h','w' all reserved → no secondary → "s"
-        // Second: 's' available, secondary 'x'
         #expect(labels[0] == "s")
         #expect(labels[1] == "sx")
     }
@@ -133,7 +123,7 @@ struct RowLabelsTests {
             ],
             customLetters: ["com.openai.chat": "d"]
         )
-        #expect(labels == ["d", "i"])
+        #expect(labels == ["d", "di"])
     }
 
     @Test("custom digits override automatic letter hints")
@@ -197,8 +187,8 @@ struct RowLabelsTests {
         #expect(prefixes == ["m"])
     }
 
-    @Test("imported full-prefix conflicts fall back to automatic hints")
-    func importedPrefixConflictFallsBack() {
+    @Test("imported full-prefix pairs remain usable")
+    func importedPrefixPairRemainsCustom() {
         let labels = RowLabels.labels(
             forInputs: [
                 input("Mail", bundleID: "com.apple.mail"),
@@ -210,7 +200,7 @@ struct RowLabelsTests {
             ],
             reserved: []
         )
-        #expect(labels == ["ma", "mu"])
+        #expect(labels == ["m", "mu"])
     }
 
     @Test("invalid and action-reserved custom letters fall back to automatic hints")
@@ -221,10 +211,40 @@ struct RowLabelsTests {
                 input("Docker", bundleID: "com.docker.desktop"),
             ],
             customLetters: [
-                "com.openai.chat": "123",
+                "com.openai.chat": "1234",
                 "com.docker.desktop": "q",
             ]
         )
         #expect(labels == ["c", "d"])
+    }
+
+    @Test("automatic labels use the shortest free prefix up to three characters")
+    func shortestFreePrefix() {
+        let labels = RowLabels.labels(
+            forInputs: [
+                input("Slack"),
+                input("Session", bundleID: "com.example.session"),
+                input("Settings"),
+                input("Kakao"),
+                input("Figma"),
+            ],
+            customLetters: ["com.example.session": "se"]
+        )
+        #expect(labels == ["s", "se", "set", "k", "fi"])
+    }
+
+    @Test("automatic label is empty when all three prefixes are occupied")
+    func automaticPrefixCeiling() {
+        let labels = RowLabels.labels(
+            forInputs: [
+                input("One", bundleID: "one"),
+                input("Two", bundleID: "two"),
+                input("Three", bundleID: "three"),
+                input("Settings"),
+            ],
+            customLetters: ["one": "s", "two": "se", "three": "set"],
+            reserved: []
+        )
+        #expect(labels == ["s", "se", "set", ""])
     }
 }
