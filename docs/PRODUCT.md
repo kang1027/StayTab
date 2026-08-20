@@ -1,6 +1,6 @@
 # StayTab product scope
 
-This document defines which parts of the inherited switching engine belong to StayTab's product promise and which remain advanced compatibility features.
+This document defines which parts of the inherited switching engine belong to StayTab's product promise and which remain internal compatibility features.
 
 ## Core promise
 
@@ -23,9 +23,9 @@ The default settings experience should prioritize:
 - the switcher layout and visual appearance;
 - permissions, screen-sharing privacy, and project information.
 
-## Advanced compatibility features
+## Inherited compatibility features
 
-The following BetterCmdTab-derived capabilities remain supported but are not the primary StayTab workflow:
+The following BetterCmdTab-derived capabilities remain readable at runtime for existing or imported configurations, but are not part of StayTab's settings surface:
 
 - per-shortcut profiles and scoped switching;
 - direct app activation and window-arrangement shortcuts;
@@ -33,7 +33,7 @@ The following BetterCmdTab-derived capabilities remain supported but are not the
 - native and browser-tab expansion, previews, and tab-level recency;
 - experimental trackpad gestures and specialized window-management actions.
 
-These settings should move behind a clearly labeled Advanced surface instead of competing with pinned apps in the default navigation. Their stored preferences and runtime behavior must remain compatible when the information architecture changes.
+The inherited Shortcuts, Controls, and Tabs panes are intentionally not registered. StayTab exposes only the app/window switch triggers instead of the previous multi-profile editor. Stored preferences remain compatible so an upgrade does not silently rewrite an existing configuration.
 
 ## Non-goals
 

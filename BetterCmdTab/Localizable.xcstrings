@@ -2453,6 +2453,74 @@
         }
       }
     },
+    "Command-Tab" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Command-Tab"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Command-Tab"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Command-Tab"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Command-Tab"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Command-Tab"
+          }
+        }
+      }
+    },
+    "Command-Tab defaults" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Command-Tab-Standardeinstellungen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valores predeterminados de Command-Tab"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réglages par défaut de Command-Tab"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Domyślne ustawienia Command-Tab"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Command-Tab 默认设置"
+          }
+        }
+      }
+    },
     "Configuration file" : {
       "localizations" : {
         "de" : {
@@ -4662,6 +4730,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "按住修饰键（默认 ⌘）并点按逐个切换。"
+          }
+        }
+      }
+    },
+    "Hold the modifier and tap to move through apps." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Halte die Sondertaste gedrückt und tippe, um durch Apps zu wechseln."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantén pulsada la tecla modificadora y pulsa para recorrer las apps."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maintenez la touche de modification enfoncée et appuyez pour parcourir les apps."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przytrzymaj klawisz modyfikujący i naciskaj, aby przełączać aplikacje."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按住修饰键并轻点，以循环切换应用。"
+          }
+        }
+      }
+    },
+    "Hold the modifier and tap to move through windows." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Halte die Sondertaste gedrückt und tippe, um durch Fenster zu wechseln."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantén pulsada la tecla modificadora y pulsa para recorrer las ventanas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maintenez la touche de modification enfoncée et appuyez pour parcourir les fenêtres."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przytrzymaj klawisz modyfikujący i naciskaj, aby przełączać okna."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按住修饰键并轻点，以循环切换窗口。"
           }
         }
       }
@@ -12529,6 +12665,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "所选文件不是受支持的声音。"
+          }
+        }
+      }
+    },
+    "These settings apply to the app and window switchers." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Einstellungen gelten für den App- und Fensterumschalter."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estos ajustes se aplican a los selectores de apps y ventanas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ces réglages s’appliquent aux sélecteurs d’apps et de fenêtres."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Te ustawienia dotyczą przełączników aplikacji i okien."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这些设置适用于应用和窗口切换器。"
           }
         }
       }

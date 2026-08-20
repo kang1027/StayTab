@@ -9,8 +9,6 @@ final class PrivacySettingsViewController: SettingsTabViewController {
 
     private let permissionIcon = NSImageView()
     private let permissionButton = NSButton(title: "", target: nil, action: nil)
-    private let fullDiskIcon = NSImageView()
-    private let fullDiskButton = NSButton(title: "", target: nil, action: nil)
 
     private var observationTasks: [Task<Void, Never>] = []
 
@@ -31,28 +29,6 @@ final class PrivacySettingsViewController: SettingsTabViewController {
             subtitle: String(localized: "Lets StayTab capture the shortcut and read your open windows. Required to work."),
             accessory: makePermissionAccessory(icon: permissionIcon, button: permissionButton, action: #selector(grantAccess)),
             searchItemID: SearchID.accessibility
-        )
-
-        addRow(
-            to: permissions,
-            title: String(localized: "Full Disk Access"),
-            subtitle: String(localized: "Lets StayTab read Safari's favicon store so Safari tab entries show site icons. Optional — other browsers don't need it."),
-            accessory: makePermissionAccessory(icon: fullDiskIcon, button: fullDiskButton, action: #selector(grantFullDiskAccess)),
-            searchItemID: SearchID.fullDiskAccess
-        )
-
-        // Apple Events consent for browser tabs — the third permission the app
-        // asks for, so it belongs here rather than beside the Tabs options it
-        // unlocks.
-        let grantButton = NSButton(title: String(localized: "Check access…"), target: self, action: #selector(grantBrowserPermissions))
-        grantButton.bezelStyle = .rounded
-        grantButton.controlSize = .small
-        addRow(
-            to: permissions,
-            title: String(localized: "Browser tab access"),
-            subtitle: String(localized: "Browsers need Apple Events consent to list their tabs. Click to check each running browser (Safari, Chrome, Arc, Brave, Edge…) — macOS prompts for consent where it's still missing. Must be done with this window open."),
-            accessory: grantButton,
-            searchItemID: SearchID.tabPermissions
         )
 
         // Screen-sharing section — hide the switcher panel from screen recording
@@ -112,13 +88,6 @@ final class PrivacySettingsViewController: SettingsTabViewController {
                                            isUsable: snapshot.status.isUsable, optional: false)
                 }
             },
-            Task { @MainActor [weak self] in
-                for await snapshot in BetterPermissions.changes(.fullDiskAccess) {
-                    guard let self else { return }
-                    self.refreshPermission(icon: self.fullDiskIcon, button: self.fullDiskButton,
-                                           isUsable: snapshot.status.isUsable, optional: true)
-                }
-            },
         ]
     }
 
@@ -147,12 +116,6 @@ final class PrivacySettingsViewController: SettingsTabViewController {
         }
     }
 
-    @objc private func grantFullDiskAccess() {
-        // FDA has no prompt API — the button always deep-links to the
-        // System Settings pane; the observation picks up the grant on return.
-        BetterPermissions.openSettings(for: .fullDiskAccess)
-    }
-
     /// Shared status render for a permission row. `optional` picks the
     /// not-granted look: a neutral gray minus for nice-to-have permissions,
     /// an orange warning for required ones.
@@ -169,46 +132,6 @@ final class PrivacySettingsViewController: SettingsTabViewController {
             icon.contentTintColor = optional ? .secondaryLabelColor : .systemOrange
             button.isHidden = false
             button.title = String(localized: "Grant Access")
-        }
-    }
-    @objc private func grantBrowserPermissions() {
-        BrowserTabs.requestPermissionForRunningBrowsers { [weak self] granted, denied in
-            self?.showBrowserPermissionOutcome(granted: granted, denied: denied)
-        }
-    }
-
-    /// macOS shows the Apple Events consent prompt only once per browser, so
-    /// on every later click the button would do nothing visible (#147). Spell
-    /// out what happened instead — and when consent was declined earlier, the
-    /// only remedy is the Automation pane (the entry is listed under
-    /// "osascript", which sends our tab scripts).
-    private func showBrowserPermissionOutcome(granted: [String], denied: [String]) {
-        let alert = NSAlert()
-        if granted.isEmpty && denied.isEmpty {
-            alert.alertStyle = .informational
-            alert.messageText = String(localized: "No supported browser is running")
-            alert.informativeText = String(localized: "Open a supported browser (Safari, Chrome, Arc, Brave, Edge, Vivaldi, Opera, Dia…) and click the button again.")
-            alert.addButton(withTitle: String(localized: "OK"))
-        } else if denied.isEmpty {
-            alert.alertStyle = .informational
-            alert.messageText = String(localized: "Browser tab access is working")
-            alert.informativeText = String(localized: "Tabs can be listed for: \(granted.joined(separator: ", ")).")
-            alert.addButton(withTitle: String(localized: "OK"))
-        } else {
-            alert.alertStyle = .warning
-            alert.messageText = String(localized: "Automation permission needed")
-            alert.informativeText = String(localized: "Tab access failed for: \(denied.joined(separator: ", ")). This usually means Automation consent was declined earlier — macOS asks only once and never prompts again. Check the browsers under \"osascript\" in System Settings → Privacy & Security → Automation.")
-            alert.addButton(withTitle: String(localized: "Open System Settings"))
-            alert.addButton(withTitle: String(localized: "Cancel"))
-        }
-        let openSettings = { (response: NSApplication.ModalResponse) in
-            guard !denied.isEmpty, response == .alertFirstButtonReturn else { return }
-            AccessibilityCheck.openSystemSettings(anchor: "Privacy_Automation")
-        }
-        if let window = view.window {
-            alert.beginSheetModal(for: window, completionHandler: openSettings)
-        } else {
-            openSettings(alert.runModal())
         }
     }
 }

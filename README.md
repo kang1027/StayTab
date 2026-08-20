@@ -15,7 +15,7 @@
 
 <br>
 
-<img src="assets/settings-pinned-apps.jpg" width="878" alt="StayTab pinned-app settings">
+<img src="assets/settings-pinned-apps.png" width="878" alt="StayTab pinned-app settings">
 
 <sub>Build a permanent app roster, choose its order, and assign one-to-three-character jump keys.</sub>
 
@@ -42,7 +42,7 @@ Quick-tapping `⌘Tab` still returns to the previously focused app. Holding it o
 - **Native switching semantics.** Quick `⌘Tab`, reverse switching, window focus, Spaces, minimized windows, and keyboard input behave like a Mac switcher should.
 - **Local by design.** No account, telemetry, analytics, or remote app-usage history.
 
-StayTab retains BetterCmdTab's advanced switching engine for compatibility. Profiles, browser tabs, window layouts, search, and detailed panel controls are power-user features rather than the core product promise. See [Product scope](docs/PRODUCT.md).
+StayTab keeps BetterCmdTab's inherited preference formats readable for upgrades, while its settings UI stays focused on persistent app switching. Legacy window-management shortcuts, detailed input tuning, browser-tab controls, and scoped profiles are intentionally not shown. See [Product scope](docs/PRODUCT.md).
 
 ## Install
 
@@ -81,7 +81,7 @@ The project and source-module names remain `BetterCmdTab` to preserve upstream h
 
 ## Permissions and privacy
 
-StayTab needs Accessibility permission to observe the switch shortcut and focus the selected window. Browser-tab switching may additionally request Automation or Full Disk Access, depending on the browser and feature used.
+StayTab needs Accessibility permission to observe the switch shortcut and focus the selected window. The focused StayTab settings surface does not ask for browser Automation or Full Disk Access.
 
 Window titles, app state, recent ordering, and preferences stay on the Mac. The only supported network traffic is an opt-in GitHub Releases update check. See [Privacy](PRIVACY.md) and [Security](SECURITY.md).
 

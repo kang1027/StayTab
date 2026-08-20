@@ -27,6 +27,25 @@ struct SettingsCatalogTests {
         }
     }
 
+    @Test("settings expose only StayTab's focused product surface")
+    func focusedTabsOnly() {
+        #expect(SettingsCatalog.tabs.map(\.id) == [
+            SettingsTabID.general,
+            SettingsTabID.profiles,
+            SettingsTabID.switcher,
+            SettingsTabID.apps,
+            SettingsTabID.appearance,
+            SettingsTabID.privacy,
+            SettingsTabID.about,
+        ])
+
+        let searchIDs = Set(SettingsCatalog.searchItems.map(\.id))
+        #expect(!searchIDs.contains(SearchID.scopedSwitch))
+        #expect(!searchIDs.contains(SearchID.panelKeys))
+        #expect(!searchIDs.contains(SearchID.fullDiskAccess))
+        #expect(!searchIDs.contains(SearchID.tabPermissions))
+    }
+
     /// Anchors are namespaced `<tab>.<section>`, so the prefix catches a row
     /// that moved panes without its anchor following.
     @Test("every section anchor belongs to the item's own tab")

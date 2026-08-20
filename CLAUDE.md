@@ -120,12 +120,13 @@ Data + control flow on the ⌘Tab hot path:
   one file for review). `AccessibilityCheck` gates on the AX permission. `Log` is the
   `os.Logger` wrapper — use `Log.*`, never `print`. Plus audio-activity, Dock-badge,
   symbolic-hotkey-guard, and launch-at-login helpers.
-- **Settings** (`Settings/`) — native AppKit settings window, ten panes registered in
-  `SettingsCatalog` (General, Profiles, Shortcuts, Switcher, Controls, Tabs, Apps,
-  Appearance, Privacy, About). One controller per pane, except that
-  `SwitcherPanesViewController` backs Switcher/Controls/Tabs from one `Pane` parameter
-  since they share every control and one `viewWillAppear` sync. Fragile/new features ship
-  off by default under a “These features are unstable” notice on their own section.
+- **Settings** (`Settings/`) — native AppKit settings window with seven visible panes:
+  General, Shortcuts, Switcher, Apps, Appearance, Privacy, and About. The Shortcuts pane
+  exposes only the app/window switch triggers. BetterCmdTab's inherited global-shortcut,
+  detailed-controls, browser-tabs, scoped-profile, and browser-permission surfaces are not
+  registered, while their runtime preferences remain readable for imported-config
+  compatibility. `SwitcherPanesViewController` still owns the hidden Controls/Tabs
+  implementations until the inherited engine is removed in a separate audited change.
 
 ## Preferences, persistence & i18n
 

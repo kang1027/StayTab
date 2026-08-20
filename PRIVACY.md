@@ -17,7 +17,7 @@ This information is used in memory or in local preference and configuration file
 
 - **Accessibility** is required to observe the switching shortcut and focus or manage the selected window.
 - **Automation** may be requested to select a browser tab when the relevant integration is enabled.
-- **Full Disk Access** may be requested for browser-tab metadata that a browser stores in protected locations.
+- **Full Disk Access** is not requested by StayTab's focused settings UI. The inherited browser-tab engine can still read a previously granted permission when an imported legacy configuration enables it.
 
 StayTab does not use these permissions to inspect document contents or collect user activity for a remote service.
 
