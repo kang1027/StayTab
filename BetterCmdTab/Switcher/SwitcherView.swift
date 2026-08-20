@@ -44,6 +44,16 @@ final class SwitcherView: NSView {
     private let haze = NSVisualEffectView()
     private let dim = BackdropDimView()
     private let listContainer = NSView()
+    private let pinnedSectionView = RosterSectionBackdropView(
+        title: String(localized: "Always"),
+        symbolName: "pin.fill",
+        emphasized: true
+    )
+    private let runningSectionView = RosterSectionBackdropView(
+        title: String(localized: "Running now"),
+        symbolName: "bolt.fill",
+        emphasized: false
+    )
     private let searchBar = SwitcherSearchBarView()
     private let tabStrip = TabStripView()
     /// Empty-state glyph + caption, shown centered when there are no rows
@@ -58,6 +68,9 @@ final class SwitcherView: NSView {
     private var rows: [SwitcherRow] = []
     private(set) var labels: [String] = []
     private var selectedIndex: Int = 0
+    /// Number of leading rows that belong to the persistent app roster. Zero
+    /// disables section chrome (search, scoped shortcuts, and ⌘`).
+    private var persistentRowCount: Int = 0
     /// Last `selectedIndex` value handed to the item views, so `applySelection`
     /// can toggle just the two affected tiles on arrow-spam instead of looping
     /// every item view every keystroke.
@@ -146,6 +159,8 @@ final class SwitcherView: NSView {
         // outright instead of relying on the glass backdrop above it to make
         // the subtree layer-backed — without a layer the glide silently no-ops.
         listContainer.wantsLayer = true
+        listContainer.addSubview(pinnedSectionView)
+        listContainer.addSubview(runningSectionView)
         contentContainer.addSubview(listContainer)
         searchBar.isHidden = true
         contentContainer.addSubview(searchBar)
@@ -189,7 +204,7 @@ final class SwitcherView: NSView {
     /// the firing shortcut's overrides instead of the global preferences.
     private var effective: EffectiveSettings = .defaults
 
-    func configure(rows: [SwitcherRow], labels: [String], selectedIndex: Int, metrics: SwitcherMetrics, effective: EffectiveSettings, highlightPrefix: String = "", searchActive: Bool = false, searchQuery: String = "", tabStripItems: [TabStripItem]? = nil, tabStripSelectedIndex: Int = 0) {
+    func configure(rows: [SwitcherRow], labels: [String], selectedIndex: Int, metrics: SwitcherMetrics, effective: EffectiveSettings, highlightPrefix: String = "", searchActive: Bool = false, searchQuery: String = "", tabStripItems: [TabStripItem]? = nil, tabStripSelectedIndex: Int = 0, persistentRowCount: Int = 0) {
         applyPanelAppearance(effective.panelAppearance)
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -209,17 +224,20 @@ final class SwitcherView: NSView {
         // the item views, which read the stored metrics) uses the fitted scale.
         let metrics = fittedMetrics(metrics, count: rows.count, searchActive: searchActive, tabActive: stripActiveNew)
         let screenFrame = layoutScreenFrame()
+        let persistentRowCount = min(max(0, persistentRowCount), rows.count)
         let geometryChanged =
             rows.count != self.rows.count ||
             metrics != self.metrics ||
             searchActive != self.searchActive ||
             stripActiveNew != self.tabStripActive ||
+            persistentRowCount != self.persistentRowCount ||
             screenFrame != layoutScreenFrameUsed
         self.layoutScreenFrameUsed = screenFrame
         self.tabStripActive = stripActiveNew
         armReflow(incoming: rows, geometryChanged: geometryChanged)
         self.rows = rows
         self.labels = labels
+        self.persistentRowCount = persistentRowCount
         self.highlightPrefix = highlightPrefix
         self.searchActive = searchActive
         // The selection highlight / jump-letter color always follows the
@@ -388,6 +406,9 @@ final class SwitcherView: NSView {
             view.removeFromSuperview()
         }
         rows = []
+        persistentRowCount = 0
+        pinnedSectionView.isHidden = true
+        runningSectionView.isHidden = true
         labels = []
         cachedLayout = nil
         appliedSelectedIndex = -1
@@ -800,7 +821,23 @@ final class SwitcherView: NSView {
             )
         }
 
+        applyRosterSectionFrames(info.sections)
         applyItemFrames(info.frames)
+    }
+
+    private func applyRosterSectionFrames(_ sections: [RosterSectionLayout.Section]) {
+        pinnedSectionView.isHidden = true
+        runningSectionView.isHidden = true
+        for section in sections {
+            let sectionView: RosterSectionBackdropView
+            switch section.kind {
+            case .pinned: sectionView = pinnedSectionView
+            case .running: sectionView = runningSectionView
+            }
+            sectionView.frame = section.frame
+            sectionView.apply(scale: metrics.scale, accent: accent)
+            sectionView.isHidden = false
+        }
     }
 
     /// Slides the whole row block from where it was drawn a moment ago to where
@@ -904,6 +941,7 @@ final class SwitcherView: NSView {
         let total: NSSize
         let rowsPerCol: Int
         let cols: Int
+        var sections: [RosterSectionLayout.Section] = []
     }
 
     /// Shrink the scale just enough that `count` items fit within the visible
@@ -1115,6 +1153,45 @@ final class SwitcherView: NSView {
         return (cols, rowsPerCol, rowW, CGFloat(cols) * rowW, CGFloat(rowsPerCol) * rowH)
     }
 
+    /// Packs the persistent roster and currently-running apps as two independent
+    /// vertical blocks. The section header is part of each block's geometry, so
+    /// labels and background chrome cannot overlap the item frames.
+    private func groupedRosterLayout(
+        itemSize: NSSize,
+        itemGap: CGFloat,
+        maxWidth: CGFloat,
+        maxColumns: Int,
+        packing: RosterSectionLayout.Packing
+    ) -> ListLayout {
+        let headerHeight = round(28 * metrics.scale)
+        let bottomPadding = round(8 * metrics.scale)
+        let sectionSpacing = round(10 * metrics.scale)
+        let result = RosterSectionLayout.make(
+            pinnedCount: persistentRowCount,
+            totalCount: rows.count,
+            itemSize: itemSize,
+            itemGap: itemGap,
+            maxWidth: maxWidth,
+            maxColumns: maxColumns,
+            headerHeight: headerHeight,
+            bottomPadding: bottomPadding,
+            sectionSpacing: sectionSpacing,
+            packing: packing
+        )
+        let outer = metrics.outerPadding
+        let visualRows = result.sections.reduce(0) { count, section in
+            count + Int(ceil(Double(section.range.count) / Double(max(1, result.columns))))
+        }
+        return ListLayout(
+            frames: result.itemFrames,
+            listSize: result.size,
+            total: NSSize(width: result.size.width + outer * 2, height: result.size.height + outer * 2),
+            rowsPerCol: max(1, visualRows),
+            cols: max(1, result.columns),
+            sections: result.sections
+        )
+    }
+
     private func computeListLayout() -> ListLayout {
         let rowH = metrics.rowHeight
         let baseRowW = metrics.resolvedRowWidth(percent: effective.listWidthPercent)
@@ -1137,6 +1214,19 @@ final class SwitcherView: NSView {
         let rowW = fit.rowW
         let listWidth = fit.listWidth
         let listHeight = fit.listHeight
+
+        if persistentRowCount > 0 {
+            // Keep list navigation predictable: the grouped roster is a single
+            // vertical column instead of letting a section boundary split the
+            // controller's column arithmetic.
+            return groupedRosterLayout(
+                itemSize: NSSize(width: rowW, height: rowH),
+                itemGap: 0,
+                maxWidth: maxListWidth,
+                maxColumns: 1,
+                packing: .columnMajor
+            )
+        }
 
         var frames: [NSRect] = []
         frames.reserveCapacity(rows.count)
@@ -1178,6 +1268,15 @@ final class SwitcherView: NSView {
 
         // Tile stacks: letter strip (top) + icon + text labels (bottom).
         let itemH = letterArea + tile + labelArea
+        if persistentRowCount > 0 {
+            return groupedRosterLayout(
+                itemSize: NSSize(width: tile, height: itemH),
+                itemGap: gap,
+                maxWidth: maxListWidth,
+                maxColumns: effective.gridMaxColumns,
+                packing: .rowMajor
+            )
+        }
         let fit = Self.gridFit(count: count, tileW: tile, itemH: itemH, gap: gap,
                                maxListWidth: maxListWidth, maxListHeight: maxListHeight,
                                userCap: effective.gridMaxColumns)
@@ -1233,6 +1332,16 @@ final class SwitcherView: NSView {
         let maxListHeight = screen.height * maxScreenHeightFraction - outerPadding * 2
             - reservedSearchHeight - reservedTabStripHeight
 
+        if persistentRowCount > 0 {
+            return groupedRosterLayout(
+                itemSize: NSSize(width: tileW, height: itemH),
+                itemGap: gap,
+                maxWidth: maxListWidth,
+                maxColumns: effective.gridMaxColumns,
+                packing: .rowMajor
+            )
+        }
+
         // Preview tiles are tall, so width-only wrapping overflows the screen
         // height well before the width. `gridFit` adds columns to keep rows within
         // the visible height; the configure-time fit-scale shrinks the tiles when
@@ -1275,6 +1384,91 @@ final class SwitcherView: NSView {
             rowsPerCol: rowsCount,
             cols: cols
         )
+    }
+}
+
+/// A quiet labelled surface behind one roster section. The pinned block uses a
+/// subtle accent wash; the live-running block stays neutral so the persistent
+/// launch targets read as a distinct, stable area at a glance.
+@MainActor
+private final class RosterSectionBackdropView: NSView {
+    private let icon = NSImageView()
+    private let title = NSTextField(labelWithString: "")
+    private let emphasized: Bool
+    private var accent: NSColor = .controlAccentColor
+    private var scale: CGFloat = 0
+
+    init(title: String, symbolName: String, emphasized: Bool) {
+        self.emphasized = emphasized
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.cornerCurve = .continuous
+
+        icon.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)
+        icon.imageScaling = .scaleProportionallyUpOrDown
+        addSubview(icon)
+
+        self.title.stringValue = title
+        self.title.lineBreakMode = .byTruncatingTail
+        addSubview(self.title)
+        isHidden = true
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) not implemented") }
+
+    func apply(scale: CGFloat, accent: NSColor) {
+        if self.scale != scale {
+            self.scale = scale
+            title.font = .systemFont(ofSize: round(11 * scale), weight: .semibold)
+            let configuration = NSImage.SymbolConfiguration(pointSize: round(10 * scale), weight: .semibold)
+            icon.symbolConfiguration = configuration
+            needsLayout = true
+        }
+        self.accent = accent
+        updateAppearance()
+    }
+
+    override func layout() {
+        super.layout()
+        let activeScale = max(scale, 0.01)
+        let inset = round(10 * activeScale)
+        let iconSize = round(12 * activeScale)
+        let headerHeight = round(28 * activeScale)
+        icon.frame = NSRect(
+            x: inset,
+            y: bounds.height - headerHeight + round((headerHeight - iconSize) / 2),
+            width: iconSize,
+            height: iconSize
+        )
+        let titleHeight = ceil(title.intrinsicContentSize.height)
+        title.frame = NSRect(
+            x: icon.frame.maxX + round(5 * activeScale),
+            y: bounds.height - headerHeight + round((headerHeight - titleHeight) / 2),
+            width: max(0, bounds.width - icon.frame.maxX - inset),
+            height: titleHeight
+        )
+        layer?.cornerRadius = round(14 * activeScale)
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateAppearance()
+    }
+
+    private func updateAppearance() {
+        guard layer != nil else { return }
+        if emphasized {
+            layer?.backgroundColor = accent.withAlphaComponent(0.12).cgColor
+            layer?.borderColor = accent.withAlphaComponent(0.30).cgColor
+            icon.contentTintColor = accent
+            title.textColor = .labelColor
+        } else {
+            layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.045).cgColor
+            layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.30).cgColor
+            icon.contentTintColor = .secondaryLabelColor
+            title.textColor = .secondaryLabelColor
+        }
+        layer?.borderWidth = 1
     }
 }
 

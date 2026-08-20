@@ -37,6 +37,24 @@ final class AppsSettingsViewController: SettingsTabViewController {
     private var cancellables = Set<AnyCancellable>()
 
     override func setupContent() {
+        if !AccessibilityCheck.isTrusted {
+            let access = addSection(title: nil, anchor: nil)
+            let button = NSButton(
+                title: String(localized: "Open Accessibility Settings"),
+                target: self,
+                action: #selector(openAccessibilitySettings)
+            )
+            button.bezelStyle = .rounded
+            button.controlSize = .small
+            addRow(
+                to: access,
+                icon: "exclamationmark.triangle.fill",
+                title: String(localized: "StayTab isn't controlling ⌘Tab yet"),
+                subtitle: String(localized: "Grant Accessibility access first. Until then macOS's original switcher remains active."),
+                accessory: button
+            )
+        }
+
         // App rules — a titled group (header + description) above a card whose
         // rows are one app each, ending in an "Add App…" row.
         let header = makeGroupHeader(
@@ -82,6 +100,11 @@ final class AppsSettingsViewController: SettingsTabViewController {
             self.rebuildPinnedCard()
         }
         rebuildPinnedCard()
+    }
+
+    @objc private func openAccessibilitySettings() {
+        AccessibilityCheck.promptIfNeeded()
+        AccessibilityCheck.openSystemSettings()
     }
 
     /// Rebuild the pinned card: the reorderable list (or an empty-state label)

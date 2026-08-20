@@ -3294,7 +3294,15 @@ final class SwitcherController: SwitcherViewDelegate {
         let sessionScreen = resolveSessionScreen()
         panel.targetScreen = sessionScreen
         currentMetrics = makeMetrics()
-        view.configure(rows: rows, labels: displayLabels, selectedIndex: index, metrics: currentMetrics, effective: effective, highlightPrefix: letterBuffer)
+        view.configure(
+            rows: rows,
+            labels: displayLabels,
+            selectedIndex: index,
+            metrics: currentMetrics,
+            effective: effective,
+            highlightPrefix: letterBuffer,
+            persistentRowCount: persistentPrefixCount(in: rows)
+        )
         panel.present(opacity: effective.panelOpacity)
         phase = .visible
         cache.setPanelVisible(true)
@@ -5574,6 +5582,20 @@ final class SwitcherController: SwitcherViewDelegate {
         )
     }
 
+    /// Persistent rows are a fixed prefix only in the unfiltered app roster.
+    /// Search and type-to-jump reorder the visible rows, so section chrome is
+    /// deliberately disabled there instead of labelling a mixed block as pinned.
+    private func persistentPrefixCount(in displayedRows: [SwitcherRow]) -> Int {
+        guard !windowsOnlyMode,
+              activeScope == nil,
+              !searchActive,
+              letterBuffer.isEmpty else { return 0 }
+        let pinned = Set(Preferences.shared.pinnedBundleIDs)
+        return displayedRows.prefix { row in
+            row.bundleIdentifier.map(pinned.contains) == true
+        }.count
+    }
+
     /// Recently closed windows/apps to surface for reopening. `forSearchQuery`
     /// non-nil filters by fuzzy match; nil yields the newest entries. Returns
     /// nothing when the feature is off or in window-only mode. App-only entries
@@ -5814,7 +5836,8 @@ final class SwitcherController: SwitcherViewDelegate {
             searchActive: searchActive,
             searchQuery: searchQuery,
             tabStripItems: tabDrillActive ? tabStripItems : tabDrillHint.map { [TabStripItem(title: $0, faviconKey: nil)] },
-            tabStripSelectedIndex: tabIndex
+            tabStripSelectedIndex: tabIndex,
+            persistentRowCount: persistentPrefixCount(in: rows)
         )
         panel.present(opacity: effective.panelOpacity)
     }
