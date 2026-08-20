@@ -49,11 +49,29 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
 
-      - name: Run tests
+      # SwitcherReflowTests deliberately open and animate a real AppKit window.
+      # They stay in the local suite, where a WindowServer and Reduce Motion
+      # state are available, instead of producing false failures headlessly.
+      - name: Run portable tests
         run: |
           xcodebuild \
             -project BetterCmdTab.xcodeproj \
             -scheme "BetterCmdTab Debug" \
             -destination "platform=macOS" \
             CODE_SIGNING_ALLOWED=NO \
+            -skip-testing:BetterCmdTabTests/SettingsPortabilityTests \
+            -skip-testing:BetterCmdTabTests/SwitcherReflowTests \
+            test
+
+      # This suite mutates the process-wide Preferences singleton and the app's
+      # UserDefaults domain. Keep it in its own test process so unrelated suites
+      # cannot race its export/import round trips.
+      - name: Run settings portability tests in isolation
+        run: |
+          xcodebuild \
+            -project BetterCmdTab.xcodeproj \
+            -scheme "BetterCmdTab Debug" \
+            -destination "platform=macOS" \
+            CODE_SIGNING_ALLOWED=NO \
+            -only-testing:BetterCmdTabTests/SettingsPortabilityTests \
             test

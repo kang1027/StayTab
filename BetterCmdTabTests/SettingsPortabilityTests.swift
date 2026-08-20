@@ -648,18 +648,22 @@ struct SettingsPortabilityTests {
     @Test("round-trip: shiftTapStepsBackward survives export/import")
     func shiftTapStepsBackwardRoundTrip() throws {
         let prefs = Preferences.shared
+        let key = Preferences.Keys.shiftTapStepsBackward
+        let savedRaw = UserDefaults.standard.object(forKey: key)
         let saved = prefs.shiftTapStepsBackward
         defer {
-            try? prefs.importSettings(from: envelope([
-                Preferences.Keys.shiftTapStepsBackward: saved
-            ]))
+            prefs.shiftTapStepsBackward = saved
+            if savedRaw == nil { UserDefaults.standard.removeObject(forKey: key) }
         }
-        // Flip away from the default (on), export, flip live back, import.
-        prefs.shiftTapStepsBackward = false
-        let data = try Preferences.exportedJSONData()
+        // Export a value that is guaranteed to exist even on a clean install.
+        // Assigning the default `false` while the key is absent is a no-op, so an
+        // export from a fresh CI host would correctly omit it and could not restore
+        // the later `true` value through the partial-import contract.
         prefs.shiftTapStepsBackward = true
+        let data = try Preferences.exportedJSONData()
+        prefs.shiftTapStepsBackward = false
         try prefs.importSettings(from: data)
-        #expect(prefs.shiftTapStepsBackward == false)
+        #expect(prefs.shiftTapStepsBackward == true)
     }
 
     @Test("import missing shiftTapStepsBackward leaves the current value untouched")
