@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Discussions
-    url: https://github.com/rokartur/BetterCmdTab/discussions
+    url: https://github.com/kang1027/StayTab/discussions
     about: Ask questions and discuss ideas with the community
+  - name: Private security report
+    url: https://github.com/kang1027/StayTab/security/advisories/new
+    about: Report a vulnerability without exposing it in a public issue

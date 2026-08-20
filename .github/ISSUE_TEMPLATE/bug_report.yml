@@ -1,16 +1,18 @@
-name: Bug Report
-description: Create a report to help us improve
-labels: ["bug", "pending"]
+name: Bug report
+description: Report incorrect switching, focus, rendering, or settings behavior
+title: "[Bug]: "
+labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        Please fill out the sections below to help everyone identify and fix the bug.
+        Thanks for helping improve StayTab. Remove private window titles, account names, notifications, and other personal information from attachments.
   - type: textarea
     id: description
     attributes:
-      label: Describe your issue
-      placeholder: When I click here this happens
+      label: What happened?
+      description: Describe the visible behavior and the app or window that remained focused.
+      placeholder: I pressed ⌘Tab from Warp, selected ChatGPT, and…
     validations:
       required: true
   - type: textarea
@@ -18,20 +20,23 @@ body:
     attributes:
       label: Steps to reproduce
       placeholder: |
-        1. Go to page X
-        2. Click here
-        3. Click there
+        1. Open these apps and windows…
+        2. Press this exact key sequence…
+        3. Select this row…
     validations:
       required: true
   - type: textarea
     id: expected
     attributes:
-      label: What was the expected result?
-      placeholder: I expected this to happen
+      label: Expected behavior
+      placeholder: The selected window should receive keyboard focus immediately.
+    validations:
+      required: true
   - type: textarea
     id: screenshots
     attributes:
-      label: Put here any screenshots or videos (optional)
+      label: Screenshots or recording
+      description: Optional but recommended for focus, animation, grouping, or stale-frame problems.
   - type: dropdown
     id: app_version
     attributes:
@@ -39,9 +44,7 @@ body:
       description: Pick the release shown in Settings > About.
       options:
         # release-options:start
-        - "26.7 (20260813144806) — latest"
-        - "26.6.1 (20260703123053) — release"
-        - "26.6 (20260702140005) — release"
+        - Source build
         # release-options:end
         - Other / not listed
     validations:
@@ -51,7 +54,7 @@ body:
     attributes:
       label: Other application version and build (optional)
       description: Complete this only when you selected "Other / not listed".
-      placeholder: 26.7 (20260712155351)
+      placeholder: 0.1.0 (20260820120000)
   - type: input
     id: os_version
     attributes:
@@ -60,7 +63,27 @@ body:
       placeholder: macOS 26.5.1
     validations:
       required: true
-  - type: markdown
+  - type: dropdown
+    id: mac
     attributes:
-      value: |
-        Thanks for reporting this issue! We will get back to you as soon as possible.
+      label: Mac architecture
+      options:
+        - Apple Silicon
+        - Intel
+        - Unknown
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Relevant configuration
+      description: Include pinned apps, jump keys, layout, profile, Space, browser-tab, or display settings that affect the issue.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and discussions first.
+          required: true
+        - label: I removed private information from logs and attachments.
+          required: true

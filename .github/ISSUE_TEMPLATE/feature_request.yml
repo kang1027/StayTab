@@ -1,0 +1,53 @@
+name: Feature request
+description: Suggest a StayTab workflow or improvement
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the workflow or problem first. Concrete examples help us decide whether a change belongs in StayTab's core or advanced feature set.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or workflow
+      description: What are you trying to do, and where does the current behavior get in the way?
+      placeholder: I keep these apps pinned, then…
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: What should happen from the user's perspective?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: How do you handle this today?
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Product area
+      options:
+        - Pinned apps and grouping
+        - App or window switching
+        - Jump keys and keyboard controls
+        - Appearance
+        - Permissions and privacy
+        - Advanced or browser-tab behavior
+        - Distribution and updates
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and discussions first.
+          required: true
+        - label: This request describes a user workflow rather than only an implementation.
+          required: true

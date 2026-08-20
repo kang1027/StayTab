@@ -1,4 +1,4 @@
-# Contributing to BetterCmdTab
+# Contributing to StayTab
 
 Thanks for taking the time to contribute. Issues and pull requests are both welcome — bug reports, feature ideas, and code changes alike.
 
@@ -28,17 +28,17 @@ The codebase is small. Read these first:
 ## Building
 
 ```bash
-git clone https://github.com/rokartur/BetterCmdTab.git
-cd BetterCmdTab
-xcodebuild -scheme "BetterCmdTab Debug" -configuration Debug build
+git clone https://github.com/kang1027/StayTab.git
+cd StayTab
+xcodebuild -project BetterCmdTab.xcodeproj -scheme "BetterCmdTab Debug" -configuration Debug CODE_SIGNING_ALLOWED=NO build
 ```
 
-You need Xcode 16+ and the macOS 26 SDK installed. The Liquid Glass code paths are gated to macOS 26 — building against an older SDK still works, the app just falls back to NSVisualEffectView at runtime.
+You need Xcode 26+ and the macOS 26 SDK installed. The deployment target remains macOS 13; Liquid Glass is runtime-gated and older systems use `NSVisualEffectView`.
 
 ## Running tests
 
 ```bash
-xcodebuild -scheme "BetterCmdTab Debug" -destination 'platform=macOS' test
+xcodebuild -project BetterCmdTab.xcodeproj -scheme "BetterCmdTab Debug" -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO test
 ```
 
 Tests live under `BetterCmdTabTests/`. They cover pure logic — switcher metrics, row labelling, updater parsing, Liquid Glass selection — plus a small AppKit-hosted set (`TabStripWindowingTests`, `SwitcherReflowTests`) that needs a live WindowServer and macOS Reduce Motion off. The rest of the UI is verified manually because the switcher needs Accessibility permissions.
@@ -57,7 +57,7 @@ Tests live under `BetterCmdTabTests/`. They cover pure logic — switcher metric
 Open an issue with:
 
 1. macOS version (`sw_vers`)
-2. BetterCmdTab version (menu bar → About)
+2. StayTab version (menu bar → About)
 3. Steps to reproduce — exact key sequence, which apps were open, which display you were on
 4. What you expected vs. what happened
 5. A short screen recording if the bug is visual (focus flicker, layout, glass rendering)
@@ -70,7 +70,7 @@ Describe the workflow you want, not the implementation. "I want to filter the sw
 
 ## Security
 
-If you find a vulnerability — anything that lets a third-party app read switcher state, intercept hotkeys, or escalate via the AX permission BetterCmdTab holds — please open a private security advisory on GitHub instead of a public issue.
+If you find a vulnerability — anything that lets a third-party app read switcher state, intercept hotkeys, or escalate via the AX permission StayTab holds — please open a private security advisory on GitHub instead of a public issue.
 
 ## License
 
