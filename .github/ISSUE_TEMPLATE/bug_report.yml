@@ -44,7 +44,7 @@ body:
       description: Pick the release shown in Settings > About.
       options:
         # release-options:start
-        - Source build
+        - "0.1.0 (20260820175413) — latest"
         # release-options:end
         - Other / not listed
     validations:
