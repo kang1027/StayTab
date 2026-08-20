@@ -46,13 +46,13 @@ final class SwitcherView: NSView {
     private let listContainer = NSView()
     private let pinnedSectionView = RosterSectionBackdropView(
         title: String(localized: "Always"),
-        symbolName: "pin.fill",
-        emphasized: true
+        symbolName: "infinity",
+        style: .persistent
     )
     private let runningSectionView = RosterSectionBackdropView(
         title: String(localized: "Running now"),
-        symbolName: "bolt.fill",
-        emphasized: false
+        symbolName: "circle.fill",
+        style: .running
     )
     private let searchBar = SwitcherSearchBarView()
     private let tabStrip = TabStripView()
@@ -1388,18 +1388,23 @@ final class SwitcherView: NSView {
 }
 
 /// A quiet labelled surface behind one roster section. The pinned block uses a
-/// subtle accent wash; the live-running block stays neutral so the persistent
-/// launch targets read as a distinct, stable area at a glance.
+/// subtle accent wash; the live-running block keeps a neutral surface with a
+/// green status label so the persistent launch targets remain visually primary.
 @MainActor
 private final class RosterSectionBackdropView: NSView {
+    enum Style {
+        case persistent
+        case running
+    }
+
     private let icon = NSImageView()
     private let title = NSTextField(labelWithString: "")
-    private let emphasized: Bool
+    private let style: Style
     private var accent: NSColor = .controlAccentColor
     private var scale: CGFloat = 0
 
-    init(title: String, symbolName: String, emphasized: Bool) {
-        self.emphasized = emphasized
+    init(title: String, symbolName: String, style: Style) {
+        self.style = style
         super.init(frame: .zero)
         wantsLayer = true
         layer?.cornerCurve = .continuous
@@ -1457,16 +1462,18 @@ private final class RosterSectionBackdropView: NSView {
 
     private func updateAppearance() {
         guard layer != nil else { return }
-        if emphasized {
+        switch style {
+        case .persistent:
             layer?.backgroundColor = accent.withAlphaComponent(0.12).cgColor
             layer?.borderColor = accent.withAlphaComponent(0.30).cgColor
             icon.contentTintColor = accent
             title.textColor = .labelColor
-        } else {
+        case .running:
+            let runningGreen = NSColor.systemGreen.withAlphaComponent(0.85)
             layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.045).cgColor
             layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.30).cgColor
-            icon.contentTintColor = .secondaryLabelColor
-            title.textColor = .secondaryLabelColor
+            icon.contentTintColor = runningGreen
+            title.textColor = runningGreen
         }
         layer?.borderWidth = 1
     }
