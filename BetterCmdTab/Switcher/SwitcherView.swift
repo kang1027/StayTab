@@ -51,7 +51,7 @@ final class SwitcherView: NSView {
     )
     private let runningSectionView = RosterSectionBackdropView(
         title: String(localized: "Running now"),
-        symbolName: "circle.fill",
+        symbolName: "bolt.fill",
         style: .running
     )
     private let searchBar = SwitcherSearchBarView()
@@ -1387,9 +1387,9 @@ final class SwitcherView: NSView {
     }
 }
 
-/// A quiet labelled surface behind one roster section. The pinned block uses a
-/// subtle accent wash; the live-running block keeps a neutral surface with a
-/// green status label so the persistent launch targets remain visually primary.
+/// A quiet labelled surface behind one roster section. The persistent block uses
+/// the system accent; the live-running block keeps a neutral surface with a green
+/// status label so both groups remain easy to scan without competing backgrounds.
 @MainActor
 private final class RosterSectionBackdropView: NSView {
     enum Style {
@@ -1467,7 +1467,7 @@ private final class RosterSectionBackdropView: NSView {
             layer?.backgroundColor = accent.withAlphaComponent(0.12).cgColor
             layer?.borderColor = accent.withAlphaComponent(0.30).cgColor
             icon.contentTintColor = accent
-            title.textColor = .labelColor
+            title.textColor = accent
         case .running:
             let runningGreen = NSColor.systemGreen.withAlphaComponent(0.85)
             layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.045).cgColor
