@@ -131,7 +131,8 @@ struct PreferencesEnumTests {
     @MainActor
     @Test("clampDelay keeps values inside the allowed range")
     func clampDelay() {
-        #expect(Preferences.clampDelay(10) == Preferences.revealDelayRange.lowerBound)
+        #expect(Preferences.clampDelay(-10) == Preferences.revealDelayRange.lowerBound)
+        #expect(Preferences.clampDelay(0) == 0)
         #expect(Preferences.clampDelay(9999) == Preferences.revealDelayRange.upperBound)
         #expect(Preferences.clampDelay(150) == 150)
     }

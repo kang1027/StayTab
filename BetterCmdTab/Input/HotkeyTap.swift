@@ -919,6 +919,24 @@ final class HotkeyTap: @unchecked Sendable {
         switchingFlag.withLock { $0 }
     }
 
+    /// The trigger tap runs before the main-actor state machine. Claim the
+    /// switching interval on this thread before enqueueing the first event so a
+    /// following key cannot leak into the app underneath during that handoff.
+    private func claimSwitchingBeforeDelivery() {
+        switchingFlag.withLock { $0 = true }
+    }
+
+    /// Pure gate for the tiny trigger-thread → main-actor handoff. Only keys
+    /// still carrying the trigger modifier are captured; a normal key pressed
+    /// after releasing it keeps flowing to the frontmost app.
+    static func shouldCapturePendingPanelInput(
+        switching: Bool,
+        panelPresented: Bool,
+        holdModifierDown: Bool
+    ) -> Bool {
+        switching && !panelPresented && holdModifierDown
+    }
+
     private func isPanelPresented() -> Bool {
         panelPresentedFlag.withLock { $0 }
     }
@@ -1249,6 +1267,7 @@ final class HotkeyTap: @unchecked Sendable {
                switchingNow || Self.triggerChordMatches(flags, configured: cfg.appModifier) {
                 if suppressTrigger { return Unmanaged.passUnretained(event) }
                 let dir: Event = shiftHeld ? .prevApp : .nextApp
+                claimSwitchingBeforeDelivery()
                 deliver(dir)
                 return nil
             }
@@ -1256,6 +1275,7 @@ final class HotkeyTap: @unchecked Sendable {
                switchingNow || Self.triggerChordMatches(flags, configured: cfg.windowModifier) {
                 if suppressTrigger { return Unmanaged.passUnretained(event) }
                 let dir: Event = shiftHeld ? .prevWindow : .nextWindow
+                claimSwitchingBeforeDelivery()
                 deliver(dir)
                 return nil
             }
@@ -1292,6 +1312,28 @@ final class HotkeyTap: @unchecked Sendable {
                 // immediately hitting `/` would leak the keystroke to the app the
                 // user is switching away from.
                 let special = specialKeys.withLock { $0 }
+                // The first trigger is claimed on this tap thread before its
+                // event reaches main. Capture a fast follow-up key while the
+                // hold modifier is still down so ⌘Tab,P can never become ⌘P in
+                // the browser underneath. Main-queue FIFO delivers the trigger
+                // first; with a zero reveal delay the panel is visible before
+                // this letter event is handled. Non-alphanumeric keys are still
+                // swallowed during this microscopic interval for the same leak
+                // prevention, but a key pressed after modifier-up passes through.
+                if Self.shouldCapturePendingPanelInput(
+                    switching: true,
+                    panelPresented: isPanelPresented(),
+                    holdModifierDown: anyModHeld
+                ) {
+                    if !optionHeld, !controlHeld,
+                       let ch = translate(keyCode: keyCode, shift: shiftHeld, option: optionHeld) {
+                        let lower = Character(ch.lowercased())
+                        if RowLabels.isDirectJumpCharacter(lower) {
+                            deliver(.letterInput(lower))
+                        }
+                    }
+                    return nil
+                }
                 // An explicit two-key jump owns its first character while the
                 // normal panel is visible. Resolve that precedence once here so
                 // it applies consistently to rebound search/tab-drill keys, vim

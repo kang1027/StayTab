@@ -658,8 +658,8 @@ final class Preferences: ObservableObject {
     /// Seeded as a first-run App rule (show only with open windows).
     static let finderBundleID = "com.apple.finder"
 
-    static let defaultRevealDelayMs = 100
-    nonisolated static let revealDelayRange: ClosedRange<Int> = 40...500
+    static let defaultRevealDelayMs = 0
+    nonisolated static let revealDelayRange: ClosedRange<Int> = 0...500
 
     /// How long a partial letter-jump prefix survives before it expires and the
     /// switcher returns to its pre-typing order. Default 1000ms.

@@ -60,4 +60,15 @@ struct HotkeyTapTriggerMatchTests {
         #expect(!HotkeyTap.chordKeyMatches(10, 48))
         #expect(!HotkeyTap.chordKeyMatches(49, 50))
     }
+
+    @Test func pendingPanelCapturesOnlyWhileTriggerModifierIsHeld() {
+        #expect(HotkeyTap.shouldCapturePendingPanelInput(
+            switching: true, panelPresented: false, holdModifierDown: true))
+        #expect(!HotkeyTap.shouldCapturePendingPanelInput(
+            switching: true, panelPresented: false, holdModifierDown: false))
+        #expect(!HotkeyTap.shouldCapturePendingPanelInput(
+            switching: true, panelPresented: true, holdModifierDown: true))
+        #expect(!HotkeyTap.shouldCapturePendingPanelInput(
+            switching: false, panelPresented: false, holdModifierDown: true))
+    }
 }

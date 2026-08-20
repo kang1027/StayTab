@@ -300,8 +300,77 @@ enum Activator {
                     return
                 }
                 if hasWindows { bringToFront(live) } else { openFreshWindow(for: live) }
-                completion()
+                finishAppRestore(
+                    app: live,
+                    generation: gen,
+                    attempt: 0,
+                    completion: completion
+                )
             }
+        }
+    }
+
+    /// Return focus to the app/window that owned it before StayTab activated its
+    /// panel. Unlike `activateApp`, a windowless fallback never creates a fresh
+    /// window: cancel must restore context, not mutate the target app.
+    @MainActor
+    static func restoreFocus(
+        to app: NSRunningApplication,
+        window: AXUIElement?,
+        completion: @escaping @MainActor @Sendable () -> Void
+    ) {
+        if let window {
+            activateRunning(
+                app: app,
+                window: window,
+                cachedWid: PrivateAPI.cgWindowId(of: window),
+                isMinimized: false,
+                isFullscreen: false,
+                instantSpace: false,
+                completion: completion
+            )
+            return
+        }
+
+        let gen = beginActivation()
+        if app.isHidden { app.unhide() }
+        activateProcess(app)
+        finishAppRestore(app: app, generation: gen, attempt: 0, completion: completion)
+    }
+
+    @MainActor
+    private static func finishAppRestore(
+        app: NSRunningApplication,
+        generation: UInt64,
+        attempt: Int,
+        completion: @escaping @MainActor @Sendable () -> Void
+    ) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) {
+            guard activationGeneration.withLock({ $0 == generation }), !app.isTerminated else {
+                completion()
+                return
+            }
+            let pid = app.processIdentifier
+            let frontmostPid = NSWorkspace.shared.frontmostApplication?.processIdentifier
+            if frontmostPid == pid {
+                completion()
+                return
+            }
+            guard mayReassertFocus(
+                frontmostPid: frontmostPid,
+                targetPid: pid,
+                switcherPid: getpid()
+            ), attempt < 5 else {
+                completion()
+                return
+            }
+            activateProcess(app)
+            finishAppRestore(
+                app: app,
+                generation: generation,
+                attempt: attempt + 1,
+                completion: completion
+            )
         }
     }
 
@@ -416,7 +485,12 @@ enum Activator {
             } else {
                 openFreshWindow(for: app)
             }
-            completion()
+            finishAppRestore(
+                app: app,
+                generation: gen,
+                attempt: 0,
+                completion: completion
+            )
             return
         }
 
@@ -437,7 +511,6 @@ enum Activator {
         activateProcess(app)
 
         let applyFocus: @Sendable () -> Void = {
-            defer { DispatchQueue.main.async { completion() } }
             guard activationGeneration.withLock({ $0 == gen }) else { return }
             AXUIElementSetMessagingTimeout(window, 0.2)
             if isMinimized {
@@ -454,23 +527,46 @@ enum Activator {
         }
         if pid == getpid() { applyFocus() } else { activationQueue.async(execute: applyFocus) }
 
-        // `activateProcess` (NSRunningApplication.activate) brings the app forward
-        // asynchronously; its effect can land *after* the writes above and
-        // re-select the app's last-used window — the app then shows active in the
-        // menu bar while our target window never takes key focus (the intermittent
-        // "switched app but wrong/no window focused" bug). Re-assert raise + focus
-        // once activation has settled, but only while our target is still frontmost
-        // so we never yank focus the user may have since moved elsewhere.
+        // `activateProcess` lands asynchronously. Keep the invisible switcher
+        // ordered until the target is genuinely frontmost and focused; dismissing
+        // it earlier lets AppKit promote an open StayTab settings window back to
+        // key, leaving Electron terminals/editors visible but inactive.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-            guard activationGeneration.withLock({ $0 == gen }),
-                  NSWorkspace.shared.frontmostApplication?.processIdentifier == pid else { return }
+            guard activationGeneration.withLock({ $0 == gen }) else {
+                completion()
+                return
+            }
+            let frontmostPid = NSWorkspace.shared.frontmostApplication?.processIdentifier
+            guard mayReassertFocus(
+                frontmostPid: frontmostPid,
+                targetPid: pid,
+                switcherPid: getpid()
+            ), let live = NSRunningApplication(processIdentifier: pid) else {
+                completion()
+                return
+            }
+            // Re-activate when StayTab still owns frontmost status. Repeating this
+            // when the target is already frontmost is harmless and closes the
+            // asynchronous activation/window-focus ordering race.
+            activateProcess(live)
             let reassert: @Sendable () -> Void = {
-                guard activationGeneration.withLock({ $0 == gen }) else { return }
+                guard activationGeneration.withLock({ $0 == gen }) else {
+                    DispatchQueue.main.async { completion() }
+                    return
+                }
                 AXUIElementPerformAction(window, kAXRaiseAction as CFString)
                 AXUIElementSetAttributeValue(window, kAXMainAttribute as CFString, kCFBooleanTrue)
                 AXUIElementSetAttributeValue(window, kAXFocusedAttribute as CFString, kCFBooleanTrue)
                 if pid != getpid() {
-                    verifyFocusSettled(window: window, wid: wid, pid: pid, generation: gen)
+                    verifyFocusSettled(
+                        window: window,
+                        wid: wid,
+                        pid: pid,
+                        generation: gen,
+                        completion: completion
+                    )
+                } else {
+                    DispatchQueue.main.async { completion() }
                 }
             }
             if pid == getpid() { reassert() } else { activationQueue.async(execute: reassert) }
@@ -485,21 +581,51 @@ enum Activator {
     /// Happy path costs a single off-main AX read (no writes, no main-thread
     /// work). The generation + frontmost guards drop the retry when the user
     /// (or a newer activation) has since moved focus deliberately.
-    private static func verifyFocusSettled(window: AXUIElement, wid: CGWindowID, pid: pid_t, generation: UInt64) {
+    private static func verifyFocusSettled(
+        window: AXUIElement,
+        wid: CGWindowID,
+        pid: pid_t,
+        generation: UInt64,
+        completion: @escaping @MainActor @Sendable () -> Void
+    ) {
         activationQueue.asyncAfter(deadline: .now() + 0.12) {
+            guard activationGeneration.withLock({ $0 == generation }) else {
+                DispatchQueue.main.async { completion() }
+                return
+            }
             let focused = focusedWindow(pid: pid)
             let focusedWid = focused.map { PrivateAPI.cgWindowId(of: $0) } ?? 0
             let sameElement = focused.map { CFEqual($0, window) } ?? false
-            if focusSettled(targetWid: wid, focusedWid: focusedWid, sameElement: sameElement) { return }
+            let settled = focusSettled(targetWid: wid, focusedWid: focusedWid, sameElement: sameElement)
             DispatchQueue.main.async {
-                guard activationGeneration.withLock({ $0 == generation }),
-                      NSWorkspace.shared.frontmostApplication?.processIdentifier == pid else { return }
+                guard activationGeneration.withLock({ $0 == generation }) else {
+                    completion()
+                    return
+                }
+                let frontmostPid = NSWorkspace.shared.frontmostApplication?.processIdentifier
+                if settled, frontmostPid == pid {
+                    completion()
+                    return
+                }
+                guard mayReassertFocus(
+                    frontmostPid: frontmostPid,
+                    targetPid: pid,
+                    switcherPid: getpid()
+                ), let live = NSRunningApplication(processIdentifier: pid) else {
+                    completion()
+                    return
+                }
+                activateProcess(live)
                 activationQueue.async {
-                    guard activationGeneration.withLock({ $0 == generation }) else { return }
+                    guard activationGeneration.withLock({ $0 == generation }) else {
+                        DispatchQueue.main.async { completion() }
+                        return
+                    }
                     AXUIElementPerformAction(window, kAXRaiseAction as CFString)
                     if wid != 0 { PrivateAPI.raiseWindow(pid: pid, wid: wid) }
                     AXUIElementSetAttributeValue(window, kAXMainAttribute as CFString, kCFBooleanTrue)
                     AXUIElementSetAttributeValue(window, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) { completion() }
                 }
             }
         }
@@ -528,12 +654,24 @@ enum Activator {
         return sameElement
     }
 
+    /// A delayed focus write may continue only while the target app or StayTab's
+    /// own invisible panel is frontmost. A third app means the user moved on and
+    /// must never be yanked back. Nil is the transient no-frontmost state during
+    /// an activation handoff and remains safe to reassert.
+    static func mayReassertFocus(
+        frontmostPid: pid_t?,
+        targetPid: pid_t,
+        switcherPid: pid_t
+    ) -> Bool {
+        frontmostPid == nil || frontmostPid == targetPid || frontmostPid == switcherPid
+    }
+
     /// Activate a specific tab inside `window`. Same window-bringing steps as
-     /// `activateRunning`, then press the tab's AX element so the host app
-     /// selects it. Some browsers (Chrome, Arc) respond to `kAXPressAction`;
-     /// others (Safari for non-current tabs) only flip selection via the
-     /// `kAXSelectedAttribute` write. Try the press first, then the attribute —
-     /// neither call short-circuits, so doing both is safe.
+    /// `activateRunning`, then press the tab's AX element so the host app
+    /// selects it. Some browsers (Chrome, Arc) respond to `kAXPressAction`;
+    /// others (Safari for non-current tabs) only flip selection via the
+    /// `kAXSelectedAttribute` write. Try the press first, then the attribute —
+    /// neither call short-circuits, so doing both is safe.
     @MainActor
     static func activateTab(
         in app: NSRunningApplication,
@@ -556,23 +694,38 @@ enum Activator {
 
         activateProcess(app)
         let apply: @Sendable () -> Void = {
-            defer { DispatchQueue.main.async { completion() } }
-            guard activationGeneration.withLock({ $0 == gen }) else { return }
+            guard activationGeneration.withLock({ $0 == gen }) else {
+                DispatchQueue.main.async { completion() }
+                return
+            }
             AXUIElementSetMessagingTimeout(window, 0.2)
             AXUIElementSetMessagingTimeout(tab, 0.2)
             if isMinimized {
                 AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
             }
-            guard activationGeneration.withLock({ $0 == gen }) else { return }
+            guard activationGeneration.withLock({ $0 == gen }) else {
+                DispatchQueue.main.async { completion() }
+                return
+            }
             AXUIElementPerformAction(window, kAXRaiseAction as CFString)
             if wid != 0 && !postedSpaceSwitch {
                 PrivateAPI.raiseWindow(pid: pid, wid: wid)
             }
             AXUIElementSetAttributeValue(window, kAXMainAttribute as CFString, kCFBooleanTrue)
             AXUIElementSetAttributeValue(window, kAXFocusedAttribute as CFString, kCFBooleanTrue)
-            guard activationGeneration.withLock({ $0 == gen }) else { return }
+            guard activationGeneration.withLock({ $0 == gen }) else {
+                DispatchQueue.main.async { completion() }
+                return
+            }
             AXUIElementPerformAction(tab, kAXPressAction as CFString)
             AXUIElementSetAttributeValue(tab, kAXSelectedAttribute as CFString, kCFBooleanTrue)
+            verifyFocusSettled(
+                window: window,
+                wid: wid,
+                pid: pid,
+                generation: gen,
+                completion: completion
+            )
         }
         if pid == getpid() { apply() } else { activationQueue.async(execute: apply) }
     }

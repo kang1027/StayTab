@@ -34,6 +34,18 @@ struct ActivatorFocusSettledTests {
     func nothingResolvedNotSettled() {
         #expect(!Activator.focusSettled(targetWid: 0, focusedWid: 0, sameElement: false))
     }
+
+    @Test("focus may be reasserted while the target or switcher owns frontmost")
+    func safeReassertOwners() {
+        #expect(Activator.mayReassertFocus(frontmostPid: 20, targetPid: 20, switcherPid: 10))
+        #expect(Activator.mayReassertFocus(frontmostPid: 10, targetPid: 20, switcherPid: 10))
+        #expect(Activator.mayReassertFocus(frontmostPid: nil, targetPid: 20, switcherPid: 10))
+    }
+
+    @Test("focus is not reasserted after the user moves to a third app")
+    func thirdAppStopsReassert() {
+        #expect(!Activator.mayReassertFocus(frontmostPid: 30, targetPid: 20, switcherPid: 10))
+    }
 }
 
 /// Covers the pure raise-id fallback (`Activator.resolvedWindowID`): the live

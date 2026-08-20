@@ -2867,6 +2867,15 @@ final class SwitcherController: SwitcherViewDelegate {
         // showing windows that flicker into tabs after the Apple Events round-trip.
         prewarmBrowserTabs()
         revealTimer?.invalidate()
+        // Zero means truly immediate. Avoid even a zero-duration run-loop timer:
+        // the tap already quarantines follow-up chord keys, and revealing inline
+        // preserves FIFO so ⌘Tab,P reaches the visible panel instead of the app
+        // underneath.
+        if revealDelay <= 0 {
+            revealTimer = nil
+            reveal()
+            return
+        }
         let timer = Timer(timeInterval: revealDelay, repeats: false) { [weak self] _ in
             // The timer already fires on the main run loop (added below), so run
             // reveal() inline instead of bouncing through `Task { @MainActor }`:
@@ -4334,8 +4343,14 @@ final class SwitcherController: SwitcherViewDelegate {
                 Activator.invalidatePendingActivation()
                 DispatchQueue.global(qos: .userInitiated).async {
                     _ = BrowserTabs.activateTab(at: tabIndex, in: app, window: window, title: parentTitle)
+                    DispatchQueue.main.async {
+                        Activator.restoreFocus(
+                            to: app,
+                            window: window,
+                            completion: completion
+                        )
+                    }
                 }
-                completion()
             }
         }
         bumpWindowMRUIfPossible(for: row)
@@ -4356,6 +4371,8 @@ final class SwitcherController: SwitcherViewDelegate {
         tabPrefetchTimer = nil
         let currentPhase = phase
         let instantSpace = Preferences.shared.instantSpaceSwitch
+        let restoreApp = previousFrontmostApp.flatMap { $0.isTerminated ? nil : $0 }
+        let restoreWindow = openFocusedWindow
         revealGeneration &+= 1
         let commitGeneration = revealGeneration
         let finishDismiss: @MainActor @Sendable () -> Void = { [weak self] in
@@ -4442,6 +4459,16 @@ final class SwitcherController: SwitcherViewDelegate {
             CommitFeedback.play()
             panel.vanish()
             pendingActivation()
+        } else if let restoreApp {
+            // Empty/no-op commit: undo the panel's self-activation without
+            // ordering it out first. Otherwise AppKit briefly promotes an open
+            // StayTab settings window before the user's app becomes active.
+            panel.vanish()
+            Activator.restoreFocus(
+                to: restoreApp,
+                window: restoreWindow,
+                completion: finishDismiss
+            )
         } else {
             finishDismiss()
         }
@@ -4461,13 +4488,6 @@ final class SwitcherController: SwitcherViewDelegate {
         prefetchedFocusedWindowTitle = ""
         prefetchedTarget = nil
         visibleSince = nil
-        // We picked a target — `pendingActivation` activates it, so there's
-        // nothing to restore. Without a pick (committing out of the empty
-        // state, or a primed commit that resolved no app) undo present()'s
-        // self-activation like cancel() does, then drop the captured app.
-        if pendingActivation == nil {
-            restorePreviousFrontmostApp()
-        }
         previousFrontmostApp = nil
         resetLetterBuffer()
         resetSearch()
@@ -4476,11 +4496,21 @@ final class SwitcherController: SwitcherViewDelegate {
     private func cancel() {
         revealTimer?.invalidate()
         revealTimer = nil
+        let restoreApp = previousFrontmostApp.flatMap { $0.isTerminated ? nil : $0 }
+        let restoreWindow = openFocusedWindow
         revealGeneration &+= 1
+        let cancelGeneration = revealGeneration
+        let finishDismiss: @MainActor @Sendable () -> Void = { [weak self] in
+            guard let self,
+                  self.revealGeneration == cancelGeneration,
+                  self.phase == .idle else { return }
+            self.panel.dismiss()
+            self.view.releaseIdleResources()
+        }
         phase = .idle
         cache.setPanelVisible(false)
         dockBadgeObserver.stop()
-        panel.dismiss()
+        if restoreApp != nil { panel.vanish() }
         primedApps = []
         rows = []
         baseRows = []
@@ -4512,25 +4542,18 @@ final class SwitcherController: SwitcherViewDelegate {
         openTargetScreen = nil
         prefetchedTarget = nil
         visibleSince = nil
-        view.releaseIdleResources()
-        // Dismissing without picking: undo the self-activation `present()` did for
-        // the glass backdrop and put the user back in the app they came from.
-        restorePreviousFrontmostApp()
-    }
-
-    /// Re-activate whatever app was frontmost when the switcher opened (captured
-    /// in `reveal()`), undoing `present()`'s self-activation. No-op if there was
-    /// none or it has since quit.
-    private func restorePreviousFrontmostApp() {
-        guard let app = previousFrontmostApp, !app.isTerminated else {
-            previousFrontmostApp = nil
-            return
-        }
         previousFrontmostApp = nil
-        if #available(macOS 14.0, *) {
-            _ = app.activate(from: .current, options: [])
+        // Keep the vanished panel ordered while focus returns. The real orderOut
+        // happens only after the original app/window is active, preventing an
+        // open StayTab settings window from flashing on Escape.
+        if let restoreApp {
+            Activator.restoreFocus(
+                to: restoreApp,
+                window: restoreWindow,
+                completion: finishDismiss
+            )
         } else {
-            app.activate(options: [.activateIgnoringOtherApps])
+            finishDismiss()
         }
     }
 
@@ -5033,8 +5056,14 @@ final class SwitcherController: SwitcherViewDelegate {
             Activator.invalidatePendingActivation()
             DispatchQueue.global(qos: .userInitiated).async {
                 _ = BrowserTabs.activateTab(at: chosen, in: app, window: window, title: title)
+                DispatchQueue.main.async {
+                    Activator.restoreFocus(
+                        to: app,
+                        window: window,
+                        completion: finishDismiss
+                    )
+                }
             }
-            finishDismiss()
         case .accessibility:
             if let tab = targetElement {
                 Activator.activateTab(
