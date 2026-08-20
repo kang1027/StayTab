@@ -1,988 +1,313 @@
 #!/usr/bin/env bash
-#
-# build_release.sh — Build, sign, notarize, and zip BetterCmdTab for distribution.
-#
-# Usage:
-#   scripts/build_release.sh               # stable release (default)
-#   scripts/build_release.sh --beta        # beta / pre-release build
-#   scripts/build_release.sh --skip-notarization  # skip notarize+staple (dev builds)
-#
-# Output:
-#   build/release/BetterCmdTab-<version>-<build>.dmg
-#   build/release/BetterCmdTab-<version>-<build>.zip
-#
-# Requirements:
-#   - Xcode with "Developer ID Application" certificate installed
-#   - App-specific password stored in Keychain for notarytool:
-#       xcrun notarytool store-credentials "BetterCmdTabNotarization" \
-#         --apple-id "your@email.com" \
-#         --team-id "N529W98U62" \
-#         --password "xxxx-xxxx-xxxx-xxxx"
-#
+# Build, sign, notarize, package, and optionally publish StayTab.
 set -euo pipefail
 
-# ─── Configuration ───────────────────────────────────────────────────────────
-
-TEAM_ID="N529W98U62"
-SIGNING_IDENTITY="${SIGNING_IDENTITY:-Developer ID Application: Artur Rok (${TEAM_ID})}"
-NOTARYTOOL_PROFILE="${NOTARYTOOL_PROFILE:-BetterCmdTabNotarization}"
+TEAM_ID="${TEAM_ID:-GGR9HG6DB8}"
+SIGNING_IDENTITY="${SIGNING_IDENTITY:-Developer ID Application: DongHyeon Kang (${TEAM_ID})}"
+NOTARYTOOL_PROFILE="${NOTARYTOOL_PROFILE:-StayTabNotarization}"
+RELEASE_REPO="${RELEASE_REPO:-kang1027/StayTab}"
 SCHEME="BetterCmdTab"
-BUNDLE_ID="pro.bettercmdtab.BetterCmdTab"
-APP_NAME="BetterCmdTab"
-RELEASE_REPO="rokartur/BetterCmdTab"
-
-# ─── Parse arguments ────────────────────────────────────────────────────────
+APP_NAME="StayTab"
+BUNDLE_ID="com.kdh.StayTab"
 
 is_beta=0
 skip_notarization=0
+skip_build=0
 clean_build=0
 auto_release=0
-skip_build_bump=0
-release_notes=""
+notes_file=""
+requested_build_number=""
 
 usage() {
 	cat <<'EOF'
 Usage: scripts/build_release.sh [OPTIONS]
 
 Options:
-  --beta                Build as beta (pre-release). Auto-detects next beta.N from GitHub tags,
-                        auto-bumps build number (timestamp), auto-cleans UpdaterDownloads cache.
-  --stable              Build as stable release (default).
-  --auto-release        After build+notarize, auto-create the GitHub release on
-                        rokartur/BetterCmdTab with DMG+ZIP attached. A beta is
-                        published as a pre-release, a stable one as latest.
-  --notes TEXT          Release notes for --auto-release. Supports literal newlines
-                        when passed as one quoted argument.
-                        When omitted on an interactive terminal, the script
-                        prompts per category (Highlights, Added, Changed, Fixed,
-                        Security, Removed, Known issues). Empty sections are
-                        skipped. See docs/agents/changelog.md.
-  --skip-build-bump     Skip build number timestamp bump.
-                        Use when re-running after a notarization failure where the
-                        bump was already committed.
-  --skip-notarization   Skip notarization & stapling (for local testing).
-  --clean               Wipe build/release/ (DMGs, ZIPs, archive, logs)
-                        and run xcodebuild clean on DerivedData.
-  -h, --help            Show this help message.
+  --stable                 Build a stable release (default).
+  --beta                   Build the next beta for the current version.
+  --skip-notarization      Build an unnotarized local test package. Never publish it.
+  --skip-build             Reuse the package recorded in build/release/latest.env.
+  --build-number NUMBER    Override the timestamp build number.
+  --clean                  Remove only build/release before building.
+  --auto-release           Publish the verified package as a GitHub Release.
+  --notes-file PATH        Markdown release notes for --auto-release.
+  -h, --help               Show this help.
 
 Environment:
-  SIGNING_IDENTITY      Override the code signing identity.
-  NOTARYTOOL_PROFILE    Override the notarytool keychain profile name.
-
-Output:
-  build/release/BetterCmdTab-<version>.dmg
-  build/release/BetterCmdTab-<version>.zip
+  TEAM_ID                   Apple Developer team (default: GGR9HG6DB8).
+  SIGNING_IDENTITY          Developer ID Application identity.
+  NOTARYTOOL_PROFILE        notarytool Keychain profile.
+  RELEASE_REPO              GitHub owner/repository (default: kang1027/StayTab).
 EOF
 }
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
-	--beta) is_beta=1 ;;
 	--stable) is_beta=0 ;;
-	--auto-release) auto_release=1 ;;
-	--notes)
-		shift
-		if [[ $# -eq 0 ]]; then
-			echo "❌ --notes requires release notes text" >&2
-			usage
-			exit 64
-		fi
-		release_notes="$1"
-		;;
-	--skip-build-bump) skip_build_bump=1 ;;
+	--beta) is_beta=1 ;;
 	--skip-notarization) skip_notarization=1 ;;
+	--skip-build) skip_build=1 ;;
 	--clean) clean_build=1 ;;
-	-h | --help)
-		usage
-		exit 0
+	--auto-release) auto_release=1 ;;
+	--notes-file)
+		shift
+		[[ $# -gt 0 ]] || { echo "--notes-file requires a path" >&2; exit 64; }
+		notes_file="$1"
 		;;
-	*)
-		echo "❌ Unknown option: $1" >&2
-		usage
-		exit 64
+	--build-number)
+		shift
+		[[ $# -gt 0 ]] || { echo "--build-number requires a value" >&2; exit 64; }
+		requested_build_number="$1"
 		;;
+	-h | --help) usage; exit 0 ;;
+	*) echo "Unknown option: $1" >&2; usage; exit 64 ;;
 	esac
 	shift
 done
 
-# ─── Paths ───────────────────────────────────────────────────────────────────
-
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_PATH="${REPO_ROOT}/BetterCmdTab.xcodeproj"
 BUILD_DIR="${REPO_ROOT}/build/release"
-ARCHIVE_PATH="${BUILD_DIR}/BetterCmdTab.xcarchive"
+ARCHIVE_PATH="${BUILD_DIR}/StayTab.xcarchive"
 EXPORT_PATH="${BUILD_DIR}/export"
-
-# ─── Helpers ─────────────────────────────────────────────────────────────────
+DMG_STAGE_DIR="${BUILD_DIR}/dmg-stage"
+METADATA_PATH="${BUILD_DIR}/latest.env"
 
 step() {
-	echo ""
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	echo "  $1"
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	printf '\n==> %s\n' "$1"
 }
 
-# Extract bullets (lines starting with "- ") under a given Markdown heading
-# until the next heading or EOF. $1 = full canonical heading incl. prefix
-# (e.g. "### Added"). $2 = source file.
-#
-# Legacy releases use synonym headings (e.g. "Changes" → "Changed",
-# "Enhancements" → "Added"). The extractor accepts known aliases per
-# canonical section so prior notes carry over even when their wording
-# predates docs/agents/changelog.md.
-extract_bullets_under_heading() {
-	local heading="$1"
-	local file="$2"
-	[[ -f "$file" ]] || return 0
-
-	local prefix="${heading% *}"
-	local section="${heading##* }"
-	local aliases=("$section")
-	case "$section" in
-	Added) aliases+=("New" "Enhancements") ;;
-	Changed) aliases+=("Changes" "Improvements") ;;
-	Fixed) aliases+=("Fixes" "Bug fixes") ;;
-	Removed) aliases+=("Deprecated") ;;
-	esac
-
-	local joined
-	joined=$(
-		IFS='|'
-		echo "${aliases[*]}"
-	)
-
-	awk -v prefix="$prefix" -v joined="$joined" '
-    BEGIN {
-      n = split(joined, arr, "|")
-      for (i = 1; i <= n; i++) targets[prefix " " arr[i]] = 1
-    }
-    $0 in targets       { in_section = 1; next }
-    /^#/                { in_section = 0 }
-    in_section && /^- / { print }
-  ' "$file"
+setting() {
+	xcodebuild -project "$PROJECT_PATH" -scheme "$SCHEME" -showBuildSettings 2>/dev/null |
+		awk -v key="$1" '$1 == key { print $3; exit }'
 }
 
-# Extract the first non-empty line under "## Highlights" until the next heading.
-extract_highlight_line() {
-	local file="$1"
-	[[ -f "$file" ]] || return 0
-	awk '
-    /^## Highlights/ { in_section = 1; next }
-    /^#/             { in_section = 0 }
-    in_section && NF { print; exit }
-  ' "$file"
+require_command() {
+	command -v "$1" >/dev/null 2>&1 || { echo "Required command not found: $1" >&2; exit 1; }
 }
 
-# Prompt user for a single sentence. Empty input → emit nothing.
-# If $3 is non-empty, that text is shown as carried-over and kept when
-# the user submits empty input.
-prompt_section_oneline() {
-	local section="$1"
-	local heading="${2:-##}"
-	local prior_text="${3:-}"
-	echo "" >&2
-	echo "── ${section} ──" >&2
-	if [[ -n "$prior_text" ]]; then
-		echo "  Carried over: ${prior_text}" >&2
-		echo "  Enter replacement, or leave empty to keep carried-over." >&2
+metadata_value() {
+	awk -F= -v key="$1" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$METADATA_PATH"
+}
+
+require_command xcodebuild
+require_command codesign
+require_command ditto
+require_command hdiutil
+require_command shasum
+
+VERSION="$(setting MARKETING_VERSION)"
+[[ -n "$VERSION" ]] || { echo "Could not read MARKETING_VERSION" >&2; exit 1; }
+
+if [[ $skip_build -eq 1 ]]; then
+	[[ -f "$METADATA_PATH" ]] || { echo "No reusable package metadata at ${METADATA_PATH}" >&2; exit 1; }
+	META_VERSION="$(metadata_value VERSION)"
+	[[ "$META_VERSION" == "$VERSION" ]] || {
+		echo "Reusable package is ${META_VERSION}, project is ${VERSION}" >&2
+		exit 1
+	}
+	BUILD_NUMBER="$(metadata_value BUILD_NUMBER)"
+	TAG="$(metadata_value TAG)"
+	DMG_PATH="$(metadata_value DMG_PATH)"
+	ZIP_PATH="$(metadata_value ZIP_PATH)"
+	[[ -f "$DMG_PATH" && -f "$ZIP_PATH" ]] || { echo "Recorded release assets are missing" >&2; exit 1; }
+	ARTIFACT_VERSION="$(metadata_value ARTIFACT_VERSION)"
+else
+	if [[ -n "$requested_build_number" ]]; then
+		[[ "$requested_build_number" =~ ^[0-9]+$ ]] || { echo "Build number must be numeric" >&2; exit 64; }
+		BUILD_NUMBER="$requested_build_number"
 	else
-		echo "  Enter one sentence. Empty input skips this section." >&2
-	fi
-	printf "  > " >&2
-	local line
-	IFS= read -r line || line=""
-	if [[ -z "$line" ]]; then
-		[[ -z "$prior_text" ]] && return 0
-		line="$prior_text"
-	fi
-	printf "%s %s\n%s\n\n" "$heading" "$section" "$line"
-}
-
-# Prompt user for bullets, one per line. Blank line finishes the section.
-# Lines without leading "- " get it prepended automatically.
-# Optional $3 = prior-notes file path. When provided, any existing bullets
-# under "$heading $section" in that file are loaded as carried-over and
-# emitted first; user input is appended.
-# Final bullet count (prior + new) zero → section skipped entirely.
-prompt_section_bullets() {
-	local section="$1"
-	local heading="${2:-###}"
-	local prior_file="${3:-}"
-
-	local prior_bullets=()
-	if [[ -n "$prior_file" && -s "$prior_file" ]]; then
-		local _b
-		while IFS= read -r _b; do
-			[[ -n "$_b" ]] && prior_bullets+=("$_b")
-		done < <(extract_bullets_under_heading "${heading} ${section}" "$prior_file")
+		BUILD_NUMBER="$(date +%Y%m%d%H%M%S)"
 	fi
 
-	echo "" >&2
-	echo "── ${section} ──" >&2
-	if [[ ${#prior_bullets[@]} -gt 0 ]]; then
-		echo "  Carried over from prior beta:" >&2
-		printf "    %s\n" "${prior_bullets[@]}" >&2
-		echo "  Add more bullets (blank line finishes, empty input keeps only carried-over):" >&2
+	if [[ $is_beta -eq 1 ]]; then
+		require_command gh
+		last_beta="$(gh release list --repo "$RELEASE_REPO" --limit 100 --json tagName --jq ".[].tagName | select(startswith(\"v${VERSION}-beta.\"))" 2>/dev/null | sort -V | tail -1 || true)"
+		if [[ -z "$last_beta" ]]; then
+			beta_number=1
+		else
+			beta_number="$(( ${last_beta##*.} + 1 ))"
+		fi
+		ARTIFACT_VERSION="${VERSION}-beta.${beta_number}"
+		TAG="v${ARTIFACT_VERSION}"
 	else
-		echo "  Enter bullets, one per line. Blank line finishes. Leave empty to skip." >&2
+		ARTIFACT_VERSION="$VERSION"
+		TAG="v${VERSION}"
 	fi
 
-	local new_bullets=()
-	local line
-	while :; do
-		printf "  > " >&2
-		IFS= read -r line || break
-		[[ -z "$line" ]] && break
-		[[ "$line" =~ ^[[:space:]]*- ]] || line="- ${line}"
-		new_bullets+=("$line")
-	done
+	DMG_PATH="${BUILD_DIR}/StayTab-${ARTIFACT_VERSION}-${BUILD_NUMBER}.dmg"
+	ZIP_PATH="${BUILD_DIR}/StayTab-${ARTIFACT_VERSION}-${BUILD_NUMBER}.zip"
+fi
 
-	local total=$((${#prior_bullets[@]} + ${#new_bullets[@]}))
-	[[ $total -eq 0 ]] && return 0
-
-	printf "%s %s\n" "$heading" "$section"
-	[[ ${#prior_bullets[@]} -gt 0 ]] && printf "%s\n" "${prior_bullets[@]}"
-	[[ ${#new_bullets[@]} -gt 0 ]] && printf "%s\n" "${new_bullets[@]}"
-	printf "\n"
-}
-
-# Build release notes Markdown by prompting through every category.
-# $1 = output file path. $2 (optional) = prior-notes file to prefill from.
-compose_release_notes_interactively() {
-	local out_file="$1"
-	local prior_file="${2:-}"
-	: >"$out_file"
-	echo "" >&2
-	echo "📝 Compose release notes. Follow docs/agents/changelog.md style." >&2
-	if [[ -n "$prior_file" && -s "$prior_file" ]]; then
-		echo "   Prior notes loaded: existing bullets carry over per section." >&2
-	fi
-
-	local prior_highlight=""
-	[[ -n "$prior_file" ]] && prior_highlight=$(extract_highlight_line "$prior_file")
-
-	prompt_section_oneline "Highlights" "##" "$prior_highlight" >>"$out_file"
-	prompt_section_bullets "Added" "###" "$prior_file" >>"$out_file"
-	prompt_section_bullets "Changed" "###" "$prior_file" >>"$out_file"
-	prompt_section_bullets "Fixed" "###" "$prior_file" >>"$out_file"
-	prompt_section_bullets "Security" "###" "$prior_file" >>"$out_file"
-	prompt_section_bullets "Removed" "###" "$prior_file" >>"$out_file"
-	prompt_section_bullets "Known issues" "###" "$prior_file" >>"$out_file"
-}
-
-# ─── Pre-flight checks ──────────────────────────────────────────────────────
-
-step "Pre-flight checks"
-
-# Verify signing identity is available
-if ! security find-identity -v -p codesigning | grep -q "${TEAM_ID}"; then
-	echo "❌ Signing identity not found for team ${TEAM_ID}."
-	echo "   Install a 'Developer ID Application' certificate from the Apple Developer portal."
+if [[ $auto_release -eq 1 && $skip_notarization -eq 1 ]]; then
+	echo "Refusing to publish an unnotarized build" >&2
 	exit 1
 fi
-echo "✅ Signing identity found"
 
-# Verify notarytool credentials (unless skipping)
-if [[ $skip_notarization -eq 0 ]]; then
-	# Use `notarytool info` with a dummy ID to validate credentials.
-	# It will return "Invalid" (exit 0 or 69) if creds are valid but ID doesn't exist,
-	# vs a credentials/auth error if the profile is wrong.
-	notary_check_output=$(xcrun notarytool info "00000000-0000-0000-0000-000000000000" \
-		--keychain-profile "${NOTARYTOOL_PROFILE}" 2>&1) || true
-
-	if echo "$notary_check_output" | grep -qi "credentials\|authentication\|could not find credentials\|profile not found"; then
-		echo "❌ Notarization credentials not found. Set them up with:"
-		echo "   xcrun notarytool store-credentials \"${NOTARYTOOL_PROFILE}\" \\"
-		echo "     --apple-id \"your@email.com\" \\"
-		echo "     --team-id \"${TEAM_ID}\" \\"
-		echo "     --password \"xxxx-xxxx-xxxx-xxxx\""
-		exit 1
-	fi
-	echo "✅ Notarization credentials found"
+if [[ -n "$notes_file" ]]; then
+	notes_file="$(cd "$(dirname "$notes_file")" && pwd)/$(basename "$notes_file")"
+	[[ -s "$notes_file" ]] || { echo "Release notes are missing or empty: $notes_file" >&2; exit 1; }
 fi
 
-# Verify gh CLI auth if --auto-release requested
-if [[ $auto_release -eq 1 ]]; then
-	if ! command -v gh &>/dev/null; then
-		echo "❌ gh CLI not installed. Install with: brew install gh"
-		exit 1
-	fi
-	if ! gh auth status --hostname github.com &>/dev/null; then
-		echo "❌ gh CLI not authenticated. Run: gh auth login"
-		exit 1
-	fi
-	echo "✅ gh CLI authenticated"
-fi
-
-# ─── Step -1: Wipe build artifacts (--clean only) ───────────────────────────
-#
-# Stale DMG/ZIP artifacts from earlier beta cycles otherwise accumulate in
-# build/release/ and confuse Finder + manual upload flows. --clean now wipes
-# the entire output directory before anything else writes to it (quality
-# gate log, archive, export, etc.). xcodebuild's own clean still runs later
-# to also drop DerivedData for the scheme.
-
-if [[ $clean_build -eq 1 ]]; then
-	step "Step -1: Wipe build folder"
-	if [[ -d "${BUILD_DIR}" ]]; then
-		echo "🧹 Removing ${BUILD_DIR}..."
-		rm -rf "${BUILD_DIR:?}"
+if [[ $skip_build -eq 0 ]]; then
+	if [[ $clean_build -eq 1 && -d "$BUILD_DIR" ]]; then
+		step "Clean release workspace"
+		find "$BUILD_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
 	fi
 	mkdir -p "$BUILD_DIR"
-	echo "✅ Build folder wiped"
-fi
 
-# ─── Step 0: Release quality gate ───────────────────────────────────────────
-#
-# Compile in Release configuration with code signing disabled and bail out if
-# any high-risk concurrency / Sendable / UnsafeMutableRawPointer warnings
-# remain. Catches Swift 6 strict-concurrency regressions before we burn an
-# archive + notarization slot on a known-bad build.
+	step "Release quality gate"
+	gate_args=(--fail-on-high-risk-warnings --log-path "${BUILD_DIR}/quality-gate.log")
+	[[ $clean_build -eq 1 ]] && gate_args+=(--clean)
+	[[ $is_beta -eq 1 ]] && gate_args+=(--skip-i18n)
+	"${REPO_ROOT}/scripts/release_quality_gate.sh" "${gate_args[@]}"
 
-step "Step 0: Release quality gate"
-
-QUALITY_GATE="${REPO_ROOT}/scripts/release_quality_gate.sh"
-QUALITY_GATE_LOG="${BUILD_DIR}/release_quality_gate.log"
-mkdir -p "$BUILD_DIR"
-
-if [[ ! -x "$QUALITY_GATE" ]]; then
-	echo "❌ release_quality_gate.sh not found or not executable at ${QUALITY_GATE}"
-	exit 1
-fi
-
-# --clean is not optional here: the gate decides pass/fail by counting warning:
-# lines in the xcodebuild log, and Xcode does not re-emit warnings for files it
-# does not recompile. On warm DerivedData an incremental build logs nothing, so
-# without this the gate reports zero high-risk warnings for every build after the
-# first and waves through exactly the artifact it exists to stop.
-_quality_gate_args=(--clean --fail-on-high-risk-warnings --log-path "$QUALITY_GATE_LOG")
-[[ $is_beta -eq 1 ]] && _quality_gate_args+=(--skip-i18n)
-
-if ! "$QUALITY_GATE" "${_quality_gate_args[@]}"; then
-	echo ""
-	echo "❌ Release quality gate failed."
-	echo "   Full xcodebuild log: ${QUALITY_GATE_LOG}"
-	exit 1
-fi
-
-echo "✅ Release quality gate passed"
-
-step "Step 1: Configure build type"
-
-if [[ $is_beta -eq 1 ]]; then
-	echo "🔶 Building BETA (pre-release)"
-else
-	echo "🟢 Building STABLE release"
-fi
-
-# Read version from project. Capture the settings once and parse with a
-# single awk: under `set -euo pipefail`, `| grep | head -1` can kill the
-# whole script silently when head's early exit SIGPIPEs grep (exit 141).
-_build_settings=$(xcodebuild -project "$PROJECT_PATH" -scheme "$SCHEME" -showBuildSettings 2>/dev/null || true)
-VERSION=$(awk '/ MARKETING_VERSION =/{print $NF; exit}' <<<"$_build_settings")
-VERSION="${VERSION#v}"
-
-if [[ -z "$VERSION" ]]; then
-	echo "❌ Could not determine MARKETING_VERSION from project"
-	exit 1
-fi
-
-BUILD_NUMBER=$(awk '/ CURRENT_PROJECT_VERSION =/{print $NF; exit}' <<<"$_build_settings")
-
-echo "   Version: ${VERSION} (build ${BUILD_NUMBER})"
-
-# Auto-detect next beta.N from GitHub tags on the public release repo.
-# Public repo (rokartur/BetterCmdTab) is the canonical source for release tags;
-# the private source repo intentionally has none.
-BETA_N=""
-BETA_TAG=""
-if [[ $is_beta -eq 1 ]]; then
-	if ! command -v gh &>/dev/null; then
-		echo "❌ gh CLI required for beta builds (need to query existing tags). Install: brew install gh"
+	step "Verify signing and notarization setup"
+	security find-identity -v -p codesigning | grep -Fq "$SIGNING_IDENTITY" || {
+		echo "Signing identity not found: ${SIGNING_IDENTITY}" >&2
 		exit 1
+	}
+	if [[ $skip_notarization -eq 0 ]]; then
+		xcrun notarytool history --keychain-profile "$NOTARYTOOL_PROFILE" >/dev/null || {
+			echo "notarytool profile is unavailable: ${NOTARYTOOL_PROFILE}" >&2
+			exit 1
+		}
 	fi
 
-	_beta_tags=$(gh api "repos/rokartur/BetterCmdTab/tags?per_page=100" \
-		--jq "[.[].name | select(startswith(\"${VERSION}-beta.\"))] | join(\"\n\")" 2>/dev/null || true)
-	_last_beta=$(echo "$_beta_tags" | sort -V | tail -1)
+	step "Archive StayTab ${ARTIFACT_VERSION} (${BUILD_NUMBER})"
+	if [[ -d "$ARCHIVE_PATH" ]]; then
+		find "$ARCHIVE_PATH" -mindepth 1 -delete
+		rmdir "$ARCHIVE_PATH"
+	fi
+	xcodebuild \
+		-project "$PROJECT_PATH" \
+		-scheme "$SCHEME" \
+		-configuration Release \
+		-archivePath "$ARCHIVE_PATH" \
+		-destination "generic/platform=macOS" \
+		DEVELOPMENT_TEAM="$TEAM_ID" \
+		CODE_SIGN_STYLE=Manual \
+		CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
+		CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+		OTHER_CODE_SIGN_FLAGS="--timestamp" \
+		archive
 
-	if [[ -z "$_last_beta" ]]; then
-		BETA_N=1
+	ARCHIVED_APP="${ARCHIVE_PATH}/Products/Applications/StayTab.app"
+	[[ -d "$ARCHIVED_APP" ]] || { echo "Archive does not contain StayTab.app" >&2; exit 1; }
+	if [[ -d "$EXPORT_PATH" ]]; then
+		find "$EXPORT_PATH" -mindepth 1 -delete
 	else
-		BETA_N=$((${_last_beta##*beta.} + 1))
+		mkdir -p "$EXPORT_PATH"
 	fi
-	BETA_TAG="${VERSION}-beta.${BETA_N}"
-	echo "   Beta tag: ${BETA_TAG} (previous: ${_last_beta:-none})"
-fi
+	APP_PATH="${EXPORT_PATH}/StayTab.app"
+	ditto "$ARCHIVED_APP" "$APP_PATH"
 
-# What Step 12 publishes when --auto-release is set. Tags are bare on both
-# channels — no `v` prefix — because both Homebrew casks template their download
-# URL on the tag.
-if [[ $is_beta -eq 1 ]]; then
-	RELEASE_TAG="$BETA_TAG"
-	RELEASE_TITLE="BetterCmdTab ${VERSION}-beta.${BETA_N}"
-	RELEASE_KIND="pre-release"
-	RELEASE_DEFAULT_NOTES="Beta ${BETA_N} of BetterCmdTab ${VERSION}."
-else
-	RELEASE_TAG="$VERSION"
-	RELEASE_TITLE="BetterCmdTab ${VERSION}"
-	RELEASE_KIND="release"
-	RELEASE_DEFAULT_NOTES="BetterCmdTab ${VERSION}."
-fi
+	step "Verify app signature and GPL resources"
+	codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+	signature_info="$(codesign -dvv "$APP_PATH" 2>&1 || true)"
+	grep -Fq "TeamIdentifier=${TEAM_ID}" <<<"$signature_info" || { echo "Unexpected signing team" >&2; exit 1; }
+	grep -Fq "Identifier=${BUNDLE_ID}" <<<"$signature_info" || { echo "Unexpected bundle identifier" >&2; exit 1; }
+	[[ -f "${APP_PATH}/Contents/Resources/LICENSE" ]] || { echo "LICENSE is missing from app resources" >&2; exit 1; }
+	[[ -f "${APP_PATH}/Contents/Resources/NOTICE.md" ]] || { echo "NOTICE.md is missing from app resources" >&2; exit 1; }
 
-# Compose artifact version: stable uses VERSION, beta appends -beta.N.
-if [[ $is_beta -eq 1 ]]; then
-	_artifact_version="${VERSION}-beta.${BETA_N}"
-else
-	_artifact_version="${VERSION}"
-fi
-
-# ─── Step 1b: Set build number (timestamp) ──────────────────────────────────
-#
-# Every build (beta and stable) gets a fresh timestamp-based CURRENT_PROJECT_VERSION
-# so the in-app updater can detect newer builds of the same version.
-# Committed + pushed BEFORE archive: if notarization fails, --skip-build-bump
-# on the retry reuses the same build number (no double-bump, no dirty pbxproj).
-#
-# We use sed (not agvtool) because agvtool would also bump BetterCmdTabRemote
-# and would replace $(CURRENT_PROJECT_VERSION) in Info.plist with the literal
-# integer, breaking the variable indirection.
-
-_commit_ref="${BETA_TAG:-${VERSION}}"
-
-if [[ $skip_build_bump -eq 0 ]]; then
-	step "Step 1b: Set build number (timestamp)"
-
-	NEW_BUILD_NUMBER=$(date +%Y%m%d%H%M%S)
-	echo "   Build number: ${BUILD_NUMBER} → ${NEW_BUILD_NUMBER}"
-
-	sed -i '' \
-		"s/CURRENT_PROJECT_VERSION = ${BUILD_NUMBER};/CURRENT_PROJECT_VERSION = ${NEW_BUILD_NUMBER};/g" \
-		"${PROJECT_PATH}/project.pbxproj"
-
-	# Verify the replacement landed correctly (single awk — a grep|head pipe
-	# can SIGPIPE under pipefail and kill the script silently)
-	_actual=$(xcodebuild -project "$PROJECT_PATH" -scheme "$SCHEME" -showBuildSettings 2>/dev/null |
-		awk '/ CURRENT_PROJECT_VERSION =/{print $NF; exit}')
-	if [[ "$_actual" != "$NEW_BUILD_NUMBER" ]]; then
-		echo "❌ Build number increment verification failed (got ${_actual}, expected ${NEW_BUILD_NUMBER})"
-		exit 1
+	NOTARY_ZIP="${BUILD_DIR}/StayTab-${ARTIFACT_VERSION}-notary.zip"
+	if [[ $skip_notarization -eq 0 ]]; then
+		step "Notarize and staple app"
+		rm -f "$NOTARY_ZIP"
+		ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$NOTARY_ZIP"
+		xcrun notarytool submit "$NOTARY_ZIP" --keychain-profile "$NOTARYTOOL_PROFILE" --wait |
+			tee "${BUILD_DIR}/notarization-app.log"
+		grep -Fq "status: Accepted" "${BUILD_DIR}/notarization-app.log" || { echo "App notarization failed" >&2; exit 1; }
+		xcrun stapler staple "$APP_PATH"
+		xcrun stapler validate "$APP_PATH"
 	fi
 
-	echo "✅ project.pbxproj updated"
-
-	# Commit and push the bump before any archive work begins.
-	git -C "$REPO_ROOT" add BetterCmdTab.xcodeproj/project.pbxproj
-	git -C "$REPO_ROOT" commit -m "chore: bump build number to ${NEW_BUILD_NUMBER} for ${_commit_ref}"
-	git -C "$REPO_ROOT" push origin HEAD
-
-	echo "✅ Build number ${NEW_BUILD_NUMBER} committed and pushed"
-
-	BUILD_NUMBER="$NEW_BUILD_NUMBER"
-else
-	echo "⏭️  Skipping build number bump (--skip-build-bump). Reusing ${BUILD_NUMBER}."
-fi
-
-# Artifact names include build number so the updater can detect same-version newer builds.
-DMG_NAME="BetterCmdTab-${_artifact_version}-${BUILD_NUMBER}.dmg"
-DMG_PATH="${BUILD_DIR}/${DMG_NAME}"
-DMG_VOLNAME="BetterCmdTab ${_artifact_version}"
-DMG_STAGE_DIR="${BUILD_DIR}/dmg-stage"
-ZIP_NAME="BetterCmdTab-${_artifact_version}-${BUILD_NUMBER}.zip"
-ZIP_PATH="${BUILD_DIR}/${ZIP_NAME}"
-
-# Transient zip used solely to ship the .app to notarytool for the first
-# notarization round (so we can staple the .app before placing it inside
-# the final DMG). Removed at the end of the build.
-NOTARIZE_ZIP_NAME="BetterCmdTab-${_artifact_version}-app-notarize.zip"
-NOTARIZE_ZIP_PATH="${BUILD_DIR}/${NOTARIZE_ZIP_NAME}"
-
-# ─── Step 1c: Clean UpdaterDownloads cache (beta only) ──────────────────────
-#
-# The in-app updater stages downloaded DMGs in
-# ~/Library/Application Support/BetterCmdTab/UpdaterDownloads. Stale beta DMGs
-# accumulate there and can be picked up on the next launch. Wipe before
-# building a new beta so the updater re-downloads the fresh artifact.
-
-if [[ $is_beta -eq 1 ]]; then
-	UPDATER_DOWNLOADS="${HOME}/Library/Application Support/BetterCmdTab/UpdaterDownloads"
-	if [[ -d "$UPDATER_DOWNLOADS" ]]; then
-		_stale_count=$(find "$UPDATER_DOWNLOADS" -maxdepth 1 -name "*.dmg" | wc -l | tr -d ' ')
-		if [[ "$_stale_count" -gt 0 ]]; then
-			echo "🧹 Removing ${_stale_count} stale DMG(s) from UpdaterDownloads..."
-			find "$UPDATER_DOWNLOADS" -maxdepth 1 -name "*.dmg" -delete
-			echo "✅ UpdaterDownloads cleaned"
-		fi
+	step "Create ZIP and DMG"
+	rm -f "$ZIP_PATH" "$DMG_PATH"
+	ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
+	if [[ -d "$DMG_STAGE_DIR" ]]; then
+		find "$DMG_STAGE_DIR" -mindepth 1 -delete
+	else
+		mkdir -p "$DMG_STAGE_DIR"
 	fi
+	ditto "$APP_PATH" "${DMG_STAGE_DIR}/StayTab.app"
+	ditto "${REPO_ROOT}/LICENSE" "${DMG_STAGE_DIR}/LICENSE.txt"
+	ditto "${REPO_ROOT}/NOTICE.md" "${DMG_STAGE_DIR}/NOTICE.md"
+	ln -s /Applications "${DMG_STAGE_DIR}/Applications"
+	hdiutil create \
+		-volname "StayTab ${ARTIFACT_VERSION}" \
+		-srcfolder "$DMG_STAGE_DIR" \
+		-ov -format UDZO -fs HFS+ "$DMG_PATH" >/dev/null
+	codesign --sign "$SIGNING_IDENTITY" --timestamp "$DMG_PATH"
+	codesign --verify --verbose=2 "$DMG_PATH"
+
+	if [[ $skip_notarization -eq 0 ]]; then
+		step "Notarize and staple DMG"
+		xcrun notarytool submit "$DMG_PATH" --keychain-profile "$NOTARYTOOL_PROFILE" --wait |
+			tee "${BUILD_DIR}/notarization-dmg.log"
+		grep -Fq "status: Accepted" "${BUILD_DIR}/notarization-dmg.log" || { echo "DMG notarization failed" >&2; exit 1; }
+		xcrun stapler staple "$DMG_PATH"
+		xcrun stapler validate "$DMG_PATH"
+	fi
+
+	rm -f "$NOTARY_ZIP"
+	printf 'VERSION=%s\nBUILD_NUMBER=%s\nARTIFACT_VERSION=%s\nTAG=%s\nDMG_PATH=%s\nZIP_PATH=%s\n' \
+		"$VERSION" "$BUILD_NUMBER" "$ARTIFACT_VERSION" "$TAG" "$DMG_PATH" "$ZIP_PATH" >"$METADATA_PATH"
 fi
 
-# ─── Step 2: Clean (optional) & Archive ──────────────────────────────────────
-
-step "Step 2: Archive"
-
-mkdir -p "$BUILD_DIR"
-
-# Remove previous archive/export
-rm -rf "$ARCHIVE_PATH" "$EXPORT_PATH"
-rm -f "$ZIP_PATH"
-
-build_cmd=(
-	xcodebuild archive
-	-allowProvisioningUpdates
-	-project "$PROJECT_PATH"
-	-scheme "$SCHEME"
-	-configuration Release
-	-destination "platform=macOS"
-	-archivePath "$ARCHIVE_PATH"
-	CODE_SIGN_STYLE=Automatic
-	DEVELOPMENT_TEAM="$TEAM_ID"
-	OTHER_CODE_SIGN_FLAGS="--timestamp"
-)
-
-# Stamp the commit this build came from so About can show it next to the build
-# number (#158). Local Xcode builds leave $(GIT_COMMIT) empty and show nothing.
-build_cmd+=(GIT_COMMIT="$(git rev-parse --short HEAD)")
-
-# Beta archives ship the -beta.N suffix in CFBundleShortVersionString. Without
-# it the app reports a bare "26.7" and semver puts every "26.7-beta.N" *below*
-# the installed version, so a beta never offers the next beta (#158).
-# Overridden at archive time — no pbxproj edit to revert afterwards.
-if [[ $is_beta -eq 1 ]]; then
-	build_cmd+=(MARKETING_VERSION="$_artifact_version")
-fi
-
-if [[ $clean_build -eq 1 ]]; then
-	echo "🧹 Cleaning build folder..."
-	xcodebuild clean -project "$PROJECT_PATH" -scheme "$SCHEME" -configuration Release -quiet
-fi
-
-echo "📦 Archiving..."
-if command -v xcbeautify &>/dev/null; then
-	"${build_cmd[@]}" 2>&1 | xcbeautify
-else
-	"${build_cmd[@]}"
-fi
-
-if [[ ! -d "$ARCHIVE_PATH" ]]; then
-	echo "❌ Archive failed — .xcarchive not found"
-	exit 1
-fi
-
-ARCHIVE_INFO_PLIST="${ARCHIVE_PATH}/Info.plist"
-ARCHIVED_APP_PATH="${ARCHIVE_PATH}/Products/Applications/BetterCmdTab.app"
-
-if [[ ! -d "$ARCHIVED_APP_PATH" ]]; then
-	echo "❌ Archive failed — BetterCmdTab.app not found in archive products"
-	exit 1
-fi
-
-if ! /usr/libexec/PlistBuddy -c "Print :ApplicationProperties:ApplicationPath" "$ARCHIVE_INFO_PLIST" >/dev/null 2>&1; then
-	echo "❌ Archive is missing ApplicationProperties in ${ARCHIVE_INFO_PLIST}"
-	echo "   Xcode will refuse exportArchive when the archive is not recognized as a proper macOS app archive."
-	echo "   Check installable targets/helpers in the scheme and ensure only BetterCmdTab.app is archived as an installable product."
-	exit 1
-fi
-
-echo "✅ Archive created: ${ARCHIVE_PATH}"
-
-# ─── Step 3: Export archive ──────────────────────────────────────────────────
-
-step "Step 3: Export"
-
-# Create export options plist (Developer ID, automatic signing)
-EXPORT_OPTIONS_PLIST="${BUILD_DIR}/ExportOptions.plist"
-cat >"$EXPORT_OPTIONS_PLIST" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>method</key>
-    <string>developer-id</string>
-    <key>teamID</key>
-    <string>${TEAM_ID}</string>
-    <key>signingStyle</key>
-    <string>automatic</string>
-    <key>signingCertificate</key>
-    <string>Developer ID Application</string>
-</dict>
-</plist>
-PLIST
-
-echo "📤 Exporting archive..."
-if command -v xcbeautify &>/dev/null; then
-	xcodebuild -exportArchive \
-		-allowProvisioningUpdates \
-		-archivePath "$ARCHIVE_PATH" \
-		-exportPath "$EXPORT_PATH" \
-		-exportOptionsPlist "$EXPORT_OPTIONS_PLIST" \
-		2>&1 | xcbeautify
-else
-	xcodebuild -exportArchive \
-		-allowProvisioningUpdates \
-		-archivePath "$ARCHIVE_PATH" \
-		-exportPath "$EXPORT_PATH" \
-		-exportOptionsPlist "$EXPORT_OPTIONS_PLIST"
-fi
-
-APP_PATH="${EXPORT_PATH}/BetterCmdTab.app"
-
-if [[ ! -d "$APP_PATH" ]]; then
-	echo "❌ Export failed — BetterCmdTab.app not found in ${EXPORT_PATH}"
-	exit 1
-fi
-
-echo "✅ Exported: ${APP_PATH}"
-
-# ─── Step 4: Verify code signature ──────────────────────────────────────────
-
-step "Step 4: Verify code signature"
-
-echo "🔍 Verifying signature..."
-codesign --verify --deep --strict --verbose=2 "$APP_PATH" 2>&1
-echo ""
-
-echo "🔍 Checking hardened runtime..."
-codesign -d --verbose "$APP_PATH" 2>&1 | grep -i "runtime"
-echo ""
-
-echo "🔍 Checking signing authority..."
-codesign -dvv "$APP_PATH" 2>&1 | grep -E "Authority|TeamIdentifier|Identifier"
-echo ""
-
-# Verify the correct team signed it
-codesign_info=$(codesign -dvv "$APP_PATH" 2>&1) || true
-if ! echo "$codesign_info" | grep -q "TeamIdentifier=${TEAM_ID}"; then
-	echo "❌ App is NOT signed by team ${TEAM_ID}"
-	exit 1
-fi
-
-echo "✅ Code signature valid"
-
-# ─── Step 5: Notarize the .app ──────────────────────────────────────────────
-#
-# notarytool requires a flat archive (zip / dmg / pkg). We submit a transient
-# zip of the .app first so we can staple the bundle BEFORE it lands inside
-# the final DMG. Once stapled, Gatekeeper accepts the app offline (no online
-# Apple lookup at first launch after the user copies it out of the DMG).
-
+step "Verify packaged assets"
+shasum -a 256 "$DMG_PATH" "$ZIP_PATH"
 if [[ $skip_notarization -eq 0 ]]; then
-	step "Step 5: Notarize the .app"
-
-	rm -f "$NOTARIZE_ZIP_PATH"
-	ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$NOTARIZE_ZIP_PATH"
-
-	echo "📡 Submitting .app for notarization..."
-	echo "   This may take a few minutes..."
-
-	xcrun notarytool submit "$NOTARIZE_ZIP_PATH" \
-		--keychain-profile "${NOTARYTOOL_PROFILE}" \
-		--wait \
-		2>&1 | tee "${BUILD_DIR}/notarization-app.log"
-
-	if ! grep -q "status: Accepted" "${BUILD_DIR}/notarization-app.log"; then
-		echo ""
-		echo "❌ App notarization failed. Check the log above."
-		echo "   For detailed info, get the submission ID from the log and run:"
-		echo "   xcrun notarytool log <submission-id> --keychain-profile ${NOTARYTOOL_PROFILE}"
-		exit 1
-	fi
-
-	echo "✅ App notarization accepted"
-
-	# ─── Step 6: Staple the .app ─────────────────────────────────────────────
-
-	step "Step 6: Staple notarization ticket to .app"
-
-	echo "📎 Stapling ticket to app..."
-	xcrun stapler staple "$APP_PATH"
-
-	echo "🔍 Verifying staple..."
-	xcrun stapler validate "$APP_PATH"
-
-	echo "✅ App ticket stapled"
-else
-	echo ""
-	echo "⏭️  Skipping app notarization (--skip-notarization)"
-fi
-
-# ─── Step 7: Build ZIP ──────────────────────────────────────────────────────
-
-step "Step 7: Build ZIP"
-
-rm -f "$ZIP_PATH"
-ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
-
-ZIP_SIZE=$(du -h "$ZIP_PATH" | awk '{print $1}')
-echo "✅ Created: ${ZIP_PATH} (${ZIP_SIZE})"
-
-# ─── Step 8: Build DMG ──────────────────────────────────────────────────────
-#
-# Layout: BetterCmdTab.app side-by-side with an /Applications symlink so the
-# user gets the standard "drag to Applications" affordance. The auto-updater
-# uses the same DMG: it mounts via hdiutil, copies the .app to a writable
-# staging dir, unmounts, and hands off to the installer helper.
-
-step "Step 8: Build DMG"
-
-rm -rf "$DMG_STAGE_DIR"
-mkdir -p "$DMG_STAGE_DIR"
-
-# ditto preserves code signatures, xattrs, and symlinks.
-ditto "$APP_PATH" "${DMG_STAGE_DIR}/BetterCmdTab.app"
-
-# Drag-to-install affordance.
-ln -s /Applications "${DMG_STAGE_DIR}/Applications"
-
-rm -f "$DMG_PATH"
-
-# UDZO = zlib-compressed, read-only, smallest practical mount overhead.
-hdiutil create \
-	-volname "$DMG_VOLNAME" \
-	-srcfolder "$DMG_STAGE_DIR" \
-	-ov \
-	-format UDZO \
-	-fs HFS+ \
-	"$DMG_PATH" >/dev/null
-
-DMG_SIZE=$(du -h "$DMG_PATH" | awk '{print $1}')
-echo "✅ Created: ${DMG_PATH} (${DMG_SIZE})"
-
-# ─── Step 9: Sign DMG ───────────────────────────────────────────────────────
-
-step "Step 9: Sign DMG"
-
-codesign --sign "$SIGNING_IDENTITY" --timestamp "$DMG_PATH"
-codesign --verify --verbose=2 "$DMG_PATH"
-
-echo "✅ DMG signed"
-
-# ─── Step 10: Notarize DMG ─────────────────────────────────────────────────
-
-if [[ $skip_notarization -eq 0 ]]; then
-	step "Step 10: Notarize DMG"
-
-	echo "📡 Submitting DMG for notarization..."
-	echo "   This may take a few minutes..."
-
-	xcrun notarytool submit "$DMG_PATH" \
-		--keychain-profile "${NOTARYTOOL_PROFILE}" \
-		--wait \
-		2>&1 | tee "${BUILD_DIR}/notarization-dmg.log"
-
-	if ! grep -q "status: Accepted" "${BUILD_DIR}/notarization-dmg.log"; then
-		echo ""
-		echo "❌ DMG notarization failed. Check the log above."
-		exit 1
-	fi
-
-	echo "✅ DMG notarization accepted"
-
-	# ─── Step 11: Staple DMG ────────────────────────────────────────────────
-
-	step "Step 11: Staple notarization ticket to DMG"
-
-	xcrun stapler staple "$DMG_PATH"
 	xcrun stapler validate "$DMG_PATH"
-
-	echo "✅ DMG ticket stapled"
-else
-	echo ""
-	echo "⏭️  Skipping DMG notarization (--skip-notarization)"
+	spctl --assess --type open --context context:primary-signature --verbose "$DMG_PATH"
 fi
-
-# ─── Step 12: Create the GitHub release (--auto-release only) ──────────────
-#
-# Creates the release tag on the public repo (rokartur/BetterCmdTab) and uploads
-# DMG+ZIP. A beta is marked pre-release with --latest=false so it cannot displace
-# the current stable as the "Latest" pointer the updater reads; the Homebrew cask
-# workflow skips pre-releases by design. A stable release takes --latest, and the
-# cask workflow does pick it up.
 
 if [[ $auto_release -eq 1 ]]; then
-	step "Step 12: Create GitHub ${RELEASE_KIND}"
-
-	if [[ $skip_notarization -eq 1 ]]; then
-		echo "⚠️  Refusing to publish a release built with --skip-notarization."
-		echo "   Re-run without --skip-notarization to publish ${RELEASE_TAG}."
+	step "Publish ${TAG} to ${RELEASE_REPO}"
+	require_command gh
+	[[ -z "$(git -C "$REPO_ROOT" status --porcelain)" ]] || { echo "Working tree must be clean" >&2; exit 1; }
+	HEAD_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+	REMOTE_SHA="$(git -C "$REPO_ROOT" ls-remote origin refs/heads/main | awk '{print $1}')"
+	[[ "$HEAD_SHA" == "$REMOTE_SHA" ]] || {
+		echo "HEAD is not the commit published at origin/main" >&2
+		exit 1
+	}
+	if gh release view "$TAG" --repo "$RELEASE_REPO" >/dev/null 2>&1; then
+		echo "Release already exists: ${TAG}" >&2
 		exit 1
 	fi
+	if [[ -z "$notes_file" ]]; then
+		notes_file="${BUILD_DIR}/release-notes-${TAG}.md"
+		cat >"$notes_file" <<EOF
+## Highlights
 
-	echo "📡 Publishing ${RELEASE_TAG} on rokartur/BetterCmdTab..."
+StayTab ${ARTIFACT_VERSION} 릴리스입니다.
 
-	RELEASE_NOTES_FILE="${BUILD_DIR}/release-notes-${RELEASE_TAG}.md"
+### License and attribution
 
-	# Carry-over rule: if the newest GitHub release is a pre-release, treat it
-	# as an in-progress notes draft and prefill from it. If the newest release
-	# is the stable "latest", we're starting a fresh beta cycle → clean slate.
-	# This decouples carry-over from VERSION-prefix matching, so a beta of a
-	# new VERSION inherits notes from the immediately prior pre-release even
-	# if the version string just rolled over.
-	PRIOR_NOTES_FILE=""
-	_newest_release_json=$(gh release list --repo rokartur/BetterCmdTab --limit 1 \
-		--json tagName,isPrerelease 2>/dev/null || echo "[]")
-	_newest_tag=$(echo "$_newest_release_json" | jq -r '.[0].tagName // empty')
-	_newest_pre=$(echo "$_newest_release_json" | jq -r '.[0].isPrerelease // false')
-
-	if [[ -z "$_newest_tag" ]]; then
-		echo "ℹ️  No prior releases found — starting from clean notes."
-	elif [[ "$_newest_pre" == "true" ]]; then
-		_candidate="${BUILD_DIR}/prior-notes-${_newest_tag}.md"
-		# GitHub returns bodies with CRLF; strip CRs so awk heading-equality works.
-		if gh release view "$_newest_tag" --repo rokartur/BetterCmdTab --json body --jq '.body' 2>/dev/null |
-			tr -d '\r' >"$_candidate" && [[ -s "$_candidate" ]]; then
-			PRIOR_NOTES_FILE="$_candidate"
-			echo "📥 Loaded notes from prior pre-release: ${_newest_tag}"
-			echo "   (existing bullets per section carry over; legacy section names recognised)"
-		else
-			rm -f "$_candidate"
-		fi
-	else
-		echo "ℹ️  Latest release (${_newest_tag}) is stable — starting from clean notes."
+StayTab은 BetterCmdTab을 기반으로 하며 GPL-3.0으로 배포됩니다.
+EOF
 	fi
-
-	if [[ -n "$release_notes" ]]; then
-		# Explicit --notes supplied: use verbatim, skip prompts.
-		printf "%s\n" "$release_notes" >"$RELEASE_NOTES_FILE"
-	elif [[ -t 0 ]]; then
-		# Interactive terminal: prompt per category (carry over from prior beta).
-		compose_release_notes_interactively "$RELEASE_NOTES_FILE" "$PRIOR_NOTES_FILE"
-		if [[ ! -s "$RELEASE_NOTES_FILE" ]]; then
-			echo "" >&2
-			echo "⚠️  No sections filled in. Falling back to default notes." >&2
-			printf "%s\n" "$RELEASE_DEFAULT_NOTES" >"$RELEASE_NOTES_FILE"
-		fi
-		echo ""
-		echo "──── Final release notes ────"
-		cat "$RELEASE_NOTES_FILE"
-		echo "──────────────────────────────"
-		printf "Publish with these notes? [y/N] " >&2
-		read -r _confirm
-		if [[ ! "$_confirm" =~ ^[Yy]$ ]]; then
-			echo "❌ Aborted by user. Notes saved to: ${RELEASE_NOTES_FILE}" >&2
-			echo "   Re-run with --notes \"\$(cat ${RELEASE_NOTES_FILE})\" to publish without prompts." >&2
-			exit 1
-		fi
-	else
-		# Non-interactive (CI / piped): keep prior fallback.
-		printf "%s\n" "$RELEASE_DEFAULT_NOTES" >"$RELEASE_NOTES_FILE"
-	fi
-
-	# GitHub orders the releases page (and the /releases API the updater reads)
-	# by the tag's *commit date*, not the publish date. The public repo's main
-	# rarely moves, so consecutive releases tagged on the same commit share one
-	# created_at and sort unpredictably — the updater then offers a stale beta.
-	# Advance public main with an empty commit and tag that instead.
-	_release_target="main"
-	_pub_head=$(gh api repos/rokartur/BetterCmdTab/git/ref/heads/main --jq '.object.sha' 2>/dev/null) || _pub_head=""
-	_pub_tree=""
-	[[ -n "$_pub_head" ]] && { _pub_tree=$(gh api "repos/rokartur/BetterCmdTab/git/commits/${_pub_head}" --jq '.tree.sha' 2>/dev/null) || _pub_tree=""; }
-	if [[ -n "$_pub_head" && -n "$_pub_tree" ]]; then
-		_pub_new=$(gh api -X POST repos/rokartur/BetterCmdTab/git/commits \
-			-f message="chore: release ${RELEASE_TAG}" \
-			-f tree="$_pub_tree" \
-			-f "parents[]=${_pub_head}" --jq '.sha' 2>/dev/null) || _pub_new=""
-		if [[ -n "$_pub_new" ]] && gh api -X PATCH repos/rokartur/BetterCmdTab/git/refs/heads/main \
-			-f sha="$_pub_new" --silent 2>/dev/null; then
-			_release_target="$_pub_new"
-			echo "ℹ️  Advanced public main to ${_pub_new:0:7}; tagging it so the release sorts newest."
-		fi
-	fi
-	if [[ "$_release_target" == "main" ]]; then
-		echo "⚠️  Could not advance public main — tagging current HEAD; release may sort below older ones."
-	fi
-
-	_release_flags=()
-	if [[ $is_beta -eq 1 ]]; then
-		_release_flags+=(--prerelease --latest=false)
-	else
-		_release_flags+=(--latest)
-	fi
-
-	gh release create "${RELEASE_TAG}" \
-		--repo rokartur/BetterCmdTab \
-		--target "$_release_target" \
-		--title "$RELEASE_TITLE" \
-		--notes-file "$RELEASE_NOTES_FILE" \
-		"${_release_flags[@]}" \
-		"${DMG_PATH}#${DMG_NAME}" \
-		"${ZIP_PATH}#${ZIP_NAME}"
-
-	echo "✅ Published ${RELEASE_KIND}: https://github.com/rokartur/BetterCmdTab/releases/tag/${RELEASE_TAG}"
-	echo "   Notes archived at: ${RELEASE_NOTES_FILE}"
-	if [[ $is_beta -eq 1 ]]; then
-		echo "   (Homebrew cask workflow skips pre-releases by design.)"
-	else
-		echo "   Confirm the Homebrew cask picked up ${RELEASE_TAG}."
-	fi
+	release_flags=(--latest)
+	[[ $is_beta -eq 1 ]] && release_flags=(--prerelease --latest=false)
+	gh release create "$TAG" \
+		--repo "$RELEASE_REPO" \
+		--target "$HEAD_SHA" \
+		--title "StayTab ${ARTIFACT_VERSION}" \
+		--notes-file "$notes_file" \
+		"${release_flags[@]}" \
+		"${DMG_PATH}#$(basename "$DMG_PATH")" \
+		"${ZIP_PATH}#$(basename "$ZIP_PATH")"
+	printf 'Published: https://github.com/%s/releases/tag/%s\n' "$RELEASE_REPO" "$TAG"
 fi
 
-# Cleanup transient artifacts.
-rm -rf "$DMG_STAGE_DIR"
-rm -f "$NOTARIZE_ZIP_PATH"
-
-# ─── Final verification ─────────────────────────────────────────────────────
-
-step "Final verification"
-
-echo "🔍 Gatekeeper assessment of .app..."
-spctl --assess --type execute --verbose "$APP_PATH" 2>&1 || true
-
-echo ""
-echo "🔍 Gatekeeper assessment of DMG..."
-spctl --assess --type open --context context:primary-signature --verbose "$DMG_PATH" 2>&1 || true
-
-echo ""
-echo "🔍 Notarization check..."
-spctl --assess --verbose=4 --type execute "$APP_PATH" 2>&1 || true
-
-# ─── Done ────────────────────────────────────────────────────────────────────
-
-step "✅ Build complete!"
-
-build_type="STABLE"
-[[ $is_beta -eq 1 ]] && build_type="BETA"
-
-echo ""
-echo "  Type:     ${build_type}"
-echo "  Version:  ${VERSION} (${BUILD_NUMBER})"
-echo "  DMG:      ${DMG_PATH} (${DMG_SIZE})"
-echo "  ZIP:      ${ZIP_PATH} (${ZIP_SIZE})"
-echo ""
-echo "  Next steps:"
-if [[ $is_beta -eq 1 ]]; then
-	if [[ $auto_release -eq 1 ]]; then
-		echo "  ✅ Pre-release ${RELEASE_TAG} already published."
-		echo "     https://github.com/rokartur/BetterCmdTab/releases/tag/${RELEASE_TAG}"
-	else
-		echo "  Run this to publish the pre-release:"
-		echo ""
-		echo "    gh release create ${BETA_TAG} \\"
-		echo "      --repo rokartur/BetterCmdTab \\"
-		echo "      --title \"BetterCmdTab ${VERSION} beta ${BETA_N}\" \\"
-		echo "      --notes \"Beta ${BETA_N} of BetterCmdTab ${VERSION}.\" \\"
-		echo "      --prerelease --latest=false \\"
-		echo "      \"${DMG_PATH}#${DMG_NAME}\" \\"
-		echo "      \"${ZIP_PATH}#${ZIP_NAME}\""
-		echo ""
-		echo "  Or re-run with --auto-release next time."
-	fi
-	echo "  Note: Homebrew cask workflow skips pre-releases by design."
-elif [[ $auto_release -eq 1 ]]; then
-	echo "  ✅ Release ${RELEASE_TAG} already published."
-	echo "     https://github.com/rokartur/BetterCmdTab/releases/tag/${RELEASE_TAG}"
-	echo "  Homebrew: BrewTestBot opens the cask bump PR from its own livecheck."
-else
-	echo "  Run this to publish the release:"
-	echo ""
-	echo "    gh release create ${RELEASE_TAG} \\"
-	echo "      --repo rokartur/BetterCmdTab \\"
-	echo "      --title \"${RELEASE_TITLE}\" \\"
-	echo "      --notes-file notes.md \\"
-	echo "      --latest \\"
-	echo "      \"${DMG_PATH}#${DMG_NAME}\" \\"
-	echo "      \"${ZIP_PATH}#${ZIP_NAME}\""
-	echo ""
-	echo "  Or re-run with --auto-release next time."
-	echo "  Homebrew: BrewTestBot opens the cask bump PR from its own livecheck."
+printf '\nStayTab package ready\n'
+printf '  Version: %s (%s)\n' "$ARTIFACT_VERSION" "$BUILD_NUMBER"
+printf '  DMG: %s\n' "$DMG_PATH"
+printf '  ZIP: %s\n' "$ZIP_PATH"
+if [[ $skip_notarization -eq 1 ]]; then
+	printf '  Warning: local test package only; do not distribute.\n'
+elif [[ $auto_release -eq 0 ]]; then
+	printf '  Publish after manual verification with:\n'
+	printf '    scripts/build_release.sh --skip-build --auto-release --notes-file notes.md\n'
 fi
-echo ""

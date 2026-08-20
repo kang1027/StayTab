@@ -135,17 +135,17 @@ final class AboutSettingsViewController: SettingsTabViewController {
         let sourceCode = AboutResourceTileView(
             title: String(localized: "Source Code"),
             iconName: "chevron.left.forwardslash.chevron.right",
-            url: URL(string: "https://github.com/rokartur/BetterCmdTab")!
+            url: URL(string: "https://github.com/kang1027/StayTab")!
         )
         let issues = AboutResourceTileView(
             title: String(localized: "Report an Issue"),
             iconName: "exclamationmark.bubble.fill",
-            url: URL(string: "https://github.com/rokartur/BetterCmdTab/issues")!
+            url: URL(string: "https://github.com/kang1027/StayTab/issues")!
         )
         let releases = AboutResourceTileView(
             title: String(localized: "Releases"),
             iconName: "shippingbox.fill",
-            url: URL(string: "https://github.com/rokartur/BetterCmdTab/releases")!
+            url: URL(string: "https://github.com/kang1027/StayTab/releases")!
         )
 
         let grid = makeTileGrid(tiles: [sourceCode, issues, releases])
@@ -201,8 +201,7 @@ final class AboutSettingsViewController: SettingsTabViewController {
     // MARK: - Footer
 
     private func buildFooter() {
-        let year = Calendar.current.component(.year, from: Date())
-        let label = NSTextField(labelWithString: "\u{00A9} \(year) \(AppInfo.displayName)")
+        let label = NSTextField(labelWithString: "StayTab · GPL-3.0 · BetterCmdTab/@rokartur")
         label.font = .systemFont(ofSize: 10, weight: .regular)
         label.textColor = .tertiaryLabelColor
         label.alignment = .center

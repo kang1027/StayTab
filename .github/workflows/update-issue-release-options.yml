@@ -7,6 +7,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-maintenance
+  cancel-in-progress: false
+
 jobs:
   update-template:
     runs-on: ubuntu-latest
@@ -58,7 +62,7 @@ jobs:
                       match.group(1)
                       for asset in release["assets"]
                       if (match := re.fullmatch(
-                          rf"BetterCmdTab-{re.escape(version)}-(\d+)\.(?:dmg|zip)",
+                          rf"StayTab-{re.escape(version)}-(\d+)\.(?:dmg|zip)",
                           asset["name"],
                       ))
                   ),

@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4B5354415954414200000001 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = 4B5354415954414200000003 /* LICENSE */; };
+		4B5354415954414200000002 /* NOTICE.md in Resources */ = {isa = PBXBuildFile; fileRef = 4B5354415954414200000004 /* NOTICE.md */; };
 		AA0000000000000000000003 /* BetterShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000002 /* BetterShortcuts */; };
 		BP0000000000000000000003 /* BetterPermissions in Frameworks */ = {isa = PBXBuildFile; productRef = BP0000000000000000000002 /* BetterPermissions */; };
 		BS0000000000000000000003 /* BetterSettings in Frameworks */ = {isa = PBXBuildFile; productRef = BS0000000000000000000002 /* BetterSettings */; };
@@ -24,6 +26,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		4B5354415954414200000003 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
+		4B5354415954414200000004 /* NOTICE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = NOTICE.md; sourceTree = "<group>"; };
 		7559A7572FC06FD5004D97B7 /* StayTab.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = StayTab.app; path = "StayTab Debug.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		7559A7642FC06FD6004D97B7 /* BetterCmdTabTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BetterCmdTabTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -79,6 +83,8 @@
 		7559A74E2FC06FD5004D97B7 = {
 			isa = PBXGroup;
 			children = (
+				4B5354415954414200000003 /* LICENSE */,
+				4B5354415954414200000004 /* NOTICE.md */,
 				7559A7592FC06FD5004D97B7 /* BetterCmdTab */,
 				7559A7672FC06FD6004D97B7 /* BetterCmdTabTests */,
 				7559A7582FC06FD5004D97B7 /* Products */,
@@ -201,6 +207,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4B5354415954414200000001 /* LICENSE in Resources */,
+				4B5354415954414200000002 /* NOTICE.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -274,7 +282,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = N529W98U62;
+				DEVELOPMENT_TEAM = GGR9HG6DB8;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -338,7 +346,7 @@
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEPLOYMENT_POSTPROCESSING = YES;
-				DEVELOPMENT_TEAM = N529W98U62;
+				DEVELOPMENT_TEAM = GGR9HG6DB8;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = NO;
@@ -374,7 +382,7 @@
 				CODE_SIGN_ENTITLEMENTS = BetterCmdTab/BetterCmdTab.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 20260813144806;
-				DEVELOPMENT_TEAM = N529W98U62;
+				DEVELOPMENT_TEAM = GGR9HG6DB8;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -385,7 +393,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "StayTab enumerates and switches tabs in browsers (Safari, Chrome, Arc, Brave, Edge, Vivaldi) when you drill into a row.";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "StayTab contributors; based on BetterCmdTab by @rokartur; GPL-3.0";
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -401,7 +409,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 26.7;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.kdh.StayTab.debug;
 				PRODUCT_MODULE_NAME = BetterCmdTab;
 				PRODUCT_NAME = "StayTab Debug";
@@ -439,7 +447,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "StayTab enumerates and switches tabs in browsers (Safari, Chrome, Arc, Brave, Edge, Vivaldi) when you drill into a row.";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "StayTab contributors; based on BetterCmdTab by @rokartur; GPL-3.0";
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -455,7 +463,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 26.7;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.kdh.StayTab;
 				PRODUCT_NAME = StayTab;
 				REGISTER_APP_GROUPS = YES;
@@ -477,7 +485,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 20260613051051;
-				DEVELOPMENT_TEAM = N529W98U62;
+				DEVELOPMENT_TEAM = GGR9HG6DB8;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
@@ -503,7 +511,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 20260613051051;
-				DEVELOPMENT_TEAM = N529W98U62;
+				DEVELOPMENT_TEAM = GGR9HG6DB8;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;

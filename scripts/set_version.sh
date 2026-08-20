@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 #
-# set_version.sh — Set the app's marketing version (CFBundleShortVersionString).
+# set_version.sh — Set StayTab's marketing version (CFBundleShortVersionString).
 #
 # Updates MARKETING_VERSION for the BetterCmdTab app target in project.pbxproj.
 # The test target keeps its own version untouched.
 #
 # Usage:
-#   scripts/set_version.sh 26.1               # set marketing version to 26.1
-#   scripts/set_version.sh 26.1 --bump-build  # also stamp a fresh build number
-#   scripts/set_version.sh 26.1 --no-commit   # update but don't commit
+#   scripts/set_version.sh 0.1.0               # set marketing version
+#   scripts/set_version.sh 0.1.0 --bump-build  # also stamp a fresh build number
+#   scripts/set_version.sh 0.1.0 --commit      # opt in to a scoped version commit
 #   scripts/set_version.sh --show             # print current version & build
 #
-# On success the version/build change to project.pbxproj is committed
-# automatically (chore: bump …). Pass --no-commit to leave it staged for review.
+# By default the change is left for review. Pass --commit to create a scoped
+# commit containing only project.pbxproj.
 #
 # Note: the release build number (CURRENT_PROJECT_VERSION) is normally stamped
 # automatically by build_release.sh on every build. Use --bump-build only when
@@ -33,15 +33,15 @@ PBXPROJ="${PROJECT_PATH}/project.pbxproj"
 
 usage() {
   cat <<'EOF'
-Usage: scripts/set_version.sh <version> [--bump-build]
+Usage: scripts/set_version.sh <version> [--bump-build] [--commit]
        scripts/set_version.sh --show
 
 Arguments:
-  <version>       New marketing version, e.g. 26.1 or 27.0.2
+  <version>       New marketing version, e.g. 0.1.0 or 1.0.0
 
 Options:
   --bump-build    Also set CURRENT_PROJECT_VERSION to a fresh timestamp.
-  --no-commit     Don't commit the change; leave it for manual review.
+  --commit        Commit only project.pbxproj after updating it.
   --show          Print the current version and build number, then exit.
   -h, --help      Show this help message.
 EOF
@@ -56,13 +56,14 @@ current_setting() {
 # ─── Parse arguments ──────────────────────────────────────────────────────────
 
 bump_build=0
-do_commit=1
+do_commit=0
 new_version=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --bump-build) bump_build=1 ;;
-    --no-commit) do_commit=0 ;;
+    --commit) do_commit=1 ;;
+    --no-commit) do_commit=0 ;; # Backward-compatible alias.
     --show)
       echo "Version: $(current_setting MARKETING_VERSION) (build $(current_setting CURRENT_PROJECT_VERSION))"
       exit 0
@@ -91,9 +92,9 @@ if [[ -z "$new_version" ]]; then
   exit 64
 fi
 
-# Accept dotted numeric versions only (e.g. 26, 26.1, 27.0.2).
+# Accept dotted numeric versions only (e.g. 0.1.0, 1.0, 2).
 if [[ ! "$new_version" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
-  echo "❌ Invalid version '${new_version}'. Use a dotted numeric version like 26.1" >&2
+  echo "❌ Invalid version '${new_version}'. Use a dotted numeric version like 0.1.0" >&2
   exit 64
 fi
 

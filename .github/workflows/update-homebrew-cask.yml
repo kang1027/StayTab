@@ -1,0 +1,67 @@
+name: Update Homebrew Cask
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-maintenance
+  cancel-in-progress: false
+
+jobs:
+  update:
+    if: ${{ !github.event.release.prerelease }}
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: main
+
+      - name: Download the stable DMG
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p dist
+          gh release download "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern 'StayTab-*.dmg' \
+            --dir dist
+          count=$(find dist -maxdepth 1 -name 'StayTab-*.dmg' | wc -l | tr -d ' ')
+          test "$count" = 1 || { echo "Expected one StayTab DMG, found $count"; exit 1; }
+
+      - name: Render checksummed cask
+        run: |
+          dmg=$(find dist -maxdepth 1 -name 'StayTab-*.dmg' -print -quit)
+          filename=$(basename "$dmg")
+          version="${GITHUB_REF_NAME#v}"
+          build=$(printf '%s' "$filename" | sed -E 's/^StayTab-.*-([0-9]+)\.dmg$/\1/')
+          test "$build" != "$filename" || { echo "Could not parse build from $filename"; exit 1; }
+          scripts/render_homebrew_cask.sh "$dmg" "$version" "$build"
+
+      - name: Audit cask
+        run: |
+          tap_name="staytab/release-audit"
+          tap_dir="$(brew --repository)/Library/Taps/staytab/homebrew-release-audit"
+          cleanup() { brew untap --force "$tap_name" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          cleanup
+          brew tap-new --no-git "$tap_name" >/dev/null
+          mkdir -p "$tap_dir/Casks"
+          cp Casks/staytab.rb "$tap_dir/Casks/staytab.rb"
+          brew style --cask "$tap_name/staytab"
+          brew audit --cask --online "$tap_name/staytab"
+
+      - name: Commit cask update
+        run: |
+          if git diff --quiet -- Casks/staytab.rb; then
+            echo "Cask is already current"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- Casks/staytab.rb
+          git commit -m "chore: Homebrew Cask를 ${GITHUB_REF_NAME}으로 갱신"
+          git push origin HEAD:main

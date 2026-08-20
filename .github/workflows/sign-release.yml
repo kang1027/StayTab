@@ -17,11 +17,11 @@ jobs:
   sign:
     runs-on: macos-15
     env:
-      OWNER: rokartur
-      REPO: BetterCmdTab
-      BUNDLE_ID: pro.bettercmdtab.BetterCmdTab
-      TEAM_ID: N529W98U62
-      PINNED_PUBLIC_KEY: EdGQwfRFT04hggloIRmN2twIC/UIlM6yoAAzZ97jgcI=
+      OWNER: kang1027
+      REPO: StayTab
+      BUNDLE_ID: com.kdh.StayTab
+      TEAM_ID: GGR9HG6DB8
+      PINNED_PUBLIC_KEY: Txxft7XtmAPHzDZbxVAr9D9YdP8uqwDniUM/7VZrzOI=
     steps:
       - name: Select Xcode 16 (Swift 6 toolchain)
         # BetterUpdater's Package.swift declares swift-tools-version 6.0, so the
@@ -54,7 +54,7 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           shopt -s nullglob
-          FILES=(dist/*.dmg dist/*.zip)
+          FILES=(dist/StayTab-*.dmg dist/StayTab-*.zip)
           if [ ${#FILES[@]} -eq 0 ]; then echo "No .dmg/.zip assets on release"; exit 1; fi
           ASSETS=()
           for f in "${FILES[@]}"; do ASSETS+=(--asset "$f"); done
@@ -68,7 +68,7 @@ jobs:
       - name: Verify before upload (fail-closed guard)
         run: |
           shopt -s nullglob
-          FILES=(dist/*.dmg dist/*.zip)
+          FILES=(dist/StayTab-*.dmg dist/StayTab-*.zip)
           if [ ${#FILES[@]} -eq 0 ]; then echo "No .dmg/.zip assets on release"; exit 1; fi
           ASSETS=()
           for f in "${FILES[@]}"; do ASSETS+=(--asset "$f"); done

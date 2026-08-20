@@ -77,11 +77,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // The pinned Ed25519 public key is the trust anchor for the signed
         // repo-identity manifest (see BetterUpdater README).
         BetterUpdater.bootstrap(configuration: .init(
-            owner: "kdh",
+            owner: "kang1027",
             repo: "StayTab",
             displayName: AppInfo.displayName,
             bundleIdentifier: "com.kdh.StayTab",
-            pinnedPublicKeyBase64: "EdGQwfRFT04hggloIRmN2twIC/UIlM6yoAAzZ97jgcI=",
+            pinnedPublicKeyBase64: "Txxft7XtmAPHzDZbxVAr9D9YdP8uqwDniUM/7VZrzOI=",
             userAgentProduct: "StayTab-Updater",
             manifestRequired: true
         ))
@@ -113,10 +113,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         axWaiter = waiter
         waiter.start()
 
-        // StayTab is a local fork, so never let the inherited updater replace it
-        // with an upstream BetterCmdTab build. Manual checks remain available
-        // while a dedicated StayTab release feed does not exist.
-        GitHubUpdater.shared.setCheckInterval(.manual)
+        // StayTab uses its own signed release feed. Keep network access opt-in
+        // for a fresh install, but preserve any cadence the user later chooses
+        // in Settings instead of resetting it on every launch.
+        if UserDefaults.standard.object(forKey: "GitHubUpdater.checkInterval") == nil {
+            GitHubUpdater.shared.setCheckInterval(.manual)
+        }
     }
 
     private func bootController() {

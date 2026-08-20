@@ -93,6 +93,7 @@ else
     -project "$project_path" \
     -scheme "BetterCmdTab Debug" \
     -destination "platform=macOS" \
+    CODE_SIGNING_ALLOWED=NO \
     test -only-testing:BetterCmdTabTests/LocalizationCatalogTests \
     >"$i18n_log" 2>&1; then
     echo "[release-quality-gate] Localization audit failed. Log: $i18n_log" >&2

@@ -15,7 +15,7 @@ works. When two designs are equally correct, ship the cheaper one.
 
 ## Build / test / run
 
-Xcode 16+ and the macOS 26 SDK are required (Liquid Glass paths are SDK-gated; deployment
+Xcode 26+ and the macOS 26 SDK are required (Liquid Glass paths are SDK-gated; deployment
 target is macOS 13.0, which falls back to `NSVisualEffectView` at runtime). Two schemes
 exist: `BetterCmdTab Debug` and `BetterCmdTab`.
 
@@ -48,40 +48,27 @@ part of the unit run.
 ## Release / version
 
 ```bash
-scripts/set_version.sh 26.5               # set MARKETING_VERSION, auto-commits (chore: bump …)
+scripts/set_version.sh 0.1.0              # set MARKETING_VERSION; review before committing
 scripts/set_version.sh --show             # print current version & build
 scripts/build_release.sh                  # build + sign + notarize + dmg/zip → build/release/
 scripts/build_release.sh --beta           # beta build, auto-detects next beta.N from GitHub tags
-scripts/build_release.sh --auto-release   # after notarize, create the GitHub release (needs --notes "$(cat notes.md)" or prompts)
+scripts/build_release.sh --skip-build --auto-release --notes-file notes.md
 scripts/build_release.sh --skip-notarization   # dev build, no notarize (refuses --auto-release)
 scripts/update-packages.sh                # bump SPM deps (clears Package.resolved, re-resolves)
 ```
 
-`build_release.sh` stamps a fresh `CURRENT_PROJECT_VERSION` on every build (skip with
-`--skip-build-bump`); only the app target's version moves, the test target keeps its own.
-Signing/notarization needs the `Developer ID Application: Artur Rok (N529W98U62)` certificate
-and the `BetterCmdTabNotarization` notarytool keychain profile (see the script header).
-`.github/workflows/sign-release.yml` runs signing in CI.
+`set_version.sh` does not commit unless `--commit` is explicitly passed. `build_release.sh`
+stamps a timestamp `CURRENT_PROJECT_VERSION` into the archive without mutating the project.
+Signing/notarization needs `Developer ID Application: DongHyeon Kang (GGR9HG6DB8)` and the
+`StayTabNotarization` notarytool Keychain profile. See `RELEASING.md` for the one-time setup.
 
 ### Changelog format (the release body)
 
-The changelog *is* the GitHub Release body (no `CHANGELOG.md`). Pass it to
-`build_release.sh --auto-release --notes "$(cat notes.md)"` — that flag takes the notes
-text, not a path, so an unquoted filename would become the release body. Or write it
-after the fact with
-`gh release create <tag> -R rokartur/BetterCmdTab --title "BetterCmdTab <version>" --notes-file notes.md`.
-Every tag is bare — no `v` prefix — for stable (`26.7`) and prereleases alike (`26.7-beta.3`,
-published with `--prerelease`); only historical stable tags through `v26.6.1` carry the prefix.
-`MAJOR` tracks the macOS year. Both Homebrew casks template their download URL on the tag, so
-the first bare stable release must also drop the `v` from `Casks/b/bettercmdtab.rb` (the
-`bettercmdtab@beta` cask is already bare) or `brew bump` lands a 404.
+The changelog is the GitHub Release body (no `CHANGELOG.md`). Pass its file path through
+`--notes-file`. Tags use `v<version>` for stable (`v0.1.0`) and
+`v<version>-beta.<n>` for prereleases (`v0.2.0-beta.1`). Release scripts never commit or push.
 
-Homebrew's own BrewTestBot autobumps both casks off their `livecheck` blocks, which read the
-version out of the DMG *asset filename*, not the tag. There is no cask workflow in this repo
-and there should not be one: a second bot would race BrewTestBot and need a token with push
-rights on a third-party repository. Cask upkeep is limited to landing template fixes upstream.
-
-Match the established BetterCmdTab body shape — this is an end-user app, so bullets are
+This is an end-user app, so bullets are
 **user-facing and outcome-first**, not internal symbol names:
 
 - **First line** is `## Highlights` — a one/two-sentence summary of what the release delivers.
@@ -91,11 +78,8 @@ Match the established BetterCmdTab body shape — this is an end-user app, so bu
 - End with a compare footer for any release with a predecessor (blank line before it):
 
   ```
-  **Full changelog:** https://github.com/rokartur/BetterCmdTab/compare/<prev-tag>...<tag>
+  **Full changelog:** https://github.com/kang1027/StayTab/compare/<prev-tag>...<tag>
   ```
-
-(Library packages in the `Better*` family — `BetterSettings`, `BetterUpdater`, etc. — use the same
-structure but with technical, API-level bullets; see their `CLAUDE.md`.)
 
 ## Architecture
 
@@ -185,24 +169,6 @@ to pick it up). Without that permission the switcher never boots and ⌘Tab does
 
 ## web/ and docs/
 
-The public site, two separate static exports (React 19, oxlint/oxfmt) that share one origin:
-`web/` is the marketing page at `/`, built with **TanStack Start** on Vite and prerendered
-(SSR at build time) to `web/out`; `docs/` is the Fumadocs site built with **Next.js** and
-`basePath: '/docs'`. `.github/workflows/deploy-pages.yml` merges the docs export into `web/out/docs`
-and publishes the result to GitHub Pages on `bettercmdtab.app`. Separate from the app; touch them
-only for the site, not app behavior.
-
-GitHub Pages serves files and nothing else — no rewrites, no redirects, no custom headers. Anything
-that would be a server rule has to be a property of the built tree instead:
-
-- Every page is `<slug>/index.html` and the slashed URL is the one that exists — `docs/` sets
-  Next's `trailingSlash: true`, `web/` gets it from TanStack Start's prerender, which writes
-  subfolder indexes by default. Canonicals, the sitemap and internal links all use that form;
-  the bare form is Pages' own 301, and pointing at it wastes a hop. The one exception is
-  `web/out/404.html`, prerendered from the `/404` route with `autoSubfolderIndex: false`
-  because Pages only serves that exact filename.
-- `web/public/sitemap.xml` is hand-maintained. CI checks it both ways: every URL resolves to a real
-  file, and every `docs/content/docs/*/*.mdx` is listed.
-- Next writes an RSC payload twin (`index.txt`, `__next._full.txt`) beside every docs page holding
-  that page's whole text. Pages cannot send `X-Robots-Tag`, so `web/public/robots.txt` disallows `*.txt$`
-  and re-allows the two `llms*.txt` files. Do not relax that without a replacement.
+These directories are inherited BetterCmdTab website sources and are not part of StayTab's
+release pipeline. Their GitHub Pages workflows are intentionally disabled. Do not publish them
+under the StayTab repository without a separate branding, attribution, and URL review.
