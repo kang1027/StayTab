@@ -15,9 +15,9 @@
 
 <br>
 
-<img src="assets/settings-pinned-apps.png" width="878" alt="StayTab 고정 앱 설정">
+<img src="assets/switcher-hero.png" width="980" alt="Always와 Running now 영역이 분리된 StayTab 앱 전환기">
 
-<sub>상시 사용할 앱의 순서와 한 자에서 세 자까지의 바로가기 키를 지정할 수 있어요.</sub>
+<sub>고정 앱은 Always 영역을 유지해요. 종료된 Docker는 바로 실행할 수 있고, 임시 앱은 Running now에만 표시돼요.</sub>
 
 </div>
 
@@ -33,6 +33,16 @@ macOS 기본 앱 전환기는 실행 중인 앱만 기억해요. StayTab은 매�
 
 `⌘Tab`을 짧게 누르면 이전에 사용하던 앱으로 바로 돌아가요. 길게 누르면 StayTab이 열리고, `⌘⇧Tab`으로 반대로 이동하며, 선택한 창에는 즉시 키보드 포커스가 들어가요.
 
+## 고정 영역 설정하기
+
+<div align="center">
+
+<img src="assets/settings-pinned-apps.png" width="878" alt="StayTab 고정 앱 설정">
+
+<sub>순서를 한 번 정한 뒤 자동 또는 사용자 지정 한 자에서 세 자까지의 점프 키로 이동할 수 있어요.</sub>
+
+</div>
+
 ## 주요 기능
 
 - **고정 앱 목록.** 메일, 브라우저, 터미널, 노트, 음악처럼 매일 쓰는 앱을 예측 가능한 순서로 유지해요.
@@ -46,20 +56,19 @@ StayTab은 업그레이드 호환성을 위해 BetterCmdTab의 기존 설정 형
 
 ## 설치
 
-### 서명된 릴리스
+### DMG 다운로드 — 권장
 
-첫 Apple 공증 버전인 `v0.1.0`을 준비 중이에요. 공개된 뒤에는 [GitHub Releases](https://github.com/kang1027/StayTab/releases/latest)에서 `.dmg`를 내려받아 열고 **StayTab**을 Applications 폴더로 옮기면 돼요.
+첫 Apple 공증 버전인 `v0.1.0`을 준비 중이에요. 공개된 뒤에는 다음 순서로 설치해요.
 
-로컬 테스트 빌드는 재배포하면 안 돼요. 공식 바이너리는 Developer ID로 서명하고 Apple 공증을 거치며 GPL-3.0 대응 소스를 함께 제공해요.
+1. [GitHub Releases](https://github.com/kang1027/StayTab/releases/latest)에서 `StayTab-*.dmg`를 내려받아요.
+2. DMG를 열고 **StayTab**을 Applications 폴더로 옮겨요.
+3. StayTab을 실행하고 macOS가 요청할 때 손쉬운 사용 권한을 허용해요.
 
-### Homebrew
+DMG는 처음 설치할 때만 필요해요. 이후에는 StayTab이 서명된 GitHub 릴리스를 확인할 수 있어요. **설정 → 일반 → 업데이트 확인**에서 확인 주기를 선택하고, 시험판이 필요한 경우에만 **베타 릴리스 포함**을 켜면 돼요.
 
-저장소에는 Cask와 릴리스 자동화가 준비되어 있어요. 첫 릴리스 이후 다음 명령을 사용할 수 있어요.
+공식 바이너리는 Developer ID로 서명하고 Apple 공증을 거치며 GPL-3.0 대응 소스를 함께 제공해요. 로컬 테스트 빌드는 재배포하면 안 돼요.
 
-```sh
-brew tap kang1027/staytab https://github.com/kang1027/StayTab.git
-brew install --cask kang1027/staytab/staytab
-```
+초기 릴리스에서는 Homebrew 설치를 안내하지 않아요. 첫 릴리스가 안정화될 때까지 DMG 직접 설치와 인앱 업데이트를 공식 배포 경로로 사용해요.
 
 ### 소스에서 빌드
 

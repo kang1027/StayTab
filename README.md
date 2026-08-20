@@ -15,9 +15,9 @@
 
 <br>
 
-<img src="assets/settings-pinned-apps.png" width="878" alt="StayTab pinned-app settings">
+<img src="assets/switcher-hero.png" width="980" alt="StayTab switcher with separate Always and Running now sections">
 
-<sub>Build a permanent app roster, choose its order, and assign one-to-three-character jump keys.</sub>
+<sub>Pinned apps keep a permanent lane. Docker is closed but ready to launch; temporary apps stay in Running now.</sub>
 
 </div>
 
@@ -33,6 +33,16 @@ The native macOS switcher only remembers apps that are running. StayTab adds a p
 
 Quick-tapping `⌘Tab` still returns to the previously focused app. Holding it opens StayTab, `⌘⇧Tab` moves backwards, and the selected window receives keyboard focus immediately.
 
+## Set up your permanent lane
+
+<div align="center">
+
+<img src="assets/settings-pinned-apps.png" width="878" alt="StayTab pinned-app settings">
+
+<sub>Choose the order once, then use automatic or custom one-to-three-character jump keys.</sub>
+
+</div>
+
 ## Highlights
 
 - **Persistent pinned apps.** Keep Mail, your browser, terminal, notes, music, and other daily tools in a predictable order.
@@ -46,20 +56,19 @@ StayTab keeps BetterCmdTab's inherited preference formats readable for upgrades,
 
 ## Install
 
-### Signed release
+### Download the DMG — recommended
 
-The first notarized `v0.1.0` release is being prepared. When it is published, download the `.dmg` from [GitHub Releases](https://github.com/kang1027/StayTab/releases/latest), open it, and drag **StayTab** to Applications.
+The first notarized `v0.1.0` release is being prepared. When it is published:
 
-Do not redistribute local test builds. Official binaries will be signed with a Developer ID, notarized by Apple, and accompanied by their GPL-3.0 source.
+1. Download `StayTab-*.dmg` from [GitHub Releases](https://github.com/kang1027/StayTab/releases/latest).
+2. Open the DMG and drag **StayTab** to Applications.
+3. Launch StayTab and grant Accessibility access when macOS asks.
 
-### Homebrew
+The DMG is only required for the first installation. StayTab can check its signed GitHub release feed afterward; choose a cadence under **Settings → General → Check for updates**. Enable **Include beta releases** only if you want prerelease builds.
 
-The repository contains the Cask and release automation. After the first release:
+Official binaries are signed with a Developer ID, notarized by Apple, and accompanied by their GPL-3.0 source. Do not redistribute local test builds.
 
-```sh
-brew tap kang1027/staytab https://github.com/kang1027/StayTab.git
-brew install --cask kang1027/staytab/staytab
-```
+Homebrew is intentionally not advertised for the initial release. Direct DMG installation and in-app updates are the supported distribution path while the first releases stabilize.
 
 ### Build from source
 
