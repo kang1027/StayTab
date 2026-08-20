@@ -44,7 +44,8 @@ body:
       description: Pick the release shown in Settings > About.
       options:
         # release-options:start
-        - "0.1.0 (20260820175413) — latest"
+        - "0.1.1 (20260820192837) — latest"
+        - "0.1.0 (20260820175413) — release"
         # release-options:end
         - Other / not listed
     validations:
