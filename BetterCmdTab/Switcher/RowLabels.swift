@@ -19,6 +19,15 @@ enum RowLabels {
         reservedStore.withLock { $0 = letters }
     }
 
+    /// Snapshot of the persisted app overrides. Kept beside the dynamic action
+    /// keys so label generation never deserializes UserDefaults on the ⌘Tab
+    /// hot path. `SwitcherController` updates it at launch and on preference
+    /// changes.
+    private static let customLettersStore = OSAllocatedUnfairLock<[String: String]>(initialState: [:])
+    static func setCustomLetters(_ letters: [String: String]) {
+        customLettersStore.withLock { $0 = letters }
+    }
+
     /// Full a–z pool for disambiguation suffixes; reserved letters are filtered
     /// out at the point of use so the pool tracks the dynamic reservation.
     static let suffixAlphabet: [Character] = Array("abcdefghijklmnopqrstuvwxyz")
@@ -26,13 +35,31 @@ enum RowLabels {
     struct Input {
         let appName: String
         let windowTitle: String
+        let bundleIdentifier: String?
+
+        init(appName: String, windowTitle: String, bundleIdentifier: String? = nil) {
+            self.appName = appName
+            self.windowTitle = windowTitle
+            self.bundleIdentifier = bundleIdentifier
+        }
     }
 
-    static func labels(for rows: [SwitcherRow]) -> [String] {
-        labels(forInputs: rows.map { Input(appName: $0.appName, windowTitle: $0.windowTitle) })
+    static func labels(for rows: [SwitcherRow], customLetters: [String: String]? = nil) -> [String] {
+        let resolvedCustomLetters = customLetters
+            ?? customLettersStore.withLock { $0 }
+        return labels(
+            forInputs: rows.map {
+                Input(
+                    appName: $0.appName,
+                    windowTitle: $0.windowTitle,
+                    bundleIdentifier: $0.bundleIdentifier
+                )
+            },
+            customLetters: resolvedCustomLetters
+        )
     }
 
-    static func labels(forInputs rows: [Input]) -> [String] {
+    static func labels(forInputs rows: [Input], customLetters: [String: String] = [:]) -> [String] {
         var labels = [String](repeating: "", count: rows.count)
         guard !rows.isEmpty else { return labels }
 
@@ -40,10 +67,22 @@ enum RowLabels {
         // it through the per-character loops below.
         let reserved = Self.reserved
 
+        let customByIndex: [Character?] = rows.map { row in
+            guard let bundleID = row.bundleIdentifier,
+                  let raw = customLetters[bundleID],
+                  let letter = normalizedCustomLetter(raw),
+                  !reserved.contains(letter) else { return nil }
+            return letter
+        }
+        // A user-assigned letter owns that direct jump. Automatic hints skip it
+        // so an unrelated app cannot turn the custom shortcut into a prefix.
+        let automaticReserved = reserved.union(customByIndex.compactMap { $0 })
+
         var firstLetterCount: [Character: Int] = [:]
         var firstLetters = [Character?](repeating: nil, count: rows.count)
         for i in 0..<rows.count {
-            let c = firstAvailableLetter(rows[i].appName, reserved: reserved)
+            let c = customByIndex[i]
+                ?? firstAvailableLetter(rows[i].appName, reserved: automaticReserved)
             firstLetters[i] = c
             if let c { firstLetterCount[c, default: 0] += 1 }
         }
@@ -64,6 +103,16 @@ enum RowLabels {
 
         disambiguateDuplicates(&labels, reserved: reserved)
         return labels
+    }
+
+    /// Normalize the settings field and imported config value. Only one ASCII
+    /// alphabetic key is a valid direct jump; action-key conflicts are checked
+    /// separately against the live `reserved` set.
+    static func normalizedCustomLetter(_ raw: String) -> Character? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard trimmed.count == 1, let letter = trimmed.first,
+              letter.isASCII, letter.isLetter else { return nil }
+        return letter
     }
 
     private static func disambiguateDuplicates(_ labels: inout [String], reserved: Set<Character>) {

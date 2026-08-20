@@ -536,14 +536,22 @@ enum CatalogFilter {
         return true
     }
 
-    /// Same hide + pin reordering for the primed app list. `windowedPids` is
+    /// Same hide filtering for the primed app list. `windowedPids` is
     /// the warm cache's set of pids with at least one catalogued window; with
     /// it present the `whenNoWindows` exceptions and the global windowless
     /// toggle apply exactly as on the visible row list, so a quick ⌘Tab tap
     /// can't activate an app the panel would hide (#112). `nil` means window
     /// state is unknown (cache cold) and counts as "has a window" — missing
     /// data must never hide an app.
-    static func filteredApps(_ apps: [NSRunningApplication], _ cfg: Config, windowedPids: Set<pid_t>? = nil) -> [NSRunningApplication] {
+    /// `reorderPinned` is disabled by the quick-switch path: its input is the
+    /// true app MRU and the first ⌘Tab step must remain the previously focused
+    /// app even though the visible panel renders pinned apps in a fixed section.
+    static func filteredApps(
+        _ apps: [NSRunningApplication],
+        _ cfg: Config,
+        windowedPids: Set<pid_t>? = nil,
+        reorderPinned: Bool = true
+    ) -> [NSRunningApplication] {
         if cfg.isIdentity { return apps }
         var filtered = apps.filter { app in
             includes(
@@ -558,9 +566,25 @@ enum CatalogFilter {
         if cfg.sortOrder != .mru {
             filtered = applySortOrder(filtered, cfg.sortOrder, name: { $0.localizedName ?? "" }, pid: { $0.processIdentifier })
         }
-        guard !cfg.pinned.isEmpty else { return filtered }
-        return stablePartition(filtered) { app in
-            app.bundleIdentifier.flatMap { cfg.pinned.firstIndex(of: $0) }
+        return applyPinnedOrder(
+            filtered,
+            pinnedIDs: cfg.pinned,
+            enabled: reorderPinned,
+            bundleID: { $0.bundleIdentifier }
+        )
+    }
+
+    /// Pure pin-order helper shared with tests. Turning it off is intentionally
+    /// a byte-for-byte order-preserving operation for the primed MRU list.
+    static func applyPinnedOrder<T>(
+        _ items: [T],
+        pinnedIDs: [String],
+        enabled: Bool,
+        bundleID: (T) -> String?
+    ) -> [T] {
+        guard enabled, !pinnedIDs.isEmpty else { return items }
+        return stablePartition(items) { item in
+            bundleID(item).flatMap { pinnedIDs.firstIndex(of: $0) }
         }
     }
 

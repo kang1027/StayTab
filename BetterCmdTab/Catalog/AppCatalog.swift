@@ -43,7 +43,15 @@ enum AppCatalog {
         for app in regulars where !seen.contains(app.processIdentifier) {
             ordered.append(app)
         }
-        return CatalogFilter.filteredApps(ordered, cfg ?? CatalogFilter.config(), windowedPids: windowedPids)
+        // Keep the primed list in true MRU order. The full snapshot still moves
+        // pinned apps into its visible section, and `reveal()` maps this MRU
+        // target back to that displayed row by pid.
+        return CatalogFilter.filteredApps(
+            ordered,
+            cfg ?? CatalogFilter.config(),
+            windowedPids: windowedPids,
+            reorderPinned: false
+        )
     }
 
     static func snapshot(orderedBy mru: [pid_t], filter cfg: CatalogFilter.Config? = nil) -> [SwitcherRow] {

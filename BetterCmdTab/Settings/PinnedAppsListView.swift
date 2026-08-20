@@ -31,8 +31,11 @@ final class PinnedAppsListView: NSView {
     var onReorder: (([String]) -> Void)?
     /// Fired with the bundle ID when its remove button is clicked.
     var onRemove: ((String) -> Void)?
+    /// Fired when the editable direct-jump key changes. Empty clears it.
+    var onJumpLetterChange: ((String, String) -> Void)?
 
     private var bundleIDs: [String] = []
+    private var jumpLetters: [String: String] = [:]
     private let tableView = NSTableView()
     private let scrollView = NSScrollView()
     private var heightConstraint: NSLayoutConstraint!
@@ -49,8 +52,9 @@ final class PinnedAppsListView: NSView {
     required init?(coder: NSCoder) { fatalError("init(coder:) not implemented") }
 
     /// Replace the list contents and resize to fit (no inner scrolling).
-    func reload(_ ids: [String]) {
+    func reload(_ ids: [String], jumpLetters: [String: String] = [:]) {
         bundleIDs = ids
+        self.jumpLetters = jumpLetters
         tableView.reloadData()
         updateHeight()
     }
@@ -114,8 +118,11 @@ extension PinnedAppsListView: NSTableViewDataSource, NSTableViewDelegate {
             cell = PinnedAppRowCellView(frame: .zero)
             cell.identifier = Self.cellID
         }
-        cell.configure(bundleID: bundleID)
+        cell.configure(bundleID: bundleID, jumpLetter: jumpLetters[bundleID])
         cell.onRemove = { [weak self] in self?.onRemove?(bundleID) }
+        cell.onJumpLetterChange = { [weak self] raw in
+            self?.onJumpLetterChange?(bundleID, raw)
+        }
         return cell
     }
 
@@ -152,14 +159,17 @@ extension PinnedAppsListView: NSTableViewDataSource, NSTableViewDelegate {
 /// spliced in — a cold LaunchServices lookup can hitch the UI (mirrors
 /// `AppRuleRowView` / `AppsSettingsViewController.makeRow`).
 @MainActor
-final class PinnedAppRowCellView: NSTableCellView {
+final class PinnedAppRowCellView: NSTableCellView, NSTextFieldDelegate {
 
     /// Fired when the remove button is clicked.
     var onRemove: (() -> Void)?
+    /// Fired when editing the direct-jump field finishes.
+    var onJumpLetterChange: ((String) -> Void)?
 
     private let handle = NSImageView()
     private let iconView = NSImageView()
     private let nameLabel = NSTextField(labelWithString: "")
+    private let jumpLetterField = NSTextField()
     private let removeButton = NSButton()
     private var bundleID = ""
 
@@ -170,8 +180,9 @@ final class PinnedAppRowCellView: NSTableCellView {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) not implemented") }
 
-    func configure(bundleID: String) {
+    func configure(bundleID: String, jumpLetter: String?) {
         self.bundleID = bundleID
+        jumpLetterField.stringValue = jumpLetter?.uppercased() ?? ""
         // Placeholder now; resolve the real name + icon off the main actor.
         iconView.image = NSImage(systemSymbolName: "app.dashed", accessibilityDescription: nil)
         nameLabel.stringValue = bundleID
@@ -203,6 +214,17 @@ final class PinnedAppRowCellView: NSTableCellView {
         nameLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
         nameLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
+        jumpLetterField.placeholderString = String(localized: "Auto")
+        jumpLetterField.alignment = .center
+        jumpLetterField.font = .monospacedSystemFont(ofSize: 12, weight: .semibold)
+        jumpLetterField.controlSize = .small
+        jumpLetterField.bezelStyle = .roundedBezel
+        jumpLetterField.maximumNumberOfLines = 1
+        jumpLetterField.toolTip = String(localized: "Jump key (A–Z). Action keys and duplicates are unavailable.")
+        jumpLetterField.delegate = self
+        jumpLetterField.setContentHuggingPriority(.required, for: .horizontal)
+        jumpLetterField.setContentCompressionResistancePriority(.required, for: .horizontal)
+
         removeButton.isBordered = false
         removeButton.bezelStyle = .accessoryBarAction
         removeButton.imagePosition = .imageOnly
@@ -214,7 +236,7 @@ final class PinnedAppRowCellView: NSTableCellView {
         removeButton.action = #selector(removeClicked)
         removeButton.setContentHuggingPriority(.required, for: .horizontal)
 
-        let stack = NSStackView(views: [handle, iconView, nameLabel, NSView(), removeButton])
+        let stack = NSStackView(views: [handle, iconView, nameLabel, NSView(), jumpLetterField, removeButton])
         stack.orientation = .horizontal
         stack.alignment = .centerY
         stack.spacing = 10
@@ -224,11 +246,17 @@ final class PinnedAppRowCellView: NSTableCellView {
         NSLayoutConstraint.activate([
             iconView.widthAnchor.constraint(equalToConstant: 22),
             iconView.heightAnchor.constraint(equalToConstant: 22),
+            jumpLetterField.widthAnchor.constraint(equalToConstant: 46),
             stack.topAnchor.constraint(equalTo: topAnchor),
             stack.bottomAnchor.constraint(equalTo: bottomAnchor),
             stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
             stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
         ])
+    }
+
+    func controlTextDidEndEditing(_ obj: Notification) {
+        guard obj.object as? NSTextField === jumpLetterField else { return }
+        onJumpLetterChange?(jumpLetterField.stringValue)
     }
 
     @objc private func removeClicked() { onRemove?() }

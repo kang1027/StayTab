@@ -57,6 +57,10 @@
       },
       "type" : "array"
     },
+    "appJumpLetters" : {
+      "description" : "Custom single-letter jump keys keyed by app bundle ID.",
+      "type" : "object"
+    },
     "applicationsOnly" : {
       "description" : "Show one entry per app instead of one per window.",
       "type" : "boolean"

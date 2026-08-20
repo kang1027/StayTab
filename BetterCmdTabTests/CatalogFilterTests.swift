@@ -150,6 +150,30 @@ struct CatalogFilterTests {
         #expect(result == [2, 4, 1, 3, 5])
     }
 
+    @Test("primed MRU order ignores visual pin order")
+    func primedMRUIgnoresPins() {
+        let items = ["frontmost", "previous", "pinned"]
+        let result = CatalogFilter.applyPinnedOrder(
+            items,
+            pinnedIDs: ["pinned"],
+            enabled: false,
+            bundleID: { $0 }
+        )
+        #expect(result == items)
+    }
+
+    @Test("visible rows still apply visual pin order")
+    func visibleRowsApplyPins() {
+        let items = ["frontmost", "previous", "pinned"]
+        let result = CatalogFilter.applyPinnedOrder(
+            items,
+            pinnedIDs: ["pinned"],
+            enabled: true,
+            bundleID: { $0 }
+        )
+        #expect(result == ["pinned", "frontmost", "previous"])
+    }
+
     // MARK: - pinnedToFront (used by filteredRows and the .mruWindows re-pin)
 
     /// A launchable row carries an arbitrary bundle id with `isPlaceholder == false`,

@@ -667,11 +667,21 @@ final class SwitcherController: SwitcherViewDelegate {
         windowMRU.start()
         cache.start(mru: mru)
         InstalledAppsIndex.shared.ensureFresh()
+        RowLabels.setCustomLetters(Preferences.shared.appJumpLetters)
         Preferences.shared.$pinnedBundleIDs
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 InstalledAppsIndex.shared.ensureFresh()
                 guard let self, self.phase == .visible else { return }
+                self.refreshDisplay()
+            }
+            .store(in: &cancellables)
+        Preferences.shared.$appJumpLetters
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] letters in
+                RowLabels.setCustomLetters(letters)
+                guard let self, self.phase == .visible else { return }
+                self.baseLabels = RowLabels.labels(for: self.baseRows)
                 self.refreshDisplay()
             }
             .store(in: &cancellables)

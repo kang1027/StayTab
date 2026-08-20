@@ -4,8 +4,16 @@ import Testing
 @Suite("RowLabels")
 struct RowLabelsTests {
 
-    private func input(_ appName: String, _ windowTitle: String = "") -> RowLabels.Input {
-        RowLabels.Input(appName: appName, windowTitle: windowTitle)
+    private func input(
+        _ appName: String,
+        _ windowTitle: String = "",
+        bundleID: String? = nil
+    ) -> RowLabels.Input {
+        RowLabels.Input(
+            appName: appName,
+            windowTitle: windowTitle,
+            bundleIdentifier: bundleID
+        )
     }
 
     @Test("unique first letters produce single-letter labels")
@@ -99,5 +107,47 @@ struct RowLabelsTests {
     func empty() {
         let labels = RowLabels.labels(forInputs: [])
         #expect(labels.isEmpty)
+    }
+
+    @Test("custom app letters override automatic hints")
+    func customLettersOverrideAutomaticHints() {
+        let labels = RowLabels.labels(
+            forInputs: [
+                input("ChatGPT", bundleID: "com.openai.chat"),
+                input("Docker Desktop", bundleID: "com.docker.desktop"),
+            ],
+            customLetters: [
+                "com.openai.chat": "C",
+                "com.docker.desktop": "d",
+            ]
+        )
+        #expect(labels == ["c", "d"])
+    }
+
+    @Test("automatic hints do not steal a custom letter")
+    func automaticHintsSkipCustomLetters() {
+        let labels = RowLabels.labels(
+            forInputs: [
+                input("ChatGPT", bundleID: "com.openai.chat"),
+                input("Discord", bundleID: "com.discord"),
+            ],
+            customLetters: ["com.openai.chat": "d"]
+        )
+        #expect(labels == ["d", "i"])
+    }
+
+    @Test("invalid and action-reserved custom letters fall back to automatic hints")
+    func invalidCustomLettersFallBack() {
+        let labels = RowLabels.labels(
+            forInputs: [
+                input("ChatGPT", bundleID: "com.openai.chat"),
+                input("Docker", bundleID: "com.docker.desktop"),
+            ],
+            customLetters: [
+                "com.openai.chat": "12",
+                "com.docker.desktop": "q",
+            ]
+        )
+        #expect(labels == ["c", "d"])
     }
 }

@@ -31,6 +31,8 @@ final class AppsSettingsViewController: SettingsTabViewController {
     private let pinnedList = PinnedAppsListView()
     /// Working copy of the pin order, persisted to `Preferences` on every mutation.
     private var pinned: [String] = Preferences.shared.pinnedBundleIDs
+    /// Editable direct-jump letters keyed by pinned app bundle identifier.
+    private var jumpLetters: [String: String] = Preferences.shared.appJumpLetters
     private var appsSheet: AppsPickerSheetWindowController?
     private var addSheet: AppsPickerSheetWindowController?
 
@@ -77,7 +79,7 @@ final class AppsSettingsViewController: SettingsTabViewController {
         // to set their fixed order; "Add App…" opens the picker for bulk edits.
         let pinnedHeader = makeGroupHeader(
             title: String(localized: "Always in ⌘Tab"),
-            description: String(localized: "These apps stay in the switcher after quitting. Selecting a closed app launches it. Drag to set their order.")
+            description: String(localized: "These apps stay in the switcher after quitting. Selecting a closed app launches it. Drag to set their order, or enter a jump key.")
         )
         let pinnedBlock = NSStackView(views: [pinnedHeader, pinnedCard])
         pinnedBlock.orientation = .vertical
@@ -96,8 +98,13 @@ final class AppsSettingsViewController: SettingsTabViewController {
         pinnedList.onRemove = { [weak self] bundleID in
             guard let self else { return }
             self.pinned.removeAll { $0 == bundleID }
+            self.jumpLetters.removeValue(forKey: bundleID)
             Preferences.shared.pinnedBundleIDs = self.pinned
+            Preferences.shared.appJumpLetters = self.jumpLetters
             self.rebuildPinnedCard()
+        }
+        pinnedList.onJumpLetterChange = { [weak self] bundleID, raw in
+            self?.updateJumpLetter(bundleID: bundleID, rawValue: raw)
         }
         rebuildPinnedCard()
     }
@@ -123,7 +130,7 @@ final class AppsSettingsViewController: SettingsTabViewController {
             empty.textColor = .tertiaryLabelColor
             pinnedCard.addContent(empty)
         } else {
-            pinnedList.reload(pinned)
+            pinnedList.reload(pinned, jumpLetters: jumpLetters)
             pinnedCard.addContent(pinnedList)
         }
         pinnedCard.addDivider()
@@ -253,6 +260,28 @@ final class AppsSettingsViewController: SettingsTabViewController {
 
     // MARK: - Pinned
 
+    private func updateJumpLetter(bundleID: String, rawValue: String) {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            jumpLetters.removeValue(forKey: bundleID)
+            Preferences.shared.appJumpLetters = jumpLetters
+            rebuildPinnedCard()
+            return
+        }
+        guard let letter = RowLabels.normalizedCustomLetter(trimmed),
+              !RowLabels.reserved.contains(letter),
+              !jumpLetters.contains(where: {
+                  $0.key != bundleID && RowLabels.normalizedCustomLetter($0.value) == letter
+              }) else {
+            NSSound.beep()
+            rebuildPinnedCard()
+            return
+        }
+        jumpLetters[bundleID] = String(letter)
+        Preferences.shared.appJumpLetters = jumpLetters
+        rebuildPinnedCard()
+    }
+
     override func viewWillAppear() {
         super.viewWillAppear()
         // Re-sync the working copy: another pane (e.g. Import settings) can rewrite
@@ -269,6 +298,10 @@ final class AppsSettingsViewController: SettingsTabViewController {
             pinned = Preferences.shared.pinnedBundleIDs
             rebuildPinnedCard()
         }
+        if Preferences.shared.appJumpLetters != jumpLetters {
+            jumpLetters = Preferences.shared.appJumpLetters
+            rebuildPinnedCard()
+        }
         Preferences.shared.$pinnedBundleIDs
             .receive(on: DispatchQueue.main)
             .sink { [weak self] ids in
@@ -276,6 +309,14 @@ final class AppsSettingsViewController: SettingsTabViewController {
                 // rebuild only for external changes.
                 guard let self, ids != self.pinned else { return }
                 self.pinned = ids
+                self.rebuildPinnedCard()
+            }
+            .store(in: &cancellables)
+        Preferences.shared.$appJumpLetters
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] letters in
+                guard let self, letters != self.jumpLetters else { return }
+                self.jumpLetters = letters
                 self.rebuildPinnedCard()
             }
             .store(in: &cancellables)
@@ -307,11 +348,15 @@ final class AppsSettingsViewController: SettingsTabViewController {
                 }
             order.append(contentsOf: added.map(\.bid))
             Preferences.shared.pinnedBundleIDs = order
+            Preferences.shared.appJumpLetters = Preferences.shared.appJumpLetters.filter {
+                selection.contains($0.key)
+            }
         }
         controller.onDidDismiss = { [weak self] in
             guard let self else { return }
             self.appsSheet = nil
             self.pinned = Preferences.shared.pinnedBundleIDs
+            self.jumpLetters = Preferences.shared.appJumpLetters
             self.rebuildPinnedCard()
         }
         appsSheet = controller

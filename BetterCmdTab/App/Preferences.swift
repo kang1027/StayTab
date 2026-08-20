@@ -745,6 +745,7 @@ final class Preferences: ObservableObject {
         /// Read once at launch and folded into `appExceptions` (hide = .always).
         static let legacyExcludedBundleIDs = "Switcher.excludedBundleIDs"
         static let pinnedBundleIDs = "Switcher.pinnedBundleIDs"
+        static let appJumpLetters = "Switcher.appJumpLetters"
         /// Bundle IDs the "Hide all windows" shortcut leaves visible.
         static let hideAllExcludedBundleIDs = "Switcher.hideAllExcludedBundleIDs"
         static let showMinimizedWindows = "Switcher.showMinimizedWindows"
@@ -1029,6 +1030,16 @@ final class Preferences: ObservableObject {
         didSet {
             guard oldValue != pinnedBundleIDs else { return }
             UserDefaults.standard.set(pinnedBundleIDs, forKey: Keys.pinnedBundleIDs)
+        }
+    }
+
+    /// Optional direct-jump key per bundle identifier. Values are persisted as
+    /// lower-case single ASCII letters by the Apps settings editor; imported
+    /// values are validated again by `RowLabels` before use.
+    @Published var appJumpLetters: [String: String] {
+        didSet {
+            guard oldValue != appJumpLetters else { return }
+            UserDefaults.standard.set(appJumpLetters, forKey: Keys.appJumpLetters)
         }
     }
 
@@ -1339,11 +1350,9 @@ final class Preferences: ObservableObject {
     }
 
     /// Whether tapping Shift on its own steps the open switcher's selection
-    /// backwards (#45). Default on — that has always been the behavior. Users
-    /// coming from Windows can turn it off so reverse needs Shift held with the
-    /// switch key (⌘⇧Tab); otherwise the keydown on Shift plus the Tab press
-    /// step back twice. Only the bare-Shift step is gated — ⌘⇧Tab keeps working
-    /// through the keyDown path regardless.
+    /// backwards (#45). Default off so the native ⌘⇧Tab chord produces exactly
+    /// one reverse step. Users who want bare-Shift stepping can opt in. Only the
+    /// bare-Shift step is gated — ⌘⇧Tab keeps working through the keyDown path.
     @Published var shiftTapStepsBackward: Bool {
         didSet {
             guard oldValue != shiftTapStepsBackward else { return }
@@ -2219,6 +2228,7 @@ final class Preferences: ObservableObject {
             defaults.set(initial.map(\.dictionary), forKey: Keys.appExceptions)
         }
         self.pinnedBundleIDs = defaults.stringArray(forKey: Keys.pinnedBundleIDs) ?? []
+        self.appJumpLetters = defaults.dictionary(forKey: Keys.appJumpLetters) as? [String: String] ?? [:]
         self.hideAllExcludedBundleIDs = defaults.stringArray(forKey: Keys.hideAllExcludedBundleIDs) ?? []
         self.showMinimizedWindows = defaults.object(forKey: Keys.showMinimizedWindows) as? Bool ?? true
         self.showHiddenApps = defaults.object(forKey: Keys.showHiddenApps) as? Bool ?? true
@@ -2258,7 +2268,7 @@ final class Preferences: ObservableObject {
         self.scrollReverseDirection = defaults.object(forKey: Keys.scrollReverseDirection) as? Bool ?? false
         self.clickOutsideToDismiss = defaults.object(forKey: Keys.clickOutsideToDismiss) as? Bool ?? true
         self.vimNavigationEnabled = defaults.object(forKey: Keys.vimNavigationEnabled) as? Bool ?? false
-        self.shiftTapStepsBackward = defaults.object(forKey: Keys.shiftTapStepsBackward) as? Bool ?? true
+        self.shiftTapStepsBackward = defaults.object(forKey: Keys.shiftTapStepsBackward) as? Bool ?? false
         self.backtickReversesAppSwitching = defaults.object(forKey: Keys.backtickReversesAppSwitching) as? Bool ?? false
         self.cycleTileWidths = defaults.object(forKey: Keys.cycleTileWidths) as? Bool ?? false
         self.instantSpaceSwitch = Self.stored(.instantSpaceSwitch, defaults)
@@ -2366,6 +2376,7 @@ final class Preferences: ObservableObject {
             appExceptions = []
         }
         pinnedBundleIDs = defaults.stringArray(forKey: Keys.pinnedBundleIDs) ?? []
+        appJumpLetters = defaults.dictionary(forKey: Keys.appJumpLetters) as? [String: String] ?? [:]
         hideAllExcludedBundleIDs = defaults.stringArray(forKey: Keys.hideAllExcludedBundleIDs) ?? []
 
         showMinimizedWindows = defaults.object(forKey: Keys.showMinimizedWindows) as? Bool ?? true
@@ -2400,7 +2411,7 @@ final class Preferences: ObservableObject {
         scrollReverseDirection = defaults.object(forKey: Keys.scrollReverseDirection) as? Bool ?? false
         clickOutsideToDismiss = defaults.object(forKey: Keys.clickOutsideToDismiss) as? Bool ?? true
         vimNavigationEnabled = defaults.object(forKey: Keys.vimNavigationEnabled) as? Bool ?? false
-        shiftTapStepsBackward = defaults.object(forKey: Keys.shiftTapStepsBackward) as? Bool ?? true
+        shiftTapStepsBackward = defaults.object(forKey: Keys.shiftTapStepsBackward) as? Bool ?? false
         backtickReversesAppSwitching = defaults.object(forKey: Keys.backtickReversesAppSwitching) as? Bool ?? false
         mouseHoverSelectionEnabled = defaults.object(forKey: Keys.mouseHoverSelectionEnabled) as? Bool ?? true
         mouseClickSelectionEnabled = defaults.object(forKey: Keys.mouseClickSelectionEnabled) as? Bool ?? true

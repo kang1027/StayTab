@@ -244,7 +244,7 @@ final class HotkeyTap: @unchecked Sendable {
     /// open steps the selection backwards. Turned off (#45) so reverse needs
     /// Shift held with the switch key (⌘⇧Tab) instead — the bare-Shift step in
     /// `flagsChanged` is suppressed; the keyDown ⌘⇧Tab path is unaffected.
-    private let shiftTapStepsBackwardFlag = OSAllocatedUnfairLock<Bool>(initialState: true)
+    private let shiftTapStepsBackwardFlag = OSAllocatedUnfairLock<Bool>(initialState: false)
     /// Synthesizes auto-repeat for a *held* Shift so it steps backwards
     /// continuously, mirroring a held Tab (a modifier emits no key-repeat
     /// keyDowns, so the cadence is driven here). Armed on the Shift-down

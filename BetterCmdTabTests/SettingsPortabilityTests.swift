@@ -228,6 +228,25 @@ struct SettingsPortabilityTests {
         #expect(prefs.commitSoundName == (savedSoundName == "Ping" ? "Pop" : "Ping"))
     }
 
+    @Test("round-trip: custom app jump letters survive export/import")
+    func appJumpLettersRoundTrip() throws {
+        let prefs = Preferences.shared
+        let saved = prefs.appJumpLetters
+        defer { prefs.appJumpLetters = saved }
+
+        try prefs.importSettings(from: envelope([
+            Preferences.Keys.appJumpLetters: [
+                "com.openai.chat": "c",
+                "com.docker.desktop": "d",
+            ],
+        ]))
+
+        #expect(prefs.appJumpLetters == [
+            "com.openai.chat": "c",
+            "com.docker.desktop": "d",
+        ])
+    }
+
     @Test("pre-#57 import (legacy currentSpaceOnly bool, no spaceScope) applies through the fallback")
     func legacySpaceScopeImport() throws {
         let prefs = Preferences.shared
