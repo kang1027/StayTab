@@ -58,7 +58,7 @@ StayTab keeps BetterCmdTab's inherited preference formats readable for upgrades,
 
 ### Download the DMG — recommended
 
-The first notarized `v0.1.0` release is being prepared. When it is published:
+Install the latest signed and notarized release as follows:
 
 1. Download `StayTab-*.dmg` from [GitHub Releases](https://github.com/kang1027/StayTab/releases/latest).
 2. Open the DMG and drag **StayTab** to Applications.

@@ -58,7 +58,7 @@ StayTab은 업그레이드 호환성을 위해 BetterCmdTab의 기존 설정 형
 
 ### DMG 다운로드 — 권장
 
-첫 Apple 공증 버전인 `v0.1.0`을 준비 중이에요. 공개된 뒤에는 다음 순서로 설치해요.
+최신 서명·공증 버전은 다음 순서로 설치해요.
 
 1. [GitHub Releases](https://github.com/kang1027/StayTab/releases/latest)에서 `StayTab-*.dmg`를 내려받아요.
 2. DMG를 열고 **StayTab**을 Applications 폴더로 옮겨요.
