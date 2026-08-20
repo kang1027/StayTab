@@ -72,6 +72,15 @@ scripts/build_release.sh --skip-notarization
 
 DMG를 직접 설치해 동작을 확인한 뒤에만 공개합니다.
 
+공개 명령을 실행하기 전에 다음 항목을 확인합니다.
+
+- `origin/main`의 App CI가 성공했습니다.
+- 작업 트리가 깨끗하고 현재 `HEAD`가 `origin/main`과 같습니다.
+- 로컬 Developer ID Application 인증서와 `StayTabNotarization` 프로필이 유효합니다.
+- GitHub Actions에 `BETTERUPDATER_PRIVATE_KEY` Secret이 등록되어 있습니다.
+- 생성된 DMG를 다른 위치에 설치해 실행, 권한 요청, `⌘Tab`, 종료된 고정 앱 실행을 확인했습니다.
+- 릴리스 노트에 사용자 변경 사항, 알려진 문제, GPL-3.0 및 BetterCmdTab 출처를 포함했습니다.
+
 ```bash
 scripts/build_release.sh \
   --skip-build \
@@ -80,7 +89,8 @@ scripts/build_release.sh \
 ```
 
 `--auto-release`는 현재 `HEAD`가 깨끗하고 `origin/main`과 동일한 경우에만 `v<version>`
-태그와 GitHub Release를 만듭니다. 스크립트는 커밋이나 push를 자동 수행하지 않습니다.
+태그와 GitHub Release를 만듭니다. BetterUpdater 서명 Secret이 없으면 공개 전에 중단하며,
+커밋이나 push를 자동 수행하지 않습니다.
 
 릴리스가 공개되면 다음 워크플로가 실행됩니다.
 
@@ -88,4 +98,13 @@ scripts/build_release.sh \
   매니페스트를 첨부합니다.
 - `update-homebrew-cask.yml`: DMG의 SHA-256으로 `Casks/staytab.rb`를 갱신합니다.
 
-워크플로가 모두 통과한 뒤 새 설치와 인앱 업데이트를 각각 확인합니다.
+초기 공개 설치 경로는 GitHub Releases의 공증된 DMG입니다. Homebrew Cask 자동화는 이후
+배포 경로를 열 때 사용할 기반으로만 유지하며 README에서는 아직 안내하지 않습니다.
+
+워크플로가 모두 통과한 뒤 다음 항목을 확인합니다.
+
+- Release 페이지에서 DMG와 ZIP을 내려받을 수 있습니다.
+- `betterupdater-manifest.json`과 서명이 Release 자산에 첨부되었습니다.
+- 새 Mac 또는 깨끗한 사용자 환경에서 DMG 설치가 성공합니다.
+- 이전 버전에서 Stable 업데이트가 표시되고 설치 후 재실행됩니다.
+- 베타 릴리스는 **베타 릴리스 포함**을 켠 경우에만 표시됩니다.
