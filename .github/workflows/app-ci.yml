@@ -32,7 +32,10 @@ concurrency:
 jobs:
   test:
     name: Build and test
-    runs-on: macos-15
+    # The Swift package graph is compiled with Xcode 26 locally. Xcode 16 on
+    # macos-15 rejects BetterPermissions' async UserNotifications bridge under
+    # Swift 6 strict concurrency before the StayTab target is reached.
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
