@@ -1,5 +1,31 @@
 import AppKit
 
+/// Pure validation for a pinned app's direct-jump key. Keeping this outside the
+/// view controller makes every rejection reason deterministic and testable.
+enum JumpKeyAssignmentValidation: Equatable {
+    case cleared
+    case valid(Character)
+    case invalid
+    case reserved(Character)
+    case duplicate(Character)
+
+    static func evaluate(
+        rawValue: String,
+        bundleID: String,
+        assignments: [String: String],
+        reservedLetters: Set<Character>
+    ) -> Self {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return .cleared }
+        guard let letter = RowLabels.normalizedCustomLetter(trimmed) else { return .invalid }
+        guard !reservedLetters.contains(letter) else { return .reserved(letter) }
+        let isDuplicate = assignments.contains {
+            $0.key != bundleID && RowLabels.normalizedCustomLetter($0.value) == letter
+        }
+        return isDuplicate ? .duplicate(letter) : .valid(letter)
+    }
+}
+
 /// Pure array-move for the pinned-apps drag reorder. Extracted from the view so
 /// the drop-index math is unit-testable without a live `NSTableView`.
 enum PinnedReorder {

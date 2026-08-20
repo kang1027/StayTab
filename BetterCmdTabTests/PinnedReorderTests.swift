@@ -51,3 +51,57 @@ struct PinnedReorderTests {
         #expect(PinnedReorder.apply(ids, movingRowAt: 5, to: 0) == ids)
     }
 }
+
+@Suite("Pinned jump-key validation")
+struct JumpKeyAssignmentValidationTests {
+    private let assignments = ["chatgpt": "c", "docker": "d"]
+    private let reserved: Set<Character> = ["w", "q"]
+
+    @Test("empty input clears the custom key")
+    func cleared() {
+        #expect(JumpKeyAssignmentValidation.evaluate(
+            rawValue: "  ", bundleID: "chatgpt", assignments: assignments,
+            reservedLetters: reserved
+        ) == .cleared)
+    }
+
+    @Test("one ASCII letter is normalized")
+    func valid() {
+        #expect(JumpKeyAssignmentValidation.evaluate(
+            rawValue: " Z ", bundleID: "chatgpt", assignments: assignments,
+            reservedLetters: reserved
+        ) == .valid("z"))
+    }
+
+    @Test("non-letter and multi-letter input is invalid")
+    func invalid() {
+        #expect(JumpKeyAssignmentValidation.evaluate(
+            rawValue: "12", bundleID: "chatgpt", assignments: assignments,
+            reservedLetters: reserved
+        ) == .invalid)
+    }
+
+    @Test("switcher control letters report a reserved-key rejection")
+    func reservedKey() {
+        #expect(JumpKeyAssignmentValidation.evaluate(
+            rawValue: "W", bundleID: "chatgpt", assignments: assignments,
+            reservedLetters: reserved
+        ) == .reserved("w"))
+    }
+
+    @Test("a key owned by another app reports a duplicate")
+    func duplicate() {
+        #expect(JumpKeyAssignmentValidation.evaluate(
+            rawValue: "D", bundleID: "chatgpt", assignments: assignments,
+            reservedLetters: reserved
+        ) == .duplicate("d"))
+    }
+
+    @Test("an app may keep its own existing key")
+    func ownKey() {
+        #expect(JumpKeyAssignmentValidation.evaluate(
+            rawValue: "C", bundleID: "chatgpt", assignments: assignments,
+            reservedLetters: reserved
+        ) == .valid("c"))
+    }
+}

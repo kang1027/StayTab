@@ -33,6 +33,8 @@ final class AppsSettingsViewController: SettingsTabViewController {
     private var pinned: [String] = Preferences.shared.pinnedBundleIDs
     /// Editable direct-jump letters keyed by pinned app bundle identifier.
     private var jumpLetters: [String: String] = Preferences.shared.appJumpLetters
+    /// The last rejected edit, shown inline instead of failing with only a beep.
+    private var jumpKeyValidationMessage: String?
     private var appsSheet: AppsPickerSheetWindowController?
     private var addSheet: AppsPickerSheetWindowController?
 
@@ -133,6 +135,7 @@ final class AppsSettingsViewController: SettingsTabViewController {
             pinnedList.reload(pinned, jumpLetters: jumpLetters)
             pinnedCard.addContent(pinnedList)
         }
+        pinnedCard.addContent(makeJumpKeyHelp())
         pinnedCard.addDivider()
 
         let addRow = AddAppRowView()
@@ -158,6 +161,47 @@ final class AppsSettingsViewController: SettingsTabViewController {
         stack.edgeInsets = NSEdgeInsets(top: 0, left: 4, bottom: 0, right: 4)
         descLabel.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -8).isActive = true
         return stack
+    }
+
+    /// Always exposes the live reserved-letter set, and temporarily replaces
+    /// the neutral hint with the exact reason an edit was rejected.
+    private func makeJumpKeyHelp() -> NSView {
+        let reserved = RowLabels.reserved.sorted().map { String($0).uppercased() }.joined(separator: ", ")
+        let text: String
+        let color: NSColor
+        let symbol: String
+        if let jumpKeyValidationMessage {
+            text = jumpKeyValidationMessage
+            color = .systemRed
+            symbol = "exclamationmark.circle.fill"
+        } else if reserved.isEmpty {
+            text = String(localized: "Jump keys use one unique A–Z letter.")
+            color = .secondaryLabelColor
+            symbol = "info.circle"
+        } else {
+            text = String(
+                format: String(localized: "Jump keys use one unique A–Z letter. Unavailable: %@. These keys are assigned to switcher controls; change them in Shortcuts."),
+                reserved
+            )
+            color = .secondaryLabelColor
+            symbol = "info.circle"
+        }
+
+        let icon = NSImageView(image: NSImage(systemSymbolName: symbol, accessibilityDescription: nil) ?? NSImage())
+        icon.contentTintColor = color
+        icon.setContentHuggingPriority(.required, for: .horizontal)
+
+        let label = NSTextField(wrappingLabelWithString: text)
+        label.font = .systemFont(ofSize: 11)
+        label.textColor = color
+        label.maximumNumberOfLines = 0
+
+        let row = NSStackView(views: [icon, label])
+        row.orientation = .horizontal
+        row.alignment = .firstBaseline
+        row.spacing = 6
+        label.widthAnchor.constraint(equalTo: row.widthAnchor, constant: -22).isActive = true
+        return row
     }
 
     // MARK: - App rules card
@@ -261,25 +305,41 @@ final class AppsSettingsViewController: SettingsTabViewController {
     // MARK: - Pinned
 
     private func updateJumpLetter(bundleID: String, rawValue: String) {
-        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty {
+        switch JumpKeyAssignmentValidation.evaluate(
+            rawValue: rawValue,
+            bundleID: bundleID,
+            assignments: jumpLetters,
+            reservedLetters: RowLabels.reserved
+        ) {
+        case .cleared:
+            jumpKeyValidationMessage = nil
             jumpLetters.removeValue(forKey: bundleID)
             Preferences.shared.appJumpLetters = jumpLetters
             rebuildPinnedCard()
-            return
-        }
-        guard let letter = RowLabels.normalizedCustomLetter(trimmed),
-              !RowLabels.reserved.contains(letter),
-              !jumpLetters.contains(where: {
-                  $0.key != bundleID && RowLabels.normalizedCustomLetter($0.value) == letter
-              }) else {
+        case let .valid(letter):
+            jumpKeyValidationMessage = nil
+            jumpLetters[bundleID] = String(letter)
+            Preferences.shared.appJumpLetters = jumpLetters
+            rebuildPinnedCard()
+        case .invalid:
+            jumpKeyValidationMessage = String(localized: "Use exactly one letter from A–Z.")
             NSSound.beep()
             rebuildPinnedCard()
-            return
+        case let .reserved(letter):
+            jumpKeyValidationMessage = String(
+                format: String(localized: "%@ is unavailable because it is assigned to a switcher control."),
+                String(letter).uppercased()
+            )
+            NSSound.beep()
+            rebuildPinnedCard()
+        case let .duplicate(letter):
+            jumpKeyValidationMessage = String(
+                format: String(localized: "%@ is already assigned to another pinned app."),
+                String(letter).uppercased()
+            )
+            NSSound.beep()
+            rebuildPinnedCard()
         }
-        jumpLetters[bundleID] = String(letter)
-        Preferences.shared.appJumpLetters = jumpLetters
-        rebuildPinnedCard()
     }
 
     override func viewWillAppear() {
@@ -302,6 +362,9 @@ final class AppsSettingsViewController: SettingsTabViewController {
             jumpLetters = Preferences.shared.appJumpLetters
             rebuildPinnedCard()
         }
+        // In-panel shortcuts can change while this cached pane is hidden. The
+        // reserved-key hint must reflect the live bindings when Apps reappears.
+        rebuildPinnedCard()
         Preferences.shared.$pinnedBundleIDs
             .receive(on: DispatchQueue.main)
             .sink { [weak self] ids in
