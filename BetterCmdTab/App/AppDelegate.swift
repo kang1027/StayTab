@@ -48,10 +48,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DirectActivation.installHandlers()
         ScopedSwitch.installHandlers()
         WindowManagement.installHandlers()
-        // Apply + watch ~/.config/bettercmdtab/config.json if the user opted
+        // Apply + watch ~/.config/staytab/config.json if the user opted
         // in (#117). After ScopedSwitch.installHandlers(): a config-file load
         // re-runs it idempotently for any imported scoped shortcuts.
         ConfigFile.shared.start()
+        // Warm the installed-app index before the first ⌘Tab reveal. Persistent
+        // pinned rows then need only dictionary lookups on the hot path.
+        InstalledAppsIndex.shared.ensureFresh()
         #if DEBUG
         // In Debug builds always show the menu bar icon, regardless of the
         // saved preference — otherwise a hidden icon leaves no way to reach
@@ -74,12 +77,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // The pinned Ed25519 public key is the trust anchor for the signed
         // repo-identity manifest (see BetterUpdater README).
         BetterUpdater.bootstrap(configuration: .init(
-            owner: "rokartur",
-            repo: "BetterCmdTab",
+            owner: "kdh",
+            repo: "StayTab",
             displayName: AppInfo.displayName,
-            bundleIdentifier: "pro.bettercmdtab.BetterCmdTab",
+            bundleIdentifier: "com.kdh.StayTab",
             pinnedPublicKeyBase64: "EdGQwfRFT04hggloIRmN2twIC/UIlM6yoAAzZ97jgcI=",
-            userAgentProduct: "BetterCmdTab-Updater",
+            userAgentProduct: "StayTab-Updater",
             manifestRequired: true
         ))
 
@@ -110,17 +113,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         axWaiter = waiter
         waiter.start()
 
-        Task { @MainActor in
-            // Touch the singleton so it boots its scheduled auto-check task,
-            // then perform an opportunistic non-forced check at launch — but
-            // only when automatic checks are enabled. The Manual cadence must
-            // mean zero update network traffic until the user checks from the
-            // About pane.
-            let updater = GitHubUpdater.shared
-            if updater.automaticChecksEnabled {
-                await updater.checkForUpdates(force: false)
-            }
-        }
+        // StayTab is a local fork, so never let the inherited updater replace it
+        // with an upstream BetterCmdTab build. Manual checks remain available
+        // while a dedicated StayTab release feed does not exist.
+        GitHubUpdater.shared.setCheckInterval(.manual)
     }
 
     private func bootController() {
@@ -169,7 +165,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let alert = NSAlert()
         alert.messageText = String(localized: "Accessibility access was turned off")
-        alert.informativeText = String(localized: "BetterCmdTab needs Accessibility permission to handle ⌘Tab. Re-enable it in System Settings and the switcher reactivates automatically.")
+        alert.informativeText = String(localized: "StayTab needs Accessibility permission to handle ⌘Tab. Re-enable it in System Settings and the switcher reactivates automatically.")
         alert.addButton(withTitle: String(localized: "Open Accessibility Settings"))
         alert.addButton(withTitle: String(localized: "Later"))
 
@@ -204,7 +200,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func installStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
-            button.image = NSImage(systemSymbolName: "command", accessibilityDescription: "BetterCmdTab")
+            button.image = NSImage(systemSymbolName: "command", accessibilityDescription: "StayTab")
             button.image?.isTemplate = true
         }
         let menu = NSMenu()
@@ -219,7 +215,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
-        let quitItem = NSMenuItem(title: String(localized: "Quit BetterCmdTab"), action: #selector(quit), keyEquivalent: "q")
+        let quitItem = NSMenuItem(title: String(localized: "Quit StayTab"), action: #selector(quit), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
         item.menu = menu

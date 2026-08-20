@@ -17,7 +17,7 @@
 			<key>UTTypeIdentifier</key>
 			<string>pro.bettercmdtab.settings</string>
 			<key>UTTypeDescription</key>
-			<string>BetterCmdTab Settings</string>
+			<string>StayTab Settings</string>
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.json</string>
@@ -42,7 +42,7 @@
 	<array>
 		<dict>
 			<key>CFBundleTypeName</key>
-			<string>BetterCmdTab Settings</string>
+			<string>StayTab Settings</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSHandlerRank</key>

@@ -55,12 +55,11 @@ final class AppsSettingsViewController: SettingsTabViewController {
         register(searchTarget: rulesCard, itemID: SearchID.exceptions)
         rebuildRulesCard()
 
-        // Pinned apps — a titled group above a reorderable card. Drag rows to set
-        // the order pinned apps appear at the front of the switcher; "Add App…"
-        // opens the picker for bulk add/remove.
+        // Persistent apps — a titled group above a reorderable card. Drag rows
+        // to set their fixed order; "Add App…" opens the picker for bulk edits.
         let pinnedHeader = makeGroupHeader(
-            title: String(localized: "Pinned"),
-            description: String(localized: "Pinned apps are forced to the front of the switcher, before recents. Drag to set their order.")
+            title: String(localized: "Always in ⌘Tab"),
+            description: String(localized: "These apps stay in the switcher after quitting. Selecting a closed app launches it. Drag to set their order.")
         )
         let pinnedBlock = NSStackView(views: [pinnedHeader, pinnedCard])
         pinnedBlock.orientation = .vertical
@@ -267,8 +266,8 @@ final class AppsSettingsViewController: SettingsTabViewController {
     @objc private func managePinned() {
         guard let window = view.window, appsSheet == nil else { return }
         let controller = AppsPickerSheetWindowController(
-            title: String(localized: "Pinned Apps"),
-            prompt: String(localized: "Selected apps are forced to the front of the switcher, before recents."),
+            title: String(localized: "Always in ⌘Tab"),
+            prompt: String(localized: "Selected apps stay in the switcher after quitting and launch when chosen."),
             selectedBundleIDs: Set(Preferences.shared.pinnedBundleIDs),
             confirmTitle: String(localized: "Done")
         ) { selection in

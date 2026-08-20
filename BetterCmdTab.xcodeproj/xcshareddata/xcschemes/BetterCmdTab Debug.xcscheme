@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "7559A7562FC06FD5004D97B7"
-               BuildableName = "BetterCmdTab.app"
+               BuildableName = "StayTab.app"
                BlueprintName = "BetterCmdTab"
                ReferencedContainer = "container:BetterCmdTab.xcodeproj">
             </BuildableReference>
@@ -58,7 +58,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "7559A7562FC06FD5004D97B7"
-            BuildableName = "BetterCmdTab.app"
+            BuildableName = "StayTab.app"
             BlueprintName = "BetterCmdTab"
             ReferencedContainer = "container:BetterCmdTab.xcodeproj">
          </BuildableReference>
@@ -75,7 +75,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "7559A7562FC06FD5004D97B7"
-            BuildableName = "BetterCmdTab.app"
+            BuildableName = "StayTab.app"
             BlueprintName = "BetterCmdTab"
             ReferencedContainer = "container:BetterCmdTab.xcodeproj">
          </BuildableReference>

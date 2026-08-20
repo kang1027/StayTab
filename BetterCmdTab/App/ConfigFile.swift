@@ -3,7 +3,7 @@ import Foundation
 import os
 
 /// Ghostty-style file-based configuration (#117): a live two-way sync between
-/// the `Switcher.*` preferences and `~/.config/bettercmdtab/config.json`
+/// the `Switcher.*` preferences and `~/.config/staytab/config.json`
 /// (flat JSON, see `SettingsPortability`).
 ///
 /// The file's existence is the opt-in switch. File present → its edits apply
@@ -25,7 +25,7 @@ final class ConfigFile: @unchecked Sendable {
     static let shared = ConfigFile()
 
     /// `$XDG_CONFIG_HOME` (only when absolute, per the XDG spec) or
-    /// `~/.config`, plus `bettercmdtab/config.json`.
+    /// `~/.config`, plus `staytab/config.json`.
     static let url: URL = {
         let base: URL
         if let xdg = ProcessInfo.processInfo.environment["XDG_CONFIG_HOME"], xdg.hasPrefix("/") {
@@ -34,7 +34,7 @@ final class ConfigFile: @unchecked Sendable {
             base = FileManager.default.homeDirectoryForCurrentUser
                 .appendingPathComponent(".config", isDirectory: true)
         }
-        return base.appendingPathComponent("bettercmdtab/config.json", isDirectory: false)
+        return base.appendingPathComponent("staytab/config.json", isDirectory: false)
     }()
 
     /// Sidecar JSON Schema, written beside the config file and pointed at by
@@ -58,7 +58,7 @@ final class ConfigFile: @unchecked Sendable {
         return try JSONSerialization.data(withJSONObject: values, options: [.prettyPrinted, .sortedKeys])
     }
 
-    private let queue = DispatchQueue(label: "pro.bettercmdtab.config", qos: .utility)
+    private let queue = DispatchQueue(label: "com.kdh.StayTab.config", qos: .utility)
     // Queue-confined state.
     private var source: DispatchSourceFileSystemObject?
     private var watchingFile = false

@@ -5,7 +5,7 @@ import Testing
 
 /// Guards the checked-in copy of the config schema against the app that
 /// generates it. `docs/src/data/config-schema.json` is copied by hand out of a
-/// generated `~/.config/bettercmdtab/schema.json` (#117), so a reworded
+/// generated `~/.config/staytab/schema.json` (#117), so a reworded
 /// description or a new documented key silently ships a docs page describing a
 /// build nobody runs. Compare the copy to `ConfigSchemaDocs` instead of by eye.
 @Suite("Config schema docs")

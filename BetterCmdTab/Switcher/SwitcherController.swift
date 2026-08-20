@@ -612,7 +612,7 @@ final class SwitcherController: SwitcherViewDelegate {
         quittingPids.remove(pid)
         guard phase == .visible, baseRows.contains(where: { $0.pid == pid }) else { return }
         baseRows.removeAll { $0.pid == pid }
-        if baseRows.isEmpty {
+        if baseRows.isEmpty, persistentAppRows(from: []).isEmpty {
             cancel()
             return
         }
@@ -666,6 +666,26 @@ final class SwitcherController: SwitcherViewDelegate {
         mru.start()
         windowMRU.start()
         cache.start(mru: mru)
+        InstalledAppsIndex.shared.ensureFresh()
+        Preferences.shared.$pinnedBundleIDs
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                InstalledAppsIndex.shared.ensureFresh()
+                guard let self, self.phase == .visible else { return }
+                self.refreshDisplay()
+            }
+            .store(in: &cancellables)
+        let installedAppsObserver = NotificationCenter.default.addObserver(
+            forName: InstalledAppsIndex.didRefreshNotification,
+            object: InstalledAppsIndex.shared,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.phase == .visible else { return }
+                self.refreshDisplay()
+            }
+        }
+        notificationObservers.append(installedAppsObserver)
         // Focus changes don't change any app's window set, so the cache routes
         // them here instead of paying a full per-pid AX re-scan: just nudge the
         // per-app window-MRU so the next reveal orders windows correctly.
@@ -3253,6 +3273,24 @@ final class SwitcherController: SwitcherViewDelegate {
         // "No open windows" empty state instead of flashing away (#31). This
         // also covers a scoped open whose filter matches nothing.
 
+        // Add quit pinned apps after the canonical running-app snapshot has
+        // settled. Preserve the selected running row because inserting a
+        // missing pin can shift its index inside the fixed block.
+        let selectedBeforePersistentPins = rows.indices.contains(index) ? rows[index] : nil
+        let persistentRows = persistentAppRows(from: baseRows)
+        if persistentRows.map(\.identity) != rows.map(\.identity) {
+            rows = persistentRows
+            labels = RowLabels.labels(for: rows)
+            if let selectedBeforePersistentPins,
+               let restored = Self.windowSelectionIndex(in: rows, selected: selectedBeforePersistentPins) {
+                index = restored
+            } else if let targetPid, let restored = rows.firstIndex(where: { $0.pid == targetPid }) {
+                index = restored
+            } else {
+                index = rows.isEmpty ? 0 : max(0, min(index, rows.count - 1))
+            }
+        }
+
         let sessionScreen = resolveSessionScreen()
         panel.targetScreen = sessionScreen
         currentMetrics = makeMetrics()
@@ -3575,6 +3613,14 @@ final class SwitcherController: SwitcherViewDelegate {
     private func applyFullSnapshot(_ fresh: [SwitcherRow], anchorPid: pid_t?) {
         guard phase == .visible else { return }
         if fresh.isEmpty {
+            // The normal roster remains useful with zero running apps because
+            // persistent entries are still valid launch targets.
+            if !persistentAppRows(from: []).isEmpty {
+                baseRows = []
+                baseLabels = []
+                refreshDisplay(anchorPid: anchorPid)
+                return
+            }
             // Distinguish "opened onto nothing" from "had windows, lost the
             // last one". If the panel is still showing placeholder rows (a cold
             // reveal whose background scan just resolved to empty), settle into
@@ -5515,6 +5561,19 @@ final class SwitcherController: SwitcherViewDelegate {
         return match
     }
 
+    /// Merge closed pinned apps into the normal app switcher. Scoped shortcuts
+    /// and ⌘` stay strictly window-based and never receive launch targets.
+    private func persistentAppRows(from source: [SwitcherRow]) -> [SwitcherRow] {
+        guard !windowsOnlyMode, activeScope == nil else { return source }
+        let pinnedIDs = Preferences.shared.pinnedBundleIDs
+        let installed = InstalledAppsIndex.shared.installedApps(bundleIDs: pinnedIDs)
+        return CatalogFilter.persistentPinnedRows(
+            source,
+            pinnedIDs: pinnedIDs,
+            installedApps: installed
+        )
+    }
+
     /// Recently closed windows/apps to surface for reopening. `forSearchQuery`
     /// non-nil filters by fuzzy match; nil yields the newest entries. Returns
     /// nothing when the feature is off or in window-only mode. App-only entries
@@ -5706,13 +5765,17 @@ final class SwitcherController: SwitcherViewDelegate {
             // Non-search: the displayed set is the running rows plus recently
             // closed entries. Labels are computed over the whole set so closed
             // apps get their own type-to-jump letter, exactly like running rows.
-            var combined = baseRows
+            let persistentRows = persistentAppRows(from: baseRows)
+            var combined = persistentRows
             combined.append(contentsOf: recentlyClosedRows(
                 forSearchQuery: nil,
-                alreadyShown: Set(baseRows.compactMap { $0.bundleIdentifier })
+                alreadyShown: Set(persistentRows.compactMap { $0.bundleIdentifier })
             ))
             // Reuse `baseLabels` when nothing was appended to keep labels stable.
-            let combinedLabels = combined.count == baseRows.count ? baseLabels : RowLabels.labels(for: combined)
+            let persistentMatchesBase = persistentRows.map(\.identity) == baseRows.map(\.identity)
+            let combinedLabels = combined.count == baseRows.count && persistentMatchesBase
+                ? baseLabels
+                : RowLabels.labels(for: combined)
 
             if !letterBuffer.isEmpty {
                 let prefix = letterBuffer

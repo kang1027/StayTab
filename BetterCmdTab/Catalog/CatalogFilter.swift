@@ -605,6 +605,31 @@ enum CatalogFilter {
         }
     }
 
+    /// Keep pinned apps in the normal app switcher even when they are not
+    /// running. Existing rows win; a launchable row is synthesized only for a
+    /// missing pinned bundle that is still installed. The result remains pin-
+    /// ordered, followed by transient running apps in their incoming order.
+    static func persistentPinnedRows(
+        _ rows: [SwitcherRow],
+        pinnedIDs: [String],
+        installedApps: [InstalledApp]
+    ) -> [SwitcherRow] {
+        guard !pinnedIDs.isEmpty else { return rows }
+
+        var represented = Set(rows.compactMap(\.bundleIdentifier))
+        var installedByBundleID: [String: InstalledApp] = [:]
+        for app in installedApps {
+            installedByBundleID[app.bundleID] = app
+        }
+        var combined = rows
+        combined.reserveCapacity(rows.count + pinnedIDs.count)
+        for bundleID in pinnedIDs where represented.insert(bundleID).inserted {
+            guard let app = installedByBundleID[bundleID] else { continue }
+            combined.append(SwitcherRow(launchable: app))
+        }
+        return pinnedToFront(combined, pinnedIDs)
+    }
+
     /// Move items with a non-nil rank to the front, ordered by (rank, original
     /// offset); everything else keeps its relative order behind them. Stable on
     /// offset preserves each pinned app's internal window ordering exactly as it

@@ -2225,7 +2225,7 @@ final class Preferences: ObservableObject {
         self.sinkHiddenApps = defaults.object(forKey: Keys.sinkHiddenApps) as? Bool ?? true
         self.sinkMinimizedWindows = defaults.object(forKey: Keys.sinkMinimizedWindows) as? Bool ?? true
         self.showWindowlessApps = defaults.object(forKey: Keys.showWindowlessApps) as? Bool ?? true
-        self.applicationsOnly = defaults.object(forKey: Keys.applicationsOnly) as? Bool ?? false
+        self.applicationsOnly = defaults.object(forKey: Keys.applicationsOnly) as? Bool ?? true
         self.fuzzySearchEnabled = defaults.object(forKey: Keys.fuzzySearchEnabled) as? Bool ?? true
         self.letterHintsEnabled = defaults.object(forKey: Keys.letterHintsEnabled) as? Bool ?? true
 
@@ -2373,7 +2373,7 @@ final class Preferences: ObservableObject {
         sinkHiddenApps = defaults.object(forKey: Keys.sinkHiddenApps) as? Bool ?? true
         sinkMinimizedWindows = defaults.object(forKey: Keys.sinkMinimizedWindows) as? Bool ?? true
         showWindowlessApps = defaults.object(forKey: Keys.showWindowlessApps) as? Bool ?? true
-        applicationsOnly = defaults.object(forKey: Keys.applicationsOnly) as? Bool ?? false
+        applicationsOnly = defaults.object(forKey: Keys.applicationsOnly) as? Bool ?? true
         fuzzySearchEnabled = defaults.object(forKey: Keys.fuzzySearchEnabled) as? Bool ?? true
         letterHintsEnabled = defaults.object(forKey: Keys.letterHintsEnabled) as? Bool ?? true
         searchDismissMode = defaults.string(forKey: Keys.searchDismissMode).flatMap(SearchDismissMode.init(rawValue:)) ?? .holdModifier

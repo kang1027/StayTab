@@ -27,8 +27,10 @@ struct InstalledApp: Sendable, Hashable {
 @MainActor
 final class InstalledAppsIndex {
     static let shared = InstalledAppsIndex()
+    static let didRefreshNotification = Notification.Name("InstalledAppsIndex.didRefresh")
 
     private var apps: [InstalledApp] = []
+    private var appsByBundleID: [String: InstalledApp] = [:]
     private var building = false
     private var lastBuilt: Date?
     /// Rebuild if the cache is older than this — picks up newly installed apps
@@ -48,10 +50,24 @@ final class InstalledAppsIndex {
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.apps = scanned
+                self.appsByBundleID = Dictionary(
+                    uniqueKeysWithValues: scanned.map { ($0.bundleID, $0) }
+                )
                 self.building = false
                 self.lastBuilt = Date()
+                NotificationCenter.default.post(
+                    name: Self.didRefreshNotification,
+                    object: self
+                )
             }
         }
+    }
+
+    /// Resolve selected apps from the in-memory index while preserving the
+    /// user's pin order. This is intentionally lookup-only so the ⌘Tab reveal
+    /// path never performs LaunchServices or filesystem work.
+    func installedApps(bundleIDs: [String]) -> [InstalledApp] {
+        bundleIDs.compactMap { appsByBundleID[$0] }
     }
 
     /// Fuzzy-matched installed apps not already running, in scan order, capped

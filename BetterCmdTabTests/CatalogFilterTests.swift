@@ -184,6 +184,51 @@ struct CatalogFilterTests {
         #expect(result.map(\.appName) == ["w1", "w2", "com.b"])
     }
 
+    @Test("persistent pins synthesize closed apps and keep transient apps")
+    func persistentPinsIncludeClosedApps() {
+        let running = [launchRow("com.transient"), launchRow("com.mail")]
+        let installed = [
+            InstalledApp(name: "Mail", bundleID: "com.mail", url: URL(fileURLWithPath: "/Applications/Mail.app")),
+            InstalledApp(name: "Music", bundleID: "com.music", url: URL(fileURLWithPath: "/Applications/Music.app")),
+        ]
+
+        let result = CatalogFilter.persistentPinnedRows(
+            running,
+            pinnedIDs: ["com.mail", "com.music"],
+            installedApps: installed
+        )
+
+        #expect(result.map(\.bundleIdentifier) == ["com.mail", "com.music", "com.transient"])
+        #expect(result.map(\.appName) == ["com.mail", "Music", "com.transient"])
+    }
+
+    @Test("persistent pins do not duplicate running or repeated pins")
+    func persistentPinsAvoidDuplicates() {
+        let rows = [launchRow("com.mail"), launchRow("com.transient")]
+        let installed = [
+            InstalledApp(name: "Mail", bundleID: "com.mail", url: URL(fileURLWithPath: "/Applications/Mail.app")),
+        ]
+
+        let result = CatalogFilter.persistentPinnedRows(
+            rows,
+            pinnedIDs: ["com.mail", "com.mail"],
+            installedApps: installed
+        )
+
+        #expect(result.map(\.bundleIdentifier) == ["com.mail", "com.transient"])
+    }
+
+    @Test("persistent pins omit apps that are no longer installed")
+    func persistentPinsOmitMissingApps() {
+        let result = CatalogFilter.persistentPinnedRows(
+            [launchRow("com.transient")],
+            pinnedIDs: ["com.missing"],
+            installedApps: []
+        )
+
+        #expect(result.map(\.bundleIdentifier) == ["com.transient"])
+    }
+
     // MARK: - sort order
 
     @Test("stable sort keeps equal-key order")

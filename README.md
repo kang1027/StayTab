@@ -2,9 +2,13 @@
 
 <img width="128" height="128" alt="AppIcon-macOS-Dark-256x256@1x" src="https://github.com/user-attachments/assets/3e4bbb67-ef7d-4619-8068-1458d8460331" />
 
-# BetterCmdTab
+# StayTab
 
-The Cmd+Tab macOS deserves.
+A persistent app roster for macOS ⌘Tab.
+
+> StayTab keeps selected apps in the switcher even after they quit. Choosing a
+> closed pinned app launches it; unpinned apps appear only while running. See
+> [STAYTAB.md](STAYTAB.md) for the focused usage and build guide.
 
 <p>
   <a href="https://github.com/rokartur/BetterCmdTab/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/rokartur/BetterCmdTab?include_prereleases&style=for-the-badge&label=release&color=white"></a>

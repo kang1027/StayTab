@@ -24,7 +24,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		7559A7572FC06FD5004D97B7 /* BetterCmdTab.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = BetterCmdTab.app; path = "BetterCmdTab Debug.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		7559A7572FC06FD5004D97B7 /* StayTab.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = StayTab.app; path = "StayTab Debug.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		7559A7642FC06FD6004D97B7 /* BetterCmdTabTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BetterCmdTabTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -88,7 +88,7 @@
 		7559A7582FC06FD5004D97B7 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				7559A7572FC06FD5004D97B7 /* BetterCmdTab.app */,
+				7559A7572FC06FD5004D97B7 /* StayTab.app */,
 				7559A7642FC06FD6004D97B7 /* BetterCmdTabTests.xctest */,
 			);
 			name = Products;
@@ -120,7 +120,7 @@
 				BP0000000000000000000002 /* BetterPermissions */,
 			);
 			productName = BetterCmdTab;
-			productReference = 7559A7572FC06FD5004D97B7 /* BetterCmdTab.app */;
+			productReference = 7559A7572FC06FD5004D97B7 /* StayTab.app */;
 			productType = "com.apple.product-type.application";
 		};
 		7559A7632FC06FD6004D97B7 /* BetterCmdTabTests */ = {
@@ -381,10 +381,10 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = BetterCmdTab/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "BetterCmdTab Debug";
+				INFOPLIST_KEY_CFBundleDisplayName = "StayTab Debug";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "BetterCmdTab enumerates and switches tabs in browsers (Safari, Chrome, Arc, Brave, Edge, Vivaldi) when you drill into a row.";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "StayTab enumerates and switches tabs in browsers (Safari, Chrome, Arc, Brave, Edge, Vivaldi) when you drill into a row.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -402,9 +402,9 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 26.7;
-				PRODUCT_BUNDLE_IDENTIFIER = pro.bettercmdtab.BetterCmdTab.debug;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kdh.StayTab.debug;
 				PRODUCT_MODULE_NAME = BetterCmdTab;
-				PRODUCT_NAME = "BetterCmdTab Debug";
+				PRODUCT_NAME = "StayTab Debug";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -434,10 +434,10 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = BetterCmdTab/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = BetterCmdTab;
+				INFOPLIST_KEY_CFBundleDisplayName = StayTab;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "BetterCmdTab enumerates and switches tabs in browsers (Safari, Chrome, Arc, Brave, Edge, Vivaldi) when you drill into a row.";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "StayTab enumerates and switches tabs in browsers (Safari, Chrome, Arc, Brave, Edge, Vivaldi) when you drill into a row.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -455,8 +455,8 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 26.7;
-				PRODUCT_BUNDLE_IDENTIFIER = pro.bettercmdtab.BetterCmdTab;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.kdh.StayTab;
+				PRODUCT_NAME = StayTab;
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -481,7 +481,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = pro.bettercmdtab.BetterCmdTabTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kdh.StayTabTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -491,7 +491,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BetterCmdTab Debug.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/BetterCmdTab Debug";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/StayTab Debug.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/StayTab Debug";
 				XROS_DEPLOYMENT_TARGET = 26.5;
 			};
 			name = Debug;
@@ -507,7 +507,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = pro.bettercmdtab.BetterCmdTabTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kdh.StayTabTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -517,7 +517,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BetterCmdTab.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/BetterCmdTab";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/StayTab.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/StayTab";
 				XROS_DEPLOYMENT_TARGET = 26.5;
 			};
 			name = Release;

@@ -8,7 +8,7 @@ enum AppInfo {
     static let appBuildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
     static let displayName = (Bundle.main.infoDictionary?["CFBundleDisplayName"] as? String)
         ?? (Bundle.main.infoDictionary?["CFBundleName"] as? String)
-        ?? "BetterCmdTab"
+        ?? "StayTab"
 
     /// Short git SHA, stamped into Info.plist by `scripts/build_release.sh`
     /// (`GIT_COMMIT` build setting). Absent for local Xcode builds.

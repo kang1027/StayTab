@@ -28,7 +28,7 @@ final class PrivacySettingsViewController: SettingsTabViewController {
         addRow(
             to: permissions,
             title: String(localized: "Accessibility access"),
-            subtitle: String(localized: "Lets BetterCmdTab capture the shortcut and read your open windows. Required to work."),
+            subtitle: String(localized: "Lets StayTab capture the shortcut and read your open windows. Required to work."),
             accessory: makePermissionAccessory(icon: permissionIcon, button: permissionButton, action: #selector(grantAccess)),
             searchItemID: SearchID.accessibility
         )
@@ -36,7 +36,7 @@ final class PrivacySettingsViewController: SettingsTabViewController {
         addRow(
             to: permissions,
             title: String(localized: "Full Disk Access"),
-            subtitle: String(localized: "Lets BetterCmdTab read Safari's favicon store so Safari tab entries show site icons. Optional — other browsers don't need it."),
+            subtitle: String(localized: "Lets StayTab read Safari's favicon store so Safari tab entries show site icons. Optional — other browsers don't need it."),
             accessory: makePermissionAccessory(icon: fullDiskIcon, button: fullDiskButton, action: #selector(grantFullDiskAccess)),
             searchItemID: SearchID.fullDiskAccess
         )

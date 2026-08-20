@@ -125,7 +125,7 @@ enum CommitFeedback {
 
     private static var customSoundsDirectory: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("BetterCmdTab", isDirectory: true)
+            .appendingPathComponent("StayTab", isDirectory: true)
             .appendingPathComponent("Sounds", isDirectory: true)
     }
 

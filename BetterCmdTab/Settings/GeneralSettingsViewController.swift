@@ -41,7 +41,7 @@ final class GeneralSettingsViewController: SettingsTabViewController {
         addRow(
             to: startup,
             title: String(localized: "Launch at login"),
-            subtitle: String(localized: "Open BetterCmdTab automatically when you log in."),
+            subtitle: String(localized: "Open StayTab automatically when you log in."),
             accessory: launchSwitch,
             searchItemID: SearchID.launchAtLogin
         )
@@ -147,7 +147,7 @@ final class GeneralSettingsViewController: SettingsTabViewController {
         addRow(
             to: recovery,
             title: String(localized: "Restore macOS keyboard shortcuts"),
-            subtitle: String(localized: "Re-enable the system's ⌘Tab and ⌘` — for example if they got stuck off after a crash. BetterCmdTab hands them back to macOS until you next relaunch it."),
+            subtitle: String(localized: "Re-enable the system's ⌘Tab and ⌘` — for example if they got stuck off after a crash. StayTab hands them back to macOS until you next relaunch it."),
             accessory: restoreShortcutsButton,
             searchItemID: SearchID.restoreShortcuts
         )

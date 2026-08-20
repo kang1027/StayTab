@@ -80,7 +80,7 @@ final class AboutSettingsViewController: SettingsTabViewController {
         titleLabel.alignment = .left
         titleLabel.maximumNumberOfLines = 1
 
-        let subtitleLabel = NSTextField(labelWithString: String(localized: "Faster window switching for macOS"))
+        let subtitleLabel = NSTextField(labelWithString: String(localized: "Your fixed app roster for ⌘Tab"))
         subtitleLabel.font = .systemFont(ofSize: 13, weight: .regular)
         subtitleLabel.textColor = .secondaryLabelColor
         subtitleLabel.alignment = .left

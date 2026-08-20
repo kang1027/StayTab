@@ -2,7 +2,7 @@ import Foundation
 import os
 
 enum Log {
-    private static let subsystem = "pro.bettercmdtab.BetterCmdTab"
+    private static let subsystem = "com.kdh.StayTab"
 
     static let switcher = Logger(subsystem: subsystem, category: "switcher")
     static let cache = Logger(subsystem: subsystem, category: "cache")
