@@ -835,6 +835,12 @@ final class Preferences: ObservableObject {
         static let legacyUnreadBadges = "Switcher.experimentalUnreadBadges"
         static let showWindowTitleLabel = "Switcher.showWindowTitleLabel"
         static let showApplicationNames = "Switcher.showApplicationNames"
+        /// Show the Always / Running now text in the persistent roster's section
+        /// headers. Default on; independent from the adjacent SF Symbols.
+        static let showRosterSectionTitles = "Switcher.showRosterSectionTitles"
+        /// Show the infinity / lightning SF Symbols in the persistent roster's
+        /// section headers. Default on; independent from the adjacent text.
+        static let showRosterSectionIcons = "Switcher.showRosterSectionIcons"
         /// Show the window-state glyphs (hidden / minimized / no window /
         /// full-screen) at the end of each entry (#149).
         static let showWindowStatusIcons = "Switcher.showWindowStatusIcons"
@@ -1616,6 +1622,24 @@ final class Preferences: ObservableObject {
         }
     }
 
+    /// Show the Always / Running now names above the persistent roster sections.
+    /// Default on. The section cards and their grouping remain when this is off.
+    @Published var showRosterSectionTitles: Bool {
+        didSet {
+            guard oldValue != showRosterSectionTitles else { return }
+            UserDefaults.standard.set(showRosterSectionTitles, forKey: Keys.showRosterSectionTitles)
+        }
+    }
+
+    /// Show the infinity / lightning symbols above the persistent roster
+    /// sections. Default on and independently configurable from their names.
+    @Published var showRosterSectionIcons: Bool {
+        didSet {
+            guard oldValue != showRosterSectionIcons else { return }
+            UserDefaults.standard.set(showRosterSectionIcons, forKey: Keys.showRosterSectionIcons)
+        }
+    }
+
     /// Show the window-state glyphs — hidden, minimized, no open window,
     /// full-screen — at the end of each List row and under each Grid tile
     /// (#149). Default on. The audio, Launch and Reopen cues are unaffected:
@@ -2285,6 +2309,8 @@ final class Preferences: ObservableObject {
 
         self.showWindowTitleLabel = defaults.object(forKey: Keys.showWindowTitleLabel) as? Bool ?? true
         self.showApplicationNames = defaults.object(forKey: Keys.showApplicationNames) as? Bool ?? true
+        self.showRosterSectionTitles = defaults.object(forKey: Keys.showRosterSectionTitles) as? Bool ?? true
+        self.showRosterSectionIcons = defaults.object(forKey: Keys.showRosterSectionIcons) as? Bool ?? true
         self.showWindowStatusIcons = defaults.object(forKey: Keys.showWindowStatusIcons) as? Bool ?? true
         self.previewTitleAlignment = defaults.string(forKey: Keys.previewTitleAlignment)
             .flatMap(PreviewTitleAlignment.init(rawValue:)) ?? .center
@@ -2431,6 +2457,8 @@ final class Preferences: ObservableObject {
         showWindowTitleLabel = defaults.object(forKey: Keys.showWindowTitleLabel) as? Bool ?? true
         showWindowStatusIcons = defaults.object(forKey: Keys.showWindowStatusIcons) as? Bool ?? true
         showApplicationNames = defaults.object(forKey: Keys.showApplicationNames) as? Bool ?? true
+        showRosterSectionTitles = defaults.object(forKey: Keys.showRosterSectionTitles) as? Bool ?? true
+        showRosterSectionIcons = defaults.object(forKey: Keys.showRosterSectionIcons) as? Bool ?? true
         previewTitleAlignment = defaults.string(forKey: Keys.previewTitleAlignment).flatMap(PreviewTitleAlignment.init(rawValue:)) ?? .center
         titleTruncationMode = defaults.string(forKey: Keys.titleTruncationMode).flatMap(TitleTruncationMode.init(rawValue:)) ?? .tail
         boldSelectedLabel = defaults.object(forKey: Keys.boldSelectedLabel) as? Bool ?? true

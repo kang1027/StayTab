@@ -208,6 +208,9 @@ final class SwitcherView: NSView {
         applyPanelAppearance(effective.panelAppearance)
         CATransaction.begin()
         CATransaction.setDisableActions(true)
+        let rosterHeaderVisibilityChanged =
+            effective.showRosterSectionTitles != self.effective.showRosterSectionTitles ||
+            effective.showRosterSectionIcons != self.effective.showRosterSectionIcons
         // Set before `fittedMetrics`/layout below read it (see ivar note).
         self.effective = effective
         // Item frames depend only on the row count, the metrics, and whether the
@@ -231,6 +234,7 @@ final class SwitcherView: NSView {
             searchActive != self.searchActive ||
             stripActiveNew != self.tabStripActive ||
             persistentRowCount != self.persistentRowCount ||
+            rosterHeaderVisibilityChanged ||
             screenFrame != layoutScreenFrameUsed
         self.layoutScreenFrameUsed = screenFrame
         self.tabStripActive = stripActiveNew
@@ -835,7 +839,12 @@ final class SwitcherView: NSView {
             case .running: sectionView = runningSectionView
             }
             sectionView.frame = section.frame
-            sectionView.apply(scale: metrics.scale, accent: accent)
+            sectionView.apply(
+                scale: metrics.scale,
+                accent: accent,
+                showsTitle: effective.showRosterSectionTitles,
+                showsIcon: effective.showRosterSectionIcons
+            )
             sectionView.isHidden = false
         }
     }
@@ -1163,7 +1172,11 @@ final class SwitcherView: NSView {
         maxColumns: Int,
         packing: RosterSectionLayout.Packing
     ) -> ListLayout {
-        let headerHeight = round(28 * metrics.scale)
+        let headerHeight = RosterSectionLayout.headerHeight(
+            scale: metrics.scale,
+            showsTitle: effective.showRosterSectionTitles,
+            showsIcon: effective.showRosterSectionIcons
+        )
         let bottomPadding = round(8 * metrics.scale)
         let sectionSpacing = round(10 * metrics.scale)
         let result = RosterSectionLayout.make(
@@ -1402,6 +1415,8 @@ private final class RosterSectionBackdropView: NSView {
     private let style: Style
     private var accent: NSColor = .controlAccentColor
     private var scale: CGFloat = 0
+    private var showsTitle = true
+    private var showsIcon = true
 
     init(title: String, symbolName: String, style: Style) {
         self.style = style
@@ -1421,7 +1436,14 @@ private final class RosterSectionBackdropView: NSView {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) not implemented") }
 
-    func apply(scale: CGFloat, accent: NSColor) {
+    func apply(scale: CGFloat, accent: NSColor, showsTitle: Bool, showsIcon: Bool) {
+        if self.showsTitle != showsTitle || self.showsIcon != showsIcon {
+            self.showsTitle = showsTitle
+            self.showsIcon = showsIcon
+            title.isHidden = !showsTitle
+            icon.isHidden = !showsIcon
+            needsLayout = true
+        }
         if self.scale != scale {
             self.scale = scale
             title.font = .systemFont(ofSize: round(11 * scale), weight: .semibold)
@@ -1438,20 +1460,33 @@ private final class RosterSectionBackdropView: NSView {
         let activeScale = max(scale, 0.01)
         let inset = round(10 * activeScale)
         let iconSize = round(12 * activeScale)
-        let headerHeight = round(28 * activeScale)
-        icon.frame = NSRect(
-            x: inset,
-            y: bounds.height - headerHeight + round((headerHeight - iconSize) / 2),
-            width: iconSize,
-            height: iconSize
+        let headerHeight = RosterSectionLayout.headerHeight(
+            scale: activeScale,
+            showsTitle: showsTitle,
+            showsIcon: showsIcon
         )
-        let titleHeight = ceil(title.intrinsicContentSize.height)
-        title.frame = NSRect(
-            x: icon.frame.maxX + round(5 * activeScale),
-            y: bounds.height - headerHeight + round((headerHeight - titleHeight) / 2),
-            width: max(0, bounds.width - icon.frame.maxX - inset),
-            height: titleHeight
-        )
+        if showsIcon {
+            icon.frame = NSRect(
+                x: inset,
+                y: bounds.height - headerHeight + round((headerHeight - iconSize) / 2),
+                width: iconSize,
+                height: iconSize
+            )
+        } else {
+            icon.frame = .zero
+        }
+        if showsTitle {
+            let titleHeight = ceil(title.intrinsicContentSize.height)
+            let titleX = showsIcon ? icon.frame.maxX + round(5 * activeScale) : inset
+            title.frame = NSRect(
+                x: titleX,
+                y: bounds.height - headerHeight + round((headerHeight - titleHeight) / 2),
+                width: max(0, bounds.width - titleX - inset),
+                height: titleHeight
+            )
+        } else {
+            title.frame = .zero
+        }
         layer?.cornerRadius = round(14 * activeScale)
     }
 

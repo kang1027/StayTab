@@ -27,6 +27,13 @@ enum RosterSectionLayout {
         let columns: Int
     }
 
+    /// The labelled header keeps the shipped 28pt rhythm. With both pieces of
+    /// content hidden, retain only a small top inset so the section card still
+    /// separates the roster without leaving an empty title row.
+    static func headerHeight(scale: CGFloat, showsTitle: Bool, showsIcon: Bool) -> CGFloat {
+        round((showsTitle || showsIcon ? 28 : 8) * max(0, scale))
+    }
+
     static func make(
         pinnedCount: Int,
         totalCount: Int,

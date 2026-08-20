@@ -4,6 +4,15 @@ import Testing
 
 @Suite("Roster section layout")
 struct RosterSectionLayoutTests {
+    @Test("section header collapses only when both title and icon are hidden")
+    func sectionHeaderVisibility() {
+        #expect(RosterSectionLayout.headerHeight(scale: 1, showsTitle: true, showsIcon: true) == 28)
+        #expect(RosterSectionLayout.headerHeight(scale: 1, showsTitle: true, showsIcon: false) == 28)
+        #expect(RosterSectionLayout.headerHeight(scale: 1, showsTitle: false, showsIcon: true) == 28)
+        #expect(RosterSectionLayout.headerHeight(scale: 1, showsTitle: false, showsIcon: false) == 8)
+        #expect(RosterSectionLayout.headerHeight(scale: 0.7, showsTitle: false, showsIcon: false) == 6)
+    }
+
     @Test("pinned and running apps occupy separate vertical sections")
     func separatesPinnedAndRunningApps() {
         let result = RosterSectionLayout.make(

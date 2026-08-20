@@ -140,6 +140,42 @@ struct SettingsPortabilityTests {
         #expect(prefs.gridSingleRow == true)
     }
 
+    @Test("roster section names and icons round-trip and default to visible")
+    func rosterSectionHeaderVisibilityRoundTrip() throws {
+        let prefs = Preferences.shared
+        let titleKey = Preferences.Keys.showRosterSectionTitles
+        let iconKey = Preferences.Keys.showRosterSectionIcons
+        let savedTitleRaw = UserDefaults.standard.object(forKey: titleKey)
+        let savedIconRaw = UserDefaults.standard.object(forKey: iconKey)
+        let savedTitles = prefs.showRosterSectionTitles
+        let savedIcons = prefs.showRosterSectionIcons
+        defer {
+            prefs.showRosterSectionTitles = savedTitles
+            prefs.showRosterSectionIcons = savedIcons
+            if savedTitleRaw == nil { UserDefaults.standard.removeObject(forKey: titleKey) }
+            if savedIconRaw == nil { UserDefaults.standard.removeObject(forKey: iconKey) }
+        }
+
+        prefs.showRosterSectionTitles = false
+        prefs.showRosterSectionIcons = false
+        let data = try Preferences.exportedJSONData()
+        let root = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(root["showRosterSectionTitles"] as? Bool == false)
+        #expect(root["showRosterSectionIcons"] as? Bool == false)
+
+        prefs.showRosterSectionTitles = true
+        prefs.showRosterSectionIcons = true
+        try prefs.importSettings(from: data)
+        #expect(prefs.showRosterSectionTitles == false)
+        #expect(prefs.showRosterSectionIcons == false)
+
+        UserDefaults.standard.removeObject(forKey: titleKey)
+        UserDefaults.standard.removeObject(forKey: iconKey)
+        prefs.reloadFromDefaults()
+        #expect(prefs.showRosterSectionTitles == true)
+        #expect(prefs.showRosterSectionIcons == true)
+    }
+
     @Test("flat import accepts keys that already carry the Switcher. prefix")
     func flatImportPrefixLeniency() throws {
         let prefs = Preferences.shared

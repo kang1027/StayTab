@@ -11274,6 +11274,74 @@
         }
       }
     },
+    "Show section icons" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abschnittssymbole anzeigen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar iconos de sección"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher les icônes de section"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pokazuj ikony sekcji"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示分区图标"
+          }
+        }
+      }
+    },
+    "Show section names" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abschnittsnamen anzeigen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar nombres de sección"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher les noms de section"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pokazuj nazwy sekcji"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示分区名称"
+          }
+        }
+      }
+    },
     "Show status icons" : {
       "localizations" : {
         "de" : {
@@ -11304,6 +11372,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示状态图标"
+          }
+        }
+      }
+    },
+    "Show the infinity and lightning symbols beside the section names. Icons can remain visible when names are hidden." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Unendlichkeits- und Blitzsymbole neben den Abschnittsnamen anzeigen. Symbole können sichtbar bleiben, wenn die Namen ausgeblendet sind."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra los símbolos de infinito y rayo junto a los nombres de las secciones. Los iconos pueden permanecer visibles cuando los nombres están ocultos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affiche les symboles infini et éclair à côté des noms de section. Les icônes peuvent rester visibles lorsque les noms sont masqués."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pokazuje symbole nieskończoności i błyskawicy obok nazw sekcji. Ikony mogą pozostać widoczne, gdy nazwy są ukryte."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在分区名称旁显示无穷和闪电符号。隐藏名称时，图标仍可保持显示。"
+          }
+        }
+      }
+    },
+    "Show “Always” and “Running now” above their app groups." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„Immer“ und „Jetzt aktiv“ über den jeweiligen App-Gruppen anzeigen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra «Siempre» y «En ejecución» encima de sus grupos de aplicaciones."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affiche « Toujours » et « En cours d’exécution » au-dessus de leurs groupes d’applications."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pokazuje „Zawsze” i „Uruchomione teraz” nad odpowiednimi grupami aplikacji."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在相应的应用分组上方显示“始终”和“正在运行”。"
           }
         }
       }

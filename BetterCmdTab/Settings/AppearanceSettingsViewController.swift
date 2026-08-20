@@ -24,6 +24,8 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
     private let livePreviewSwitch = PreferenceSwitch(bind: \.livePreviews)
     private let windowTitleSwitch = PreferenceSwitch(bind: \.showWindowTitleLabel)
     private let appNamesSwitch = PreferenceSwitch(bind: \.showApplicationNames)
+    private let rosterSectionTitlesSwitch = PreferenceSwitch(bind: \.showRosterSectionTitles)
+    private let rosterSectionIconsSwitch = PreferenceSwitch(bind: \.showRosterSectionIcons)
     private let statusIconsSwitch = PreferenceSwitch(bind: \.showWindowStatusIcons)
     private let boldSelectedSwitch = PreferenceSwitch(bind: \.boldSelectedLabel)
     private let opacitySlider = NSSlider()
@@ -132,6 +134,14 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
         addRow(to: labels, title: String(localized: "Font"),
                subtitle: String(localized: "Typeface for names and titles."),
                accessory: fontFacePopup, searchItemID: SearchID.fontFace)
+
+        addRow(to: labels, title: String(localized: "Show section names"),
+               subtitle: String(localized: "Show “Always” and “Running now” above their app groups."),
+               accessory: rosterSectionTitlesSwitch, searchItemID: SearchID.rosterSectionTitles)
+
+        addRow(to: labels, title: String(localized: "Show section icons"),
+               subtitle: String(localized: "Show the infinity and lightning symbols beside the section names. Icons can remain visible when names are hidden."),
+               accessory: rosterSectionIconsSwitch, searchItemID: SearchID.rosterSectionIcons)
 
         addRow(to: labels, title: String(localized: "Show window title"),
                subtitle: String(localized: "Show each window's title under the icon in the Grid and Previews layouts."),
@@ -362,6 +372,14 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.appNamesSwitch.sync() }
             .store(in: &cancellables)
+        prefs.$showRosterSectionTitles
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.rosterSectionTitlesSwitch.sync() }
+            .store(in: &cancellables)
+        prefs.$showRosterSectionIcons
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.rosterSectionIconsSwitch.sync() }
+            .store(in: &cancellables)
         prefs.$showWindowStatusIcons
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.statusIconsSwitch.sync() }
@@ -408,6 +426,8 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
         selectFontFace(prefs.fontFace)
         boldSelectedSwitch.sync()
         appNamesSwitch.sync()
+        rosterSectionTitlesSwitch.sync()
+        rosterSectionIconsSwitch.sync()
         statusIconsSwitch.sync()
         animationsSwitch.sync()
         applyOpacity(prefs.panelOpacity)
@@ -639,7 +659,8 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
             labels: RowLabels.labels(for: previewRows),
             selectedIndex: 0,
             metrics: metrics,
-            effective: effective
+            effective: effective,
+            persistentRowCount: min(1, previewRows.count)
         )
         previewView.layoutSubtreeIfNeeded()
 

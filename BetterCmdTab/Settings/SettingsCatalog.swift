@@ -158,6 +158,8 @@ enum SearchID {
     static let fontFace = "appearance.fontFace"
     static let boldSelected = "appearance.boldSelected"
     static let applicationNames = "switcher.applicationNames"
+    static let rosterSectionTitles = "appearance.rosterSectionTitles"
+    static let rosterSectionIcons = "appearance.rosterSectionIcons"
     static let windowStatusIcons = "switcher.windowStatusIcons"
     static let theme = "appearance.theme"
     static let opacity = "appearance.opacity"
@@ -370,6 +372,12 @@ enum SettingsCatalog {
         item(SearchID.applicationNames, .appearance, SettingsAnchor.appearanceLabels, String(localized: "Appearance"), String(localized: "Labels"),
              String(localized: "Show application names"),
              ["application names", "app name", "app names", "name", "label", "icon only", "hide name"]),
+        item(SearchID.rosterSectionTitles, .appearance, SettingsAnchor.appearanceLabels, String(localized: "Appearance"), String(localized: "Labels"),
+             String(localized: "Show section names"),
+             ["section names", "section titles", "always", "running now", "roster", "group labels", "hide section text"]),
+        item(SearchID.rosterSectionIcons, .appearance, SettingsAnchor.appearanceLabels, String(localized: "Appearance"), String(localized: "Labels"),
+             String(localized: "Show section icons"),
+             ["section icons", "infinity", "lightning", "bolt", "roster", "group icons", "hide icons"]),
         item(SearchID.windowStatusIcons, .appearance, SettingsAnchor.appearanceLabels, String(localized: "Appearance"), String(localized: "Labels"),
              String(localized: "Show status icons"),
              ["status icons", "status", "icons", "glyph", "minimized", "hidden", "full-screen", "no window", "dashed square"]),

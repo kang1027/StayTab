@@ -28,6 +28,8 @@ struct EffectiveSettings {
     let titleTruncationMode: TitleTruncationMode
     let boldSelectedLabel: Bool
     let showApplicationNames: Bool
+    let showRosterSectionTitles: Bool
+    let showRosterSectionIcons: Bool
     let showWindowStatusIcons: Bool
     let showUnreadBadges: Bool
     let letterHintsEnabled: Bool
@@ -69,6 +71,8 @@ extension Preferences {
             titleTruncationMode: override.titleTruncationMode ?? titleTruncationMode,
             boldSelectedLabel: override.boldSelectedLabel ?? boldSelectedLabel,
             showApplicationNames: override.showApplicationNames ?? showApplicationNames,
+            showRosterSectionTitles: showRosterSectionTitles,
+            showRosterSectionIcons: showRosterSectionIcons,
             showWindowStatusIcons: override.showWindowStatusIcons ?? showWindowStatusIcons,
             showUnreadBadges: override.showUnreadBadges ?? showUnreadBadges,
             letterHintsEnabled: override.letterHintsEnabled ?? letterHintsEnabled,
