@@ -23,11 +23,10 @@ tmp="${output}.tmp"
 
 cat >"$tmp" <<EOF
 cask "staytab" do
-  version "${version},${build}"
+  version "${version}"
   sha256 "${sha256}"
 
-  url "https://github.com/kang1027/StayTab/releases/download/v#{version.csv.first}/StayTab-#{version.csv.first}-#{version.csv.second}.dmg",
-      verified: "github.com/kang1027/StayTab/"
+  url "https://github.com/kang1027/StayTab/releases/download/v#{version}/StayTab-#{version}-${build}.dmg"
   name "StayTab"
   desc "Persistent app roster and launcher for Command-Tab switching"
   homepage "https://github.com/kang1027/StayTab"
