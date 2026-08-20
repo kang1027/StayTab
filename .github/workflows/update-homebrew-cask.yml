@@ -56,7 +56,7 @@ jobs:
 
       - name: Commit cask update
         run: |
-          if git diff --quiet -- Casks/staytab.rb; then
+          if ! git status --porcelain -- Casks/staytab.rb | grep -q .; then
             echo "Cask is already current"
             exit 0
           fi
