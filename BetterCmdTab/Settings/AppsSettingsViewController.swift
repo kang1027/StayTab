@@ -175,12 +175,12 @@ final class AppsSettingsViewController: SettingsTabViewController {
             color = .systemRed
             symbol = "exclamationmark.circle.fill"
         } else if reserved.isEmpty {
-            text = String(localized: "Jump keys use one unique A–Z letter.")
+            text = String(localized: "Jump keys use one or two A–Z letters or 0–9 digits.")
             color = .secondaryLabelColor
             symbol = "info.circle"
         } else {
             text = String(
-                format: String(localized: "Jump keys use one unique A–Z letter. Unavailable: %@. These keys are assigned to switcher controls; change them in Shortcuts."),
+                format: String(localized: "Jump keys use one or two A–Z letters or 0–9 digits. Unavailable alone: %@. A two-key jump may start with one and takes priority over that switcher control."),
                 reserved
             )
             color = .secondaryLabelColor
@@ -316,13 +316,13 @@ final class AppsSettingsViewController: SettingsTabViewController {
             jumpLetters.removeValue(forKey: bundleID)
             Preferences.shared.appJumpLetters = jumpLetters
             rebuildPinnedCard()
-        case let .valid(letter):
+        case let .valid(sequence):
             jumpKeyValidationMessage = nil
-            jumpLetters[bundleID] = String(letter)
+            jumpLetters[bundleID] = sequence
             Preferences.shared.appJumpLetters = jumpLetters
             rebuildPinnedCard()
         case .invalid:
-            jumpKeyValidationMessage = String(localized: "Use exactly one letter from A–Z.")
+            jumpKeyValidationMessage = String(localized: "Use one or two A–Z letters or 0–9 digits.")
             NSSound.beep()
             rebuildPinnedCard()
         case let .reserved(letter):
@@ -332,10 +332,10 @@ final class AppsSettingsViewController: SettingsTabViewController {
             )
             NSSound.beep()
             rebuildPinnedCard()
-        case let .duplicate(letter):
+        case let .conflict(sequence):
             jumpKeyValidationMessage = String(
-                format: String(localized: "%@ is already assigned to another pinned app."),
-                String(letter).uppercased()
+                format: String(localized: "%@ conflicts with another pinned app jump key."),
+                sequence.uppercased()
             )
             NSSound.beep()
             rebuildPinnedCard()

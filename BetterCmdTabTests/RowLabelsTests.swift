@@ -136,6 +136,83 @@ struct RowLabelsTests {
         #expect(labels == ["d", "i"])
     }
 
+    @Test("custom digits override automatic letter hints")
+    func customDigitsOverrideAutomaticHints() {
+        let labels = RowLabels.labels(
+            forInputs: [
+                input("ChatGPT", bundleID: "com.openai.chat"),
+                input("Docker", bundleID: "com.docker.desktop"),
+            ],
+            customLetters: ["com.openai.chat": "7"]
+        )
+        #expect(labels == ["7", "d"])
+    }
+
+    @Test("a reserved digit falls back to an automatic hint")
+    func reservedCustomDigitFallsBack() {
+        let labels = RowLabels.labels(
+            forInputs: [input("ChatGPT", bundleID: "com.openai.chat")],
+            customLetters: ["com.openai.chat": "7"],
+            reserved: ["7"]
+        )
+        #expect(labels == ["c"])
+    }
+
+    @Test("two-key chains with a shared start stay distinct")
+    func sharedCustomPrefix() {
+        let labels = RowLabels.labels(
+            forInputs: [
+                input("Mail", bundleID: "com.apple.mail"),
+                input("Music", bundleID: "com.apple.Music"),
+            ],
+            customLetters: [
+                "com.apple.mail": "MA",
+                "com.apple.Music": "mu",
+            ]
+        )
+        #expect(labels == ["ma", "mu"])
+    }
+
+    @Test("a two-key chain may own a reserved first character")
+    func reservedCustomPrefix() {
+        let labels = RowLabels.labels(
+            forInputs: [input("Mail", bundleID: "com.apple.mail")],
+            customLetters: ["com.apple.mail": "ma"],
+            reserved: ["m"]
+        )
+        #expect(labels == ["ma"])
+    }
+
+    @Test("live two-key chains expose their shared first character")
+    func customChainPrefixSnapshot() {
+        let prefixes = RowLabels.customChainPrefixes(
+            customLetters: [
+                "com.apple.mail": "MA",
+                "com.apple.Music": "mu",
+                "com.example.unpinned": "z1",
+            ],
+            allowedBundleIDs: ["com.apple.mail", "com.apple.Music"],
+            reserved: ["m"]
+        )
+        #expect(prefixes == ["m"])
+    }
+
+    @Test("imported full-prefix conflicts fall back to automatic hints")
+    func importedPrefixConflictFallsBack() {
+        let labels = RowLabels.labels(
+            forInputs: [
+                input("Mail", bundleID: "com.apple.mail"),
+                input("Music", bundleID: "com.apple.Music"),
+            ],
+            customLetters: [
+                "com.apple.mail": "m",
+                "com.apple.Music": "mu",
+            ],
+            reserved: []
+        )
+        #expect(labels == ["ma", "mu"])
+    }
+
     @Test("invalid and action-reserved custom letters fall back to automatic hints")
     func invalidCustomLettersFallBack() {
         let labels = RowLabels.labels(
@@ -144,7 +221,7 @@ struct RowLabelsTests {
                 input("Docker", bundleID: "com.docker.desktop"),
             ],
             customLetters: [
-                "com.openai.chat": "12",
+                "com.openai.chat": "123",
                 "com.docker.desktop": "q",
             ]
         )

@@ -4,10 +4,10 @@ import AppKit
 /// view controller makes every rejection reason deterministic and testable.
 enum JumpKeyAssignmentValidation: Equatable {
     case cleared
-    case valid(Character)
+    case valid(String)
     case invalid
     case reserved(Character)
-    case duplicate(Character)
+    case conflict(String)
 
     static func evaluate(
         rawValue: String,
@@ -17,12 +17,22 @@ enum JumpKeyAssignmentValidation: Equatable {
     ) -> Self {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return .cleared }
-        guard let letter = RowLabels.normalizedCustomLetter(trimmed) else { return .invalid }
-        guard !reservedLetters.contains(letter) else { return .reserved(letter) }
-        let isDuplicate = assignments.contains {
-            $0.key != bundleID && RowLabels.normalizedCustomLetter($0.value) == letter
+        guard let sequence = RowLabels.normalizedCustomKey(trimmed) else { return .invalid }
+        if sequence.count == 1, let character = sequence.first,
+           reservedLetters.contains(character) {
+            return .reserved(character)
         }
-        return isDuplicate ? .duplicate(letter) : .valid(letter)
+        if sequence.count == 2, let character = sequence.last,
+           reservedLetters.contains(character) {
+            return .reserved(character)
+        }
+        let hasConflict = assignments.contains {
+            guard $0.key != bundleID,
+                  let other = RowLabels.normalizedCustomKey($0.value),
+                  RowLabels.isUsableCustomSequence(other, reserved: reservedLetters) else { return false }
+            return RowLabels.sequencesConflict(sequence, other)
+        }
+        return hasConflict ? .conflict(sequence) : .valid(sequence)
     }
 }
 
@@ -246,7 +256,7 @@ final class PinnedAppRowCellView: NSTableCellView, NSTextFieldDelegate {
         jumpLetterField.controlSize = .small
         jumpLetterField.bezelStyle = .roundedBezel
         jumpLetterField.maximumNumberOfLines = 1
-        jumpLetterField.toolTip = String(localized: "Jump key (A–Z). Action keys and duplicates are unavailable.")
+        jumpLetterField.toolTip = String(localized: "Jump key (one or two A–Z letters or 0–9 digits). Conflicting keys are unavailable.")
         jumpLetterField.delegate = self
         jumpLetterField.setContentHuggingPriority(.required, for: .horizontal)
         jumpLetterField.setContentCompressionResistancePriority(.required, for: .horizontal)

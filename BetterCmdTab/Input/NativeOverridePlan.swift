@@ -162,13 +162,15 @@ private let kcVimK: UInt32 = 40
 ///     whether the letter keys are letter-jump or search input, and whether the
 ///     arrows step the selection or the tab strip.
 ///   - panelActions: the rebindable in-panel action keys (W/M/H/Q/F).
+///   - customJumpPrefixKeyCodes: first keys of explicit two-key jumps. These
+///     letter-jump chords are registered ahead of switcher controls so MA/MU
+///     can own M even while Minimize is bound there.
 ///   - searchKeyCode / tabDrillKeyCode: the rebindable search and tab-drill keys
 ///     (#169), defaulting to the shipped `/` and `\`. `nil` when the user cleared
 ///     that recorder, which disables the key here too.
 ///   - vimNavigationEnabled: the opt-in vim h/j/k/l navigation preference. When
-///     on, h/j/k/l are registered as arrow-motion chords ahead of the panel
-///     actions and letter-jump so they win the dedupe — mirroring the tap, where
-///     the vim branch precedes `panelKeyMap` and letter-jump.
+///     on, h/j/k/l are registered as arrow-motion chords ahead of panel actions
+///     and generic letter-jump, but after an explicit custom two-key prefix.
 func computeNativeOverridePlan(
     trigger: TriggerSpec,
     secureInputActive: Bool,
@@ -178,6 +180,7 @@ func computeNativeOverridePlan(
     searchActive: Bool = false,
     tabDrillActive: Bool = false,
     panelActions: [PanelActionSpec] = [],
+    customJumpPrefixKeyCodes: Set<UInt32> = [],
     vimNavigationEnabled: Bool = false,
     searchKeyCode: UInt32? = kcSlash,
     tabDrillKeyCode: UInt32? = kcBackslash
@@ -266,6 +269,14 @@ func computeNativeOverridePlan(
             chords.append(ChordSpec(keyCode: kcDown, modifiers: mod, kind: .navDown))
             chords.append(ChordSpec(keyCode: kcLeft, modifiers: mod, kind: .navLeft))
             chords.append(ChordSpec(keyCode: kcRight, modifiers: mod, kind: .navRight))
+            // In normal mode, explicit two-key app jumps beat every switcher
+            // control on their first key. Search and tab-drill modes keep their
+            // own input semantics and do not register these prefixes.
+            if !searchActive {
+                for keyCode in customJumpPrefixKeyCodes.sorted() {
+                    chords.append(ChordSpec(keyCode: keyCode, modifiers: mod, kind: .letterJump))
+                }
+            }
             // The tab-drill key drills in from both modes, and it is checked
             // before the search key here for the same reason the tap checks it
             // first: whatever a rebound drill key collides with — the search key
@@ -284,19 +295,14 @@ func computeNativeOverridePlan(
                 }
             } else {
                 // Vim navigation parity with the tap: h/j/k/l mirror the arrows
-                // (h←, l→, k↑, j↓). Appended before the panel actions and the
-                // generic letter-jump loop so the first-wins dedupe makes vim win
-                // over both — mirroring the tap, where the vim branch precedes
-                // `panelKeyMap` and letter-jump (so vim `h` beats a Hide binding
-                // on the same key).
+                // (h←, l→, k↑, j↓). Outside an explicit custom prefix, vim wins
+                // over panel actions and generic letter-jump.
                 if vimNavigationEnabled {
                     chords.append(ChordSpec(keyCode: kcVimH, modifiers: mod, kind: .navLeft))
                     chords.append(ChordSpec(keyCode: kcVimL, modifiers: mod, kind: .navRight))
                     chords.append(ChordSpec(keyCode: kcVimK, modifiers: mod, kind: .navUp))
                     chords.append(ChordSpec(keyCode: kcVimJ, modifiers: mod, kind: .navDown))
                 }
-                // Panel actions before letter-jump so an action key (e.g. W) wins
-                // the dedupe over letter-jump on the same keycode.
                 for action in panelActions {
                     chords.append(ChordSpec(keyCode: action.keyCode, modifiers: mod, kind: action.action))
                 }

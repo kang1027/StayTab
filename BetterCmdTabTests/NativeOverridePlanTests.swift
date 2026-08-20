@@ -200,6 +200,23 @@ struct NativeOverridePlanTests {
         #expect(!Self.has(plan, 1, .letterJump, Self.cmd))
     }
 
+    @Test func normalMode_customChainPrefixWinsOverPanelAction() {
+        let plan = computeNativeOverridePlan(trigger: Self.native(), secureInputActive: true,
+                                             panelOpen: true, holdModifierDown: true,
+                                             panelActions: Self.panelActions,
+                                             customJumpPrefixKeyCodes: [46])
+        #expect(Self.kinds(plan, 46) == [.letterJump])  // M starts MA/MU, not Minimize.
+        #expect(Self.kinds(plan, 13) == [.close])       // Unrelated actions stay intact.
+    }
+
+    @Test func normalMode_customChainPrefixWinsOverReboundSearch() {
+        let plan = computeNativeOverridePlan(trigger: Self.native(), secureInputActive: true,
+                                             panelOpen: true, holdModifierDown: true,
+                                             customJumpPrefixKeyCodes: [44],
+                                             searchKeyCode: 44)
+        #expect(Self.kinds(plan, 44) == [.letterJump])
+    }
+
     // MARK: In-panel — vim navigation parity
 
     @Test func vimEnabled_registersHJKLAsNavAndWinsOverActionsAndLetterJump() {
@@ -219,6 +236,16 @@ struct NativeOverridePlanTests {
         #expect(Self.kinds(plan, 37) == [.navRight])
         #expect(Self.kinds(plan, 40) == [.navUp])
         #expect(Self.kinds(plan, 38) == [.navDown])
+    }
+
+    @Test func customChainPrefixWinsOverVimNavigation() {
+        let plan = computeNativeOverridePlan(trigger: Self.native(), secureInputActive: true,
+                                             panelOpen: true, holdModifierDown: true,
+                                             panelActions: Self.panelActions,
+                                             customJumpPrefixKeyCodes: [4],
+                                             vimNavigationEnabled: true)
+        #expect(Self.kinds(plan, 4) == [.letterJump])
+        #expect(Self.kinds(plan, 37) == [.navRight])
     }
 
     @Test func vimDisabled_leavesHideAndLetterJumpIntact() {

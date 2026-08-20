@@ -404,7 +404,8 @@ final class HotkeyTap: @unchecked Sendable {
     private static let defaultSearchKey: Int64 = 44
     private static let defaultTabDrillKey: Int64 = 42
 
-    /// Letters reserved from letter-jump because they drive an in-panel action.
+    /// Letters or digits reserved from direct jump because they drive an
+    /// in-panel action.
     /// Recomputed from the live `panelKeyMap` bindings plus the search and
     /// tab-drill keys, all translated to the current layout — so it tracks
     /// whatever the user assigns in the in-panel keys section instead of a
@@ -416,6 +417,12 @@ final class HotkeyTap: @unchecked Sendable {
     private let reservedLetters = OSAllocatedUnfairLock<Set<Character>>(
         initialState: ["w", "m", "h", "q", "f"]
     )
+
+    /// First characters of explicit two-key app jumps (for example the `m` in
+    /// MA/MU). An explicit chain owns its first key while the panel is open, even
+    /// when an in-panel action is bound there; the next character completes the
+    /// chain. Pushed from the controller whenever pins or custom keys change.
+    private let customJumpPrefixes = OSAllocatedUnfairLock<Set<Character>>(initialState: [])
 
     /// Fired (on the caller's thread — currently always main) whenever the
     /// reserved-letter set is recomputed, so `SwitcherController` can mirror it
@@ -863,14 +870,21 @@ final class HotkeyTap: @unchecked Sendable {
         recomputeReservedLetters()
     }
 
-    /// Re-derive the reserved-letter set from the current bindings (each bound
+    /// Replace the cold-path snapshot used to arbitrate custom two-key chains
+    /// against rebindable in-panel actions. Read only while the panel is open.
+    func setCustomJumpPrefixes(_ prefixes: Set<Character>) {
+        customJumpPrefixes.withLock { $0 = prefixes }
+    }
+
+    /// Re-derive the reserved jump-key set from the current bindings (each bound
     /// keycode — close/minimize/hide/quit/full-screen plus search and tab-drill —
     /// translated to the active layout), then store it and notify
     /// `onReservedLettersChanged`. Called on every binding push and whenever the
     /// keyboard layout changes, so reserved letters always match what the user
     /// actually assigned. The defaults translate to `/` and `\`, which are not
-    /// letters and so reserve nothing; binding search to a letter key does reserve
-    /// it, keeping hint generation from handing out a letter the tap would eat.
+    /// alphanumerics and so reserve nothing; binding search to a letter or digit
+    /// does reserve it, keeping hint generation from handing out a key the tap
+    /// would eat.
     @MainActor
     private func recomputeReservedLetters() {
         let map = panelKeyMap.withLock { $0 }
@@ -879,7 +893,7 @@ final class HotkeyTap: @unchecked Sendable {
         for keyCode in map.keys + [special.search, special.tabDrill] where keyCode >= 0 {
             guard let ch = translate(keyCode: keyCode) else { continue }
             let lower = Character(ch.lowercased())
-            if lower.isLetter { collected.insert(lower) }
+            if RowLabels.isDirectJumpCharacter(lower) { collected.insert(lower) }
         }
         let letters = Self.reservedSet(
             boundLetters: collected,
@@ -1278,10 +1292,23 @@ final class HotkeyTap: @unchecked Sendable {
                 // immediately hitting `/` would leak the keystroke to the app the
                 // user is switching away from.
                 let special = specialKeys.withLock { $0 }
+                // An explicit two-key jump owns its first character while the
+                // normal panel is visible. Resolve that precedence once here so
+                // it applies consistently to rebound search/tab-drill keys, vim
+                // navigation, and panel actions.
+                let customPrefixes = customJumpPrefixes.withLock { $0 }
+                var typed: Character?
+                var customJumpOwnsKey = false
+                if !tabDrillNow, !isSearchingNow(), isPanelPresented(), !customPrefixes.isEmpty {
+                    typed = translate(keyCode: keyCode)
+                    if let ch = typed {
+                        customJumpOwnsKey = customPrefixes.contains(Character(ch.lowercased()))
+                    }
+                }
                 // Drill-in trigger. The controller no-ops if the highlighted row
                 // has no tab group or tab drill-in is off, so this is safe to
                 // always emit.
-                if keyCode == special.tabDrill {
+                if keyCode == special.tabDrill, !customJumpOwnsKey {
                     deliver(.enterTabDrill); return nil
                 }
                 if isSearchingNow() {
@@ -1303,7 +1330,7 @@ final class HotkeyTap: @unchecked Sendable {
                         deliver(.escape); return nil
                     case Self.deleteKey:
                         deliver(.searchBackspace); return nil
-                    case special.search:
+                    case special.search where !customJumpOwnsKey:
                         deliver(.toggleSearch); return nil
                     default:
                         // Modifier-aware translation, so a character that needs
@@ -1398,9 +1425,9 @@ final class HotkeyTap: @unchecked Sendable {
                             }
                             // Vim navigation: h/j/k/l mirror the bare arrows.
                             // Opt-in because h overlaps the default Hide panel
-                            // binding and j/k/l overlap letter-jump. Checked
-                            // before `panelKeyMap` and letter-jump so an enabled
-                            // vim toggle wins over both. The trigger's hold
+                            // binding and j/k/l overlap letter-jump. An explicit
+                            // two-key jump prefix wins over vim and action keys;
+                            // otherwise vim wins over both. The trigger's hold
                             // modifier(s) are intentionally NOT gated out: the
                             // panel is held open by whatever modifier the user
                             // recorded (⌘ by default, ⌥ for an ⌥Tab trigger —
@@ -1414,17 +1441,14 @@ final class HotkeyTap: @unchecked Sendable {
                             // hint generation never assigns them as letter-jump
                             // hints the tap would silently swallow here.
                             //
-                            // `translate` is needed only by the vim check and the
-                            // type-to-search opener, so it is computed only when a
-                            // branch that needs it actually runs — a bound action
-                            // key (⌘W/⌘M/⌘H/⌘Q/⌘F) short-circuits in `panelKeyMap`
-                            // below without ever paying a translate. When it is
-                            // computed, the resolved character is reused by the
-                            // branches below, so a keystroke is still translated
-                            // at most once.
+                            // `translate` is computed above only when a custom
+                            // prefix exists, or lazily here for vim and the
+                            // type-to-search opener. The resolved character is
+                            // reused by every branch below, so each keystroke is
+                            // still translated at most once.
                             let vimOn = vimNavigationFlag.withLock { $0 }
-                            var typed: Character? = vimOn ? translate(keyCode: keyCode) : nil
-                            if vimOn,
+                            if typed == nil, vimOn { typed = translate(keyCode: keyCode) }
+                            if vimOn, !customJumpOwnsKey,
                                Self.onlyTriggerModifiersHeld(
                                    flags,
                                    heldTriggerModifiers: (appModHeld ? cfg.appModifier : [])
@@ -1442,8 +1466,11 @@ final class HotkeyTap: @unchecked Sendable {
                             // `isSearchingNow()` branch swallows everything
                             // printable) or clear the binding in Settings, which
                             // removes the key from this map and frees the letter
-                            // for the opener.
-                            if let action = panelKeyMap.withLock({ $0[keyCode] }) {
+                            // for the opener. An explicit two-key jump may start
+                            // on one of these keys (MA/MU over Minimize); while it
+                            // is configured, the chain intentionally owns M.
+                            if !customJumpOwnsKey,
+                               let action = panelKeyMap.withLock({ $0[keyCode] }) {
                                 switch action {
                                 case .close: deliver(.closeWindow)
                                 case .minimize: deliver(.minimizeWindow)
@@ -1501,10 +1528,8 @@ final class HotkeyTap: @unchecked Sendable {
                                     return nil
                                 }
                                 let lower = Character(letter.lowercased())
-                                if lower.isLetter,
-                                   let ascii = lower.asciiValue,
-                                   ascii >= 0x61 && ascii <= 0x7A,
-                                   !reservedLetters.withLock({ $0.contains(lower) }) {
+                                if RowLabels.isDirectJumpCharacter(lower),
+                                   (customJumpOwnsKey || !reservedLetters.withLock({ $0.contains(lower) })) {
                                     deliver(.letterInput(lower))
                                     return nil
                                 }

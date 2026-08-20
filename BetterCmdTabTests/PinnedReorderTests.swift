@@ -73,12 +73,45 @@ struct JumpKeyAssignmentValidationTests {
         ) == .valid("z"))
     }
 
-    @Test("non-letter and multi-letter input is invalid")
+    @Test("one ASCII digit is accepted")
+    func validDigit() {
+        #expect(JumpKeyAssignmentValidation.evaluate(
+            rawValue: " 7 ", bundleID: "chatgpt", assignments: assignments,
+            reservedLetters: reserved
+        ) == .valid("7"))
+    }
+
+    @Test("more than two characters is invalid")
     func invalid() {
         #expect(JumpKeyAssignmentValidation.evaluate(
-            rawValue: "12", bundleID: "chatgpt", assignments: assignments,
+            rawValue: "123", bundleID: "chatgpt", assignments: assignments,
             reservedLetters: reserved
         ) == .invalid)
+    }
+
+    @Test("two-key chains may share their first character")
+    func sharedPrefixChains() {
+        let existing = ["mail": "ma"]
+        #expect(JumpKeyAssignmentValidation.evaluate(
+            rawValue: "MU", bundleID: "music", assignments: existing,
+            reservedLetters: ["m"]
+        ) == .valid("mu"))
+    }
+
+    @Test("a two-key chain may start with a switcher control key")
+    func actionKeyPrefix() {
+        #expect(JumpKeyAssignmentValidation.evaluate(
+            rawValue: "MA", bundleID: "mail", assignments: [:],
+            reservedLetters: ["m"]
+        ) == .valid("ma"))
+    }
+
+    @Test("a two-key chain cannot end with a switcher control key")
+    func actionKeySuffix() {
+        #expect(JumpKeyAssignmentValidation.evaluate(
+            rawValue: "MQ", bundleID: "mail", assignments: [:],
+            reservedLetters: ["q"]
+        ) == .reserved("q"))
     }
 
     @Test("switcher control letters report a reserved-key rejection")
@@ -89,12 +122,28 @@ struct JumpKeyAssignmentValidationTests {
         ) == .reserved("w"))
     }
 
-    @Test("a key owned by another app reports a duplicate")
-    func duplicate() {
+    @Test("a key owned by another app reports a conflict")
+    func conflict() {
         #expect(JumpKeyAssignmentValidation.evaluate(
             rawValue: "D", bundleID: "chatgpt", assignments: assignments,
             reservedLetters: reserved
-        ) == .duplicate("d"))
+        ) == .conflict("d"))
+    }
+
+    @Test("a one-key and two-key prefix pair conflicts")
+    func prefixConflict() {
+        #expect(JumpKeyAssignmentValidation.evaluate(
+            rawValue: "C7", bundleID: "docker", assignments: assignments,
+            reservedLetters: reserved
+        ) == .conflict("c7"))
+    }
+
+    @Test("an unusable imported assignment does not block a valid chain")
+    func invalidImportedAssignmentDoesNotConflict() {
+        #expect(JumpKeyAssignmentValidation.evaluate(
+            rawValue: "MA", bundleID: "mail", assignments: ["legacy": "m"],
+            reservedLetters: ["m"]
+        ) == .valid("ma"))
     }
 
     @Test("an app may keep its own existing key")

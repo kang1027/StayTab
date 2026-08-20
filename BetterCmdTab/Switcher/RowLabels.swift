@@ -59,35 +59,65 @@ enum RowLabels {
         )
     }
 
-    static func labels(forInputs rows: [Input], customLetters: [String: String] = [:]) -> [String] {
+    static func labels(
+        forInputs rows: [Input],
+        customLetters: [String: String] = [:],
+        reserved overrideReserved: Set<Character>? = nil
+    ) -> [String] {
         var labels = [String](repeating: "", count: rows.count)
         guard !rows.isEmpty else { return labels }
 
         // Snapshot the reserved set once per call (one lock acquisition) and thread
         // it through the per-character loops below.
-        let reserved = Self.reserved
+        let reserved = overrideReserved ?? Self.reserved
 
-        let customByIndex: [Character?] = rows.map { row in
+        let preliminaryCustom: [String?] = rows.map { row in
             guard let bundleID = row.bundleIdentifier,
                   let raw = customLetters[bundleID],
-                  let letter = normalizedCustomLetter(raw),
-                  !reserved.contains(letter) else { return nil }
-            return letter
+                  let sequence = normalizedCustomKey(raw),
+                  isUsableCustomSequence(sequence, reserved: reserved) else { return nil }
+            return sequence
         }
-        // A user-assigned letter owns that direct jump. Automatic hints skip it
-        // so an unrelated app cannot turn the custom shortcut into a prefix.
-        let automaticReserved = reserved.union(customByIndex.compactMap { $0 })
+
+        // Imported config can bypass the settings editor. Drop every exact or
+        // prefix-conflicting sequence ("m" vs "ma") back to automatic so no
+        // displayed hint becomes impossible to commit. Shared prefixes of equal
+        // length ("ma" / "mu") are valid and handled by the letter buffer.
+        var conflictingCustomIndices = Set<Int>()
+        for i in preliminaryCustom.indices {
+            guard let lhs = preliminaryCustom[i] else { continue }
+            for j in preliminaryCustom.indices where j > i {
+                guard let rhs = preliminaryCustom[j] else { continue }
+                if sequencesConflict(lhs, rhs) {
+                    conflictingCustomIndices.insert(i)
+                    conflictingCustomIndices.insert(j)
+                }
+            }
+        }
+        let customByIndex = preliminaryCustom.enumerated().map {
+            conflictingCustomIndices.contains($0.offset) ? nil : $0.element
+        }
+
+        // A user-assigned sequence owns its first character. Automatic hints
+        // skip that character so an unrelated single-key hint cannot become an
+        // uncommittable prefix of a custom two-key chain.
+        let customPrefixes = customByIndex.compactMap { $0?.first }
+        let automaticReserved = reserved.union(customPrefixes)
 
         var firstLetterCount: [Character: Int] = [:]
         var firstLetters = [Character?](repeating: nil, count: rows.count)
         for i in 0..<rows.count {
-            let c = customByIndex[i]
-                ?? firstAvailableLetter(rows[i].appName, reserved: automaticReserved)
+            guard customByIndex[i] == nil else { continue }
+            let c = firstAvailableLetter(rows[i].appName, reserved: automaticReserved)
             firstLetters[i] = c
             if let c { firstLetterCount[c, default: 0] += 1 }
         }
 
         for i in 0..<rows.count {
+            if let custom = customByIndex[i] {
+                labels[i] = custom
+                continue
+            }
             guard let first = firstLetters[i] else {
                 labels[i] = ""
                 continue
@@ -105,14 +135,65 @@ enum RowLabels {
         return labels
     }
 
-    /// Normalize the settings field and imported config value. Only one ASCII
-    /// alphabetic key is a valid direct jump; action-key conflicts are checked
-    /// separately against the live `reserved` set.
-    static func normalizedCustomLetter(_ raw: String) -> Character? {
+    /// Normalize the settings field and imported config value. A custom direct
+    /// jump accepts one or two ASCII letters/digits; automatic hints remain
+    /// letters.
+    /// Action-key conflicts are checked separately against the live `reserved`
+    /// set.
+    static func normalizedCustomKey(_ raw: String) -> String? {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard trimmed.count == 1, let letter = trimmed.first,
-              letter.isASCII, letter.isLetter else { return nil }
-        return letter
+        guard (1...2).contains(trimmed.count),
+              trimmed.allSatisfy(isDirectJumpCharacter) else { return nil }
+        return trimmed
+    }
+
+    /// Allocation-free character gate shared with the keyboard-event hot path.
+    static func isDirectJumpCharacter(_ character: Character) -> Bool {
+        guard let ascii = character.asciiValue else { return false }
+        return (ascii >= 0x61 && ascii <= 0x7A)
+            || (ascii >= 0x41 && ascii <= 0x5A)
+            || (ascii >= 0x30 && ascii <= 0x39)
+    }
+
+    /// One-key custom jumps cannot claim an action key. A two-key chain may
+    /// start with one: the explicit chain then owns that first key while the
+    /// switcher is open. Its second key must stay unreserved so the chain can
+    /// finish without being consumed by another panel action.
+    static func isUsableCustomSequence(_ sequence: String, reserved: Set<Character>) -> Bool {
+        guard let first = sequence.first else { return false }
+        if sequence.count == 1 { return !reserved.contains(first) }
+        guard let last = sequence.last else { return false }
+        return !reserved.contains(last)
+    }
+
+    /// Exact duplicates and full-prefix pairs are ambiguous; equal-length
+    /// sequences with only a shared start ("ma" / "mu") are not.
+    static func sequencesConflict(_ lhs: String, _ rhs: String) -> Bool {
+        lhs == rhs || lhs.hasPrefix(rhs) || rhs.hasPrefix(lhs)
+    }
+
+    /// First characters of live two-key custom chains. The input layer uses
+    /// this cold-path snapshot to let an explicit chain beat an action bound to
+    /// the same first key (for example MA/MU over the default Minimize key M).
+    static func customChainPrefixes(
+        customLetters: [String: String],
+        allowedBundleIDs: Set<String>,
+        reserved: Set<Character>
+    ) -> Set<Character> {
+        let sequences: [(bundleID: String, sequence: String)] = customLetters.compactMap { bundleID, raw in
+            guard allowedBundleIDs.contains(bundleID),
+                  let sequence = normalizedCustomKey(raw),
+                  isUsableCustomSequence(sequence, reserved: reserved) else { return nil }
+            return (bundleID, sequence)
+        }
+        return Set(sequences.compactMap { candidate in
+            guard candidate.sequence.count == 2 else { return nil }
+            let conflicts = sequences.contains {
+                $0.bundleID != candidate.bundleID
+                    && sequencesConflict(candidate.sequence, $0.sequence)
+            }
+            return conflicts ? nil : candidate.sequence.first
+        })
     }
 
     private static func disambiguateDuplicates(_ labels: inout [String], reserved: Set<Character>) {

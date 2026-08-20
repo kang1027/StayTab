@@ -399,6 +399,9 @@ final class SwitcherController: SwitcherViewDelegate {
     /// `nil` until the launch push, so the first push always reaches the tap even
     /// when every key resolves to "cleared".
     private var lastSpecialPanelKeys: HotkeyTap.SpecialPanelKeys?
+    /// Layout-aware Carbon keycodes for the first character of active custom
+    /// two-key app jumps. Recomputed only when pins, mappings, or layout change.
+    private var customJumpPrefixKeyCodes = Set<UInt32>()
 
     /// Signatures of windows the user just closed locally. Any cache refresh
     /// completing before the AX close has propagated would otherwise re-add
@@ -672,7 +675,9 @@ final class SwitcherController: SwitcherViewDelegate {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 InstalledAppsIndex.shared.ensureFresh()
-                guard let self, self.phase == .visible else { return }
+                guard let self else { return }
+                self.updateCustomJumpPrefixes()
+                guard self.phase == .visible else { return }
                 self.refreshDisplay()
             }
             .store(in: &cancellables)
@@ -680,7 +685,9 @@ final class SwitcherController: SwitcherViewDelegate {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] letters in
                 RowLabels.setCustomLetters(letters)
-                guard let self, self.phase == .visible else { return }
+                guard let self else { return }
+                self.updateCustomJumpPrefixes()
+                guard self.phase == .visible else { return }
                 self.baseLabels = RowLabels.labels(for: self.baseRows)
                 self.refreshDisplay()
             }
@@ -745,7 +752,10 @@ final class SwitcherController: SwitcherViewDelegate {
         // Mirror the tap's reserved-letter set (in-panel action keys + ⌘F,
         // recomputed on every binding/layout change) into RowLabels so hint
         // generation never assigns a letter that's bound to an action.
-        hotkey.onReservedLettersChanged = { letters in RowLabels.setReserved(letters) }
+        hotkey.onReservedLettersChanged = { [weak self] letters in
+            RowLabels.setReserved(letters)
+            self?.updateCustomJumpPrefixes()
+        }
         // The tap reported a re-enable storm (it keeps getting disabled — most
         // often because Accessibility was revoked under an active session tap).
         // Recover on main so the spinning tap thread can't keep freezing the
@@ -1327,6 +1337,7 @@ final class SwitcherController: SwitcherViewDelegate {
             searchActive: searchActive,
             tabDrillActive: tabDrillActive,
             panelActions: panelActionSpecs(),
+            customJumpPrefixKeyCodes: customJumpPrefixKeyCodes,
             vimNavigationEnabled: Preferences.shared.vimNavigationEnabled,
             searchKeyCode: Self.panelKeyCode(.panelSearch(for: activeTarget.storageKey)),
             tabDrillKeyCode: Self.panelKeyCode(.panelTabDrill(for: activeTarget.storageKey))
@@ -1351,6 +1362,22 @@ final class SwitcherController: SwitcherViewDelegate {
             specs.append(PanelActionSpec(keyCode: UInt32(shortcut.carbonKeyCode), action: action))
         }
         return specs
+    }
+
+    /// Push the explicit two-key prefix snapshot to both input paths. The tap
+    /// needs characters for live arbitration; the Secure Event Input survivor
+    /// needs layout-aware keycodes for Carbon chord precedence.
+    private func updateCustomJumpPrefixes() {
+        let prefixes = RowLabels.customChainPrefixes(
+            customLetters: Preferences.shared.appJumpLetters,
+            allowedBundleIDs: Set(Preferences.shared.pinnedBundleIDs),
+            reserved: RowLabels.reserved
+        )
+        hotkey.setCustomJumpPrefixes(prefixes)
+        let keyCodes = KeyboardLayout.keyCodes(for: prefixes)
+        guard keyCodes != customJumpPrefixKeyCodes else { return }
+        customJumpPrefixKeyCodes = keyCodes
+        if phase != .idle { syncNativeHotkeyOverride() }
     }
 
     /// The `CGEventFlags` mask for the trigger's primary hold modifier, used by

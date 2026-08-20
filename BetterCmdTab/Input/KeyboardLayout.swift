@@ -56,6 +56,21 @@ enum KeyboardLayout {
         }
     }
 
+    /// Reverse lookup used only when pinned custom-key settings or the keyboard
+    /// layout change. Scanning the compact virtual-key range keeps layout-aware
+    /// MA/MU-style prefixes working in the Secure Event Input Carbon fallback;
+    /// this never runs on the keystroke hot path.
+    static func keyCodes(for characters: Set<Character>) -> Set<UInt32> {
+        guard !characters.isEmpty else { return [] }
+        var result = Set<UInt32>()
+        for keyCode in UInt32(0)..<UInt32(128) {
+            guard let character = character(for: keyCode) else { continue }
+            let lower = Character(character.lowercased())
+            if characters.contains(lower) { result.insert(keyCode) }
+        }
+        return result
+    }
+
     /// Re-read the current keyboard layout. Safe to call from any thread.
     static func reload() {
         guard let data = currentOrFallbackLayoutData() else { return }
