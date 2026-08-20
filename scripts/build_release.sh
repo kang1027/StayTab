@@ -265,6 +265,12 @@ fi
 if [[ $auto_release -eq 1 ]]; then
 	step "Publish ${TAG} to ${RELEASE_REPO}"
 	require_command gh
+	if ! gh secret list --repo "$RELEASE_REPO" --json name --jq '.[].name' |
+		grep -Fxq "BETTERUPDATER_PRIVATE_KEY"; then
+		echo "GitHub Actions secret is missing: BETTERUPDATER_PRIVATE_KEY" >&2
+		echo "Run: scripts/configure_release_secrets.sh ${RELEASE_REPO}" >&2
+		exit 1
+	fi
 	[[ -z "$(git -C "$REPO_ROOT" status --porcelain)" ]] || { echo "Working tree must be clean" >&2; exit 1; }
 	HEAD_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 	REMOTE_SHA="$(git -C "$REPO_ROOT" ls-remote origin refs/heads/main | awk '{print $1}')"
