@@ -79,14 +79,14 @@ git clone https://github.com/kang1027/StayTab.git
 cd StayTab
 
 xcodebuild \
-  -project BetterCmdTab.xcodeproj \
-  -scheme "BetterCmdTab Debug" \
+  -project StayTab.xcodeproj \
+  -scheme "StayTab Debug" \
   -configuration Debug \
   CODE_SIGNING_ALLOWED=NO \
   build
 ```
 
-The project and source-module names remain `BetterCmdTab` to preserve upstream history and compatibility. The built product is `StayTab`, with bundle identifier `com.kdh.StayTab`.
+The Xcode project, schemes, and Swift module are named `StayTab`. The built product is `StayTab`, with bundle identifier `com.kdh.StayTab`.
 
 ## Permissions and privacy
 
@@ -100,8 +100,8 @@ Run all tests with:
 
 ```sh
 xcodebuild \
-  -project BetterCmdTab.xcodeproj \
-  -scheme "BetterCmdTab Debug" \
+  -project StayTab.xcodeproj \
+  -scheme "StayTab Debug" \
   -destination "platform=macOS" \
   CODE_SIGNING_ALLOWED=NO \
   test

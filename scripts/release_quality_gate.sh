@@ -25,7 +25,7 @@ EOF
 clean_build=0
 fail_on_high_risk=0
 skip_i18n=0
-log_path="${TMPDIR:-/tmp}/bettercmdtab_release_quality_gate.log"
+log_path="${TMPDIR:-/tmp}/staytab_release_quality_gate.log"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -61,12 +61,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-project_path="$repo_root/BetterCmdTab.xcodeproj"
+project_path="$repo_root/StayTab.xcodeproj"
 
 build_cmd=(
   xcodebuild
   -project "$project_path"
-  -scheme "BetterCmdTab"
+  -scheme "StayTab"
   -configuration Release
   -destination "platform=macOS"
   CODE_SIGNING_ALLOWED=NO
@@ -91,10 +91,10 @@ else
   i18n_log="${log_path%.log}-i18n.log"
   if ! xcodebuild \
     -project "$project_path" \
-    -scheme "BetterCmdTab Debug" \
+    -scheme "StayTab Debug" \
     -destination "platform=macOS" \
     CODE_SIGNING_ALLOWED=NO \
-    test -only-testing:BetterCmdTabTests/LocalizationCatalogTests \
+    test -only-testing:StayTabTests/LocalizationCatalogTests \
     >"$i18n_log" 2>&1; then
     echo "[release-quality-gate] Localization audit failed. Log: $i18n_log" >&2
     tail -n 40 "$i18n_log" >&2 || true

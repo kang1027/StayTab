@@ -6,7 +6,7 @@ TEAM_ID="${TEAM_ID:-GGR9HG6DB8}"
 SIGNING_IDENTITY="${SIGNING_IDENTITY:-Developer ID Application: DongHyeon Kang (${TEAM_ID})}"
 NOTARYTOOL_PROFILE="${NOTARYTOOL_PROFILE:-StayTabNotarization}"
 RELEASE_REPO="${RELEASE_REPO:-kang1027/StayTab}"
-SCHEME="BetterCmdTab"
+SCHEME="StayTab"
 APP_NAME="StayTab"
 BUNDLE_ID="com.kdh.StayTab"
 
@@ -66,7 +66,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PROJECT_PATH="${REPO_ROOT}/BetterCmdTab.xcodeproj"
+PROJECT_PATH="${REPO_ROOT}/StayTab.xcodeproj"
 BUILD_DIR="${REPO_ROOT}/build/release"
 ARCHIVE_PATH="${BUILD_DIR}/StayTab.xcarchive"
 EXPORT_PATH="${BUILD_DIR}/export"

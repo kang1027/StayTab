@@ -2,8 +2,8 @@
 # Rules that only ever fire on code we write this way on purpose are off, reason inline.
 
 included:
-  - BetterCmdTab
-  - BetterCmdTabTests
+  - StayTab
+  - StayTabTests
 
 excluded:
   - build

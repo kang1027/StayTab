@@ -16,7 +16,7 @@ too. A bare literal in UI code ships untranslated — wrap it.
 
 ## 2. Add the catalog entries
 
-Edit `BetterCmdTab/Localizable.xcstrings` directly (it is JSON). For each new
+Edit `StayTab/Localizable.xcstrings` directly (it is JSON). For each new
 key add translations for **all** of: `de`, `es`, `fr`, `pl`, `zh-Hans`. Copy
 the exact JSON shape of a neighboring entry, keep keys sorted where the
 surrounding file is sorted, and keep format specifiers (`%@`, `%d`, …)
@@ -26,8 +26,8 @@ catalog entries whose code key was deleted.
 ## 3. Verify
 
 ```bash
-xcodebuild -scheme "BetterCmdTab Debug" -destination 'platform=macOS' test \
-  -only-testing:BetterCmdTabTests/LocalizationCatalogTests
+xcodebuild -scheme "StayTab Debug" -destination 'platform=macOS' test \
+  -only-testing:StayTabTests/LocalizationCatalogTests
 ```
 
 **Complete when:** the suite passes with the new keys present in all five

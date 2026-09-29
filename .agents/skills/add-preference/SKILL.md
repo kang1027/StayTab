@@ -1,6 +1,6 @@
 ---
 name: add-preference
-description: Contract for adding or changing a persisted setting in BetterCmdTab. Use when touching Preferences.swift, a settings pane, or any Switcher.* UserDefaults key.
+description: Contract for adding or changing a persisted setting in StayTab. Use when touching Preferences.swift, a settings pane, or any Switcher.* UserDefaults key.
 ---
 
 # Add a preference
@@ -11,7 +11,7 @@ export, or apply on the hot path.
 
 ## 1. Declare the key and property
 
-In `BetterCmdTab/App/Preferences.swift`:
+In `StayTab/App/Preferences.swift`:
 
 - Add the key to the `Keys` enum as `"Switcher.camelCaseName"`. The string is
   the contract — it is read by name in other files, exported to config files,
@@ -51,7 +51,7 @@ round trip and is absent from `passthrough`.
 ## 4. Portability and config file — usually free
 
 Export/import (`SettingsPortability.swift`) and
-`~/.config/bettercmdtab/config.json` (`ConfigFile.swift`) pick up any
+`~/.config/staytab/config.json` (`ConfigFile.swift`) pick up any
 `Switcher.*` key automatically. Only act if the value is device-local state
 (caches, recently-closed, machine-specific paths): add it to
 `exportExcludedKeys` in `SettingsPortability.swift`.
@@ -59,7 +59,7 @@ Export/import (`SettingsPortability.swift`) and
 ## 5. UI and strings
 
 Add the control to the matching pane view controller in
-`BetterCmdTab/Settings/` — Switcher/Controls/Tabs all live in
+`StayTab/Settings/` — Switcher/Controls/Tabs all live in
 `SwitcherPanesViewController`, picked by its `Pane` parameter. Fragile or new
 behavior ships off by default under a “These features are unstable” notice on
 its own section. Register the control in `SettingsCatalog.swift` if the pane
@@ -73,10 +73,10 @@ New pure-logic behavior gets a Swift Testing test. Then run the suites the
 contract touches:
 
 ```bash
-xcodebuild -scheme "BetterCmdTab Debug" -destination 'platform=macOS' test \
-  -only-testing:BetterCmdTabTests/PreferencesEnumTests \
-  -only-testing:BetterCmdTabTests/SettingsPortabilityTests \
-  -only-testing:BetterCmdTabTests/LocalizationCatalogTests
+xcodebuild -scheme "StayTab Debug" -destination 'platform=macOS' test \
+  -only-testing:StayTabTests/PreferencesEnumTests \
+  -only-testing:StayTabTests/SettingsPortabilityTests \
+  -only-testing:StayTabTests/LocalizationCatalogTests
 ```
 
 **Complete when:** those suites pass and the setting survives an
