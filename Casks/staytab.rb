@@ -1,8 +1,8 @@
 cask "staytab" do
-  version "0.1.1"
-  sha256 "9ae20d89d711efb814395a3cdd178ee54475e1e0e75d3517b28935b50c261a08"
+  version "0.1.2"
+  sha256 "148aecd0679197364f6b881093c71a915d42adcb7ed3bcfa104189341b4fbfc4"
 
-  url "https://github.com/kang1027/StayTab/releases/download/v#{version}/StayTab-#{version}-20260820192837.dmg"
+  url "https://github.com/kang1027/StayTab/releases/download/v#{version}/StayTab-#{version}-20260929131026.dmg"
   name "StayTab"
   desc "Persistent app roster and launcher for Command-Tab switching"
   homepage "https://github.com/kang1027/StayTab"
