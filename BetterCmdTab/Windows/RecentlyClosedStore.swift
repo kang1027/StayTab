@@ -109,7 +109,7 @@ final class RecentlyClosedStore {
 
     func record(bundleID: String, appName: String, title: String, documentPath: String?) {
         guard !bundleID.isEmpty else { return }
-        // Never record ourselves — BetterCmdTab shows in the switcher while its
+        // Never record ourselves — StayTab shows in the switcher while its
         // Settings window is open, so closing that window must not land us in
         // the recently-closed list.
         guard bundleID != Bundle.main.bundleIdentifier else { return }

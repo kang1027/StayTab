@@ -56,7 +56,8 @@ extension Preferences {
 
     /// Identifier of the exported UTI declared in Info.plist
     /// (`UTExportedTypeDeclarations`). Kept so old `.cmdtab` files retain their
-    /// icon and stay openable in the import panel.
+    /// icon and stay openable in the import panel. It is BetterCmdTab's own
+    /// type identifier on purpose: renaming it would orphan those files.
     nonisolated static let exportUTIIdentifier = "pro.bettercmdtab.settings"
 
     /// Default file name (no extension — the save panel appends `.json` from

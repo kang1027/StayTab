@@ -130,7 +130,7 @@ final class ConfigFile: @unchecked Sendable {
     // MARK: - Queue-confined
 
     /// (Re)attach the watcher: the file itself when it exists, otherwise our own
-    /// `bettercmdtab/` directory so a file created while running is picked up.
+    /// `staytab/` directory so a file created while running is picked up.
     private func armWatcher() {
         source?.cancel()
         source = nil
@@ -157,7 +157,7 @@ final class ConfigFile: @unchecked Sendable {
             return
         }
 
-        // Only ever watch bettercmdtab/, never its parent: ~/.config is written
+        // Only ever watch staytab/, never its parent: ~/.config is written
         // constantly by unrelated tools, and each such write would wake this
         // queue for a stat on behalf of a feature the user never enabled.
         let dir = Self.url.deletingLastPathComponent()
@@ -175,7 +175,7 @@ final class ConfigFile: @unchecked Sendable {
             src.activate()
             return
         }
-        // ponytail: no watcher when bettercmdtab/ itself is absent — watching a
+        // ponytail: no watcher when staytab/ itself is absent — watching a
         // parent for it to appear would fire on every unrelated dotfile write
         // (polling through another door). Creating the directory externally
         // mid-session needs a relaunch or the Create button.

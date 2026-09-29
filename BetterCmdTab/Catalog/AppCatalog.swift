@@ -56,7 +56,7 @@ enum AppCatalog {
 
     static func snapshot(orderedBy mru: [pid_t], filter cfg: CatalogFilter.Config? = nil) -> [SwitcherRow] {
         let resolvedCfg = cfg ?? CatalogFilter.config()
-        // Self is intentionally included: BetterCmdTab should appear in the
+        // Self is intentionally included: StayTab should appear in the
         // switcher when — and only when — it has a real standard window open
         // (the Settings window). The switcher panel is a borderless
         // non-activating NSPanel whose AX subrole isn't Standard/Dialog, so

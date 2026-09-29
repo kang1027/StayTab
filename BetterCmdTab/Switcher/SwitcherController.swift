@@ -151,7 +151,7 @@ final class SwitcherController: SwitcherViewDelegate {
     /// opens — before the panel is presented, while the user's real app is still
     /// frontmost. Window-management chords act on THIS ("obecne okno"), not the
     /// highlighted row and not a live `frontmostApplication` read (which returns
-    /// BetterCmdTab once our key panel is on screen). Cleared on teardown.
+    /// StayTab once our key panel is on screen). Cleared on teardown.
     private var openFocusedWindow: AXUIElement?
     /// AX title captured with `openFocusedWindow`; for browsers this identifies
     /// the active tab without another AppleScript scan.
@@ -163,7 +163,7 @@ final class SwitcherController: SwitcherViewDelegate {
     /// with `openFocusedWindow`.
     private var openTargetScreen: NSScreen?
     /// The app that was frontmost when the switcher opened. On open we activate
-    /// BetterCmdTab so the WindowServer renders the Liquid Glass backdrop as
+    /// StayTab so the WindowServer renders the Liquid Glass backdrop as
     /// active (an `.accessory`/non-activating app's in-process `appearsActive`
     /// override can't reach the server-side glass). Restored on `cancel()` so
     /// dismissing without picking anything leaves the user exactly where they
@@ -798,7 +798,7 @@ final class SwitcherController: SwitcherViewDelegate {
         // left the system ⌘Tab stuck. Re-syncs the live override afterwards so
         // the current trigger re-disables only what it actually needs.
         NotificationCenter.default.publisher(
-            for: Notification.Name("BetterCmdTab_restoreNativeShortcuts")
+            for: Notification.Name("StayTab_restoreNativeShortcuts")
         )
         .receive(on: DispatchQueue.main)
         .sink { [weak self] _ in self?.restoreNativeShortcutsThenResync() }
@@ -1918,7 +1918,7 @@ final class SwitcherController: SwitcherViewDelegate {
     /// (regardless of the tracked `disabledSymbolicKeys` set, which can drift if a
     /// prior run exited uncleanly), then resync — which, suspended, drops all our
     /// Carbon chords and leaves the system's ⌘Tab alone. The user's native ⌘Tab
-    /// stays back until they relaunch BetterCmdTab (the suspension is in-memory).
+    /// stays back until they relaunch StayTab (the suspension is in-memory).
     private func restoreNativeShortcutsThenResync() {
         nativeOverrideSuspended = true
         PrivateAPI.setNativeCommandTabEnabled(true, [.commandTab, .commandShiftTab, .commandKeyAboveTab])
@@ -4619,7 +4619,7 @@ final class SwitcherController: SwitcherViewDelegate {
     /// Window-management chords act on the window that was current when the
     /// switcher opened (`openFocusedWindow`), not the highlighted row. A live
     /// `frontmostApplication` read can't be used here: once our key panel is on
-    /// screen the system reports BetterCmdTab as frontmost, so the chord would
+    /// screen the system reports StayTab as frontmost, so the chord would
     /// no-op. The switcher stays open so chords can be chained.
     private func arrangeFrontmost(_ arrangement: WindowArrangement) {
         if phase == .visible {

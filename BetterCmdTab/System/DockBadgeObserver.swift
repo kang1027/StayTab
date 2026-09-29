@@ -64,7 +64,7 @@ final class DockBadgeObserver {
     /// Panel-open poll cadence. The panel is open only briefly, so this is a
     /// handful of off-main Dock scans per session — never any idle cost.
     private static let pollIntervalSeconds = 0.6
-    private let buildQueue = DispatchQueue(label: "pro.bettercmdtab.DockBadgeObserver.build", qos: .utility)
+    private let buildQueue = DispatchQueue(label: "com.kdh.StayTab.DockBadgeObserver.build", qos: .utility)
 
     /// Structural changes (an item appears/disappears or the dock re-lays-out) —
     /// these also mean the per-item subscription set is stale and must be rebuilt.

@@ -179,8 +179,23 @@ enum SettingsCatalog {
     static let globalDefaultNoteTitle = String(localized: "Command-Tab defaults")
     static let globalDefaultNoteSubtitle = String(localized: "These settings apply to the app and window switchers.")
 
+    /// Backs the sidebar "Show Details" toggle. Earlier builds stored it under
+    /// the upstream `BetterCmdTab.` prefix; `migrateShowDetailsKey` carries an
+    /// existing choice over once so the rename doesn't flip it back on.
+    static let showDetailsDefaultsKey = "StayTab.showSettingsDetails"
+    static let legacyShowDetailsDefaultsKey = "BetterCmdTab.showSettingsDetails"
+
+    static func migrateShowDetailsKey(in defaults: UserDefaults = .standard) {
+        guard let legacy = defaults.object(forKey: legacyShowDetailsDefaultsKey) else { return }
+        if defaults.object(forKey: showDetailsDefaultsKey) == nil {
+            defaults.set(legacy, forKey: showDetailsDefaultsKey)
+        }
+        defaults.removeObject(forKey: legacyShowDetailsDefaultsKey)
+    }
+
     static func makeConfiguration() -> SettingsConfiguration {
-        SettingsConfiguration(
+        migrateShowDetailsKey()
+        return SettingsConfiguration(
             tabs: tabs,
             searchItems: searchItems,
             contentProvider: { tab, _ in
@@ -198,7 +213,7 @@ enum SettingsCatalog {
                 }
             },
             searchPlaceholder: String(localized: "Search"),
-            showDetailsDefaultsKey: "BetterCmdTab.showSettingsDetails",
+            showDetailsDefaultsKey: showDetailsDefaultsKey,
             // Keep the active tab + 1 previous live and drop to active-only when
             // the settings window loses key. Inactive tab trees are freed and
             // rebuilt lazily on revisit, minimizing RAM for this secondary window.

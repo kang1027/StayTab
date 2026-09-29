@@ -71,8 +71,8 @@ final class AppCatalogCache {
     private var axObserversInstalling: [pid_t: UInt64] = [:]
     private var nextAXObserverInstallToken: UInt64 = 0
     private var pendingOneShotCompletions: [() -> Void] = []
-    private let snapshotQueue = DispatchQueue(label: "BetterCmdTab.snapshot", qos: .userInteractive, attributes: .concurrent)
-    private let axInstallQueue = DispatchQueue(label: "BetterCmdTab.axInstall", qos: .utility, attributes: .concurrent)
+    private let snapshotQueue = DispatchQueue(label: "com.kdh.StayTab.snapshot", qos: .userInteractive, attributes: .concurrent)
+    private let axInstallQueue = DispatchQueue(label: "com.kdh.StayTab.axInstall", qos: .utility, attributes: .concurrent)
     private var isRunning = false
     /// Invalidates completions from a prior start/stop lifetime. Dispatch queues
     /// cannot cancel an AX scan already executing, so every completion checks

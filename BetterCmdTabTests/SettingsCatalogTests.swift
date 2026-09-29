@@ -1,4 +1,5 @@
 import BetterSettings
+import Foundation
 import Testing
 @testable import BetterCmdTab
 
@@ -54,6 +55,33 @@ struct SettingsCatalogTests {
             #expect(item.sectionAnchor.hasPrefix(item.tabID + "."),
                     "\(item.id) is on tab \(item.tabID) but anchored at \(item.sectionAnchor)")
         }
+    }
+
+    @Test("the Show Details choice survives the defaults key rename")
+    func showDetailsKeyMigrates() throws {
+        let suite = "StayTabTests.showDetails.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        defaults.set(false, forKey: SettingsCatalog.legacyShowDetailsDefaultsKey)
+        SettingsCatalog.migrateShowDetailsKey(in: defaults)
+
+        #expect(defaults.object(forKey: SettingsCatalog.showDetailsDefaultsKey) as? Bool == false)
+        #expect(defaults.object(forKey: SettingsCatalog.legacyShowDetailsDefaultsKey) == nil)
+    }
+
+    @Test("a value already under the new key wins over the legacy one")
+    func showDetailsKeyKeepsCurrentValue() throws {
+        let suite = "StayTabTests.showDetails.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        defaults.set(true, forKey: SettingsCatalog.showDetailsDefaultsKey)
+        defaults.set(false, forKey: SettingsCatalog.legacyShowDetailsDefaultsKey)
+        SettingsCatalog.migrateShowDetailsKey(in: defaults)
+
+        #expect(defaults.object(forKey: SettingsCatalog.showDetailsDefaultsKey) as? Bool == true)
+        #expect(defaults.object(forKey: SettingsCatalog.legacyShowDetailsDefaultsKey) == nil)
     }
 
     private func duplicates(in ids: [String]) -> [String] {

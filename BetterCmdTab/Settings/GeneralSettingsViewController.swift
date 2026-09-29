@@ -133,7 +133,7 @@ final class GeneralSettingsViewController: SettingsTabViewController {
 
         // Recovery section — manual escape hatch if the native ⌘Tab is stuck
         // (moved here from Privacy: it's troubleshooting, not privacy).
-        // BetterCmdTab disables the system's ⌘Tab so it can take over under
+        // StayTab disables the system's ⌘Tab so it can take over under
         // Secure Event Input; that disable lives in the WindowServer and
         // outlives the process, so an unclean exit (crash, Force Quit) can leave
         // macOS's own ⌘Tab dead. This button re-enables every native chord, then
@@ -342,7 +342,7 @@ final class GeneralSettingsViewController: SettingsTabViewController {
         // Hand off to the live SwitcherController (it owns the symbolic-hotkey
         // state and the Carbon fallback), which re-enables every native chord and
         // then re-syncs the override for the current trigger.
-        NotificationCenter.default.post(name: Notification.Name("BetterCmdTab_restoreNativeShortcuts"), object: nil)
+        NotificationCenter.default.post(name: Notification.Name("StayTab_restoreNativeShortcuts"), object: nil)
     }
 
     // MARK: - Backup

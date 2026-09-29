@@ -34,7 +34,7 @@ extension BrowserTabs {
 
 // Private SPI from libsystem: detaches the spawned child's TCC
 // "responsibility" so it acts as its own client (osascript) instead of
-// inheriting from us (BetterCmdTab). This is the documented escape hatch
+// inheriting from us (StayTab). This is the documented escape hatch
 // when an LSUIElement agent can't surface Apple Events TCC prompts — a known
 // gap on macOS Tahoe (26). Same symbol that Witch, TabTab, and several other
 // shipping switchers use.

@@ -78,7 +78,7 @@ final class PinnedAppsListView: NSView {
 
     private static let rowHeight: CGFloat = 36
     private static let cellID = NSUserInterfaceItemIdentifier("PinnedAppRowCell")
-    private static let dragType = NSPasteboard.PasteboardType("pro.bettercmdtab.pinnedapp.row")
+    private static let dragType = NSPasteboard.PasteboardType("com.kdh.StayTab.pinnedapp.row")
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)

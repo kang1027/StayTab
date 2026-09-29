@@ -554,7 +554,7 @@ final class HotkeyTap: @unchecked Sendable {
             }
             CFRunLoopRun()
         }
-        thread.name = "pro.bettercmdtab.HotkeyTap"
+        thread.name = "com.kdh.StayTab.HotkeyTap"
         thread.qualityOfService = .userInteractive
         thread.start()
         started.wait()

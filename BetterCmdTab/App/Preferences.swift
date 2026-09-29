@@ -1250,7 +1250,7 @@ final class Preferences: ObservableObject {
         }
     }
 
-    /// File owned by BetterCmdTab under Application Support. Machine-local by
+    /// File owned by StayTab under Application Support. Machine-local by
     /// design: settings exports carry the system fallback, not a filesystem path.
     @Published var customCommitSoundFilename: String? {
         didSet {

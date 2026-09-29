@@ -447,13 +447,13 @@ enum Activator {
     /// Swift data race.
     private static let activationGeneration = OSAllocatedUnfairLock<UInt64>(initialState: 0)
     private static let activationQueue = DispatchQueue(
-        label: "BetterCmdTab.activation",
+        label: "com.kdh.StayTab.activation",
         qos: .userInitiated
     )
     /// Verification reads must never sit in front of a newer user-requested
     /// activation on `activationQueue`; a deaf AX app may use its full timeout.
     private static let activationVerificationQueue = DispatchQueue(
-        label: "BetterCmdTab.activation.verify",
+        label: "com.kdh.StayTab.activation.verify",
         qos: .userInitiated
     )
     /// A busy Electron/Chromium accessibility server can consume this timeout

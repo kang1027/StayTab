@@ -2,7 +2,7 @@ import AppKit
 import BetterShortcuts
 import Carbon.HIToolbox
 
-// Strongly-typed names for BetterCmdTab's two switcher triggers. The recorded
+// Strongly-typed names for StayTab's two switcher triggers. The recorded
 // shortcuts are stored by the BetterShortcuts package but are NOT registered
 // as live Carbon hotkeys — no `onKeyDown`/`onKeyUp` handler is attached, so the
 // package never steals the combo. The CGEvent tap in `HotkeyTap` remains the

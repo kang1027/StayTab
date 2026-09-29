@@ -148,7 +148,7 @@ final class SpaceSwipeSuppressor: @unchecked Sendable {
             }
             CFRunLoopRun()
         }
-        thread.name = "pro.bettercmdtab.SpaceSwipeSuppressor"
+        thread.name = "com.kdh.StayTab.SpaceSwipeSuppressor"
         thread.qualityOfService = .userInteractive
         thread.start()
         started.wait()
