@@ -36,6 +36,14 @@ struct SettingsPortabilityTests {
         #expect(!root.isEmpty)
     }
 
+    @Test("export file name carries the StayTab prefix and an ISO date")
+    func exportDefaultBaseName() {
+        let prefix = "staytab-settings-"
+        let name = Preferences.exportDefaultBaseName
+        #expect(name.hasPrefix(prefix))
+        #expect(name.dropFirst(prefix.count).wholeMatch(of: #/\d{4}-\d{2}-\d{2}/#) != nil)
+    }
+
     @Test("flat import applies bare keys to the published properties")
     func flatImport() throws {
         let prefs = Preferences.shared
