@@ -7,8 +7,6 @@ included:
 
 excluded:
   - build
-  - web
-  - docs
 
 disabled_rules:
   - trailing_comma # multi-line literals keep the trailing comma: one-line diffs when a case is added

@@ -171,9 +171,3 @@ to pick it up). Without that permission the switcher never boots and ⌘Tab does
 - Commits: `type: short summary` (`fix:`/`feat:`/`perf:`/`refactor:`/`docs:`/`chore:`),
   body wrapped ~72 chars explaining *why*. One logical change per PR.
 - New pure-logic behavior ships with at least one test.
-
-## web/ and docs/
-
-These directories are inherited BetterCmdTab website sources and are not part of StayTab's
-release pipeline. Their GitHub Pages workflows are intentionally disabled. Do not publish them
-under the StayTab repository without a separate branding, attribution, and URL review.
