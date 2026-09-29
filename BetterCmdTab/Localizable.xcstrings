@@ -1362,41 +1362,6 @@
         }
       }
     },
-    "BetterCmdTab needs Accessibility permission to handle ⌘Tab. Re-enable it in System Settings and the switcher reactivates automatically." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "BetterCmdTab benötigt die Bedienungshilfen-Berechtigung für ⌘Tab. Aktiviere sie in den Systemeinstellungen erneut, dann reaktiviert sich der Umschalter automatisch."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "BetterCmdTab necesita el permiso de Accesibilidad para gestionar ⌘Tab. Vuelve a activarlo en Ajustes del Sistema y el conmutador se reactivará automáticamente."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "BetterCmdTab a besoin de l'autorisation d'Accessibilité pour gérer ⌘Tab. Réactive-la dans Réglages Système et le sélecteur se réactive automatiquement."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "BetterCmdTab potrzebuje uprawnienia Dostępności, aby obsługiwać ⌘Tab. Włącz je ponownie w Ustawieniach systemowych, a przełącznik uaktywni się automatycznie."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "BetterCmdTab 需要辅助功能权限才能处理 ⌘Tab。请在“系统设置”中重新启用，切换器会自动恢复。"
-          }
-        }
-      }
-    },
     "Bold selected title" : {
       "localizations" : {
         "de" : {
@@ -6096,70 +6061,36 @@
         }
       }
     },
-    "Lets BetterCmdTab capture the shortcut and read your open windows. Required to work." : {
+    "Lets StayTab capture the shortcut and read your open windows. Required to work." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ermöglicht BetterCmdTab, den Kurzbefehl zu erfassen und deine geöffneten Fenster auszulesen. Für die Funktion erforderlich."
+            "value" : "Ermöglicht StayTab, den Kurzbefehl zu erfassen und deine geöffneten Fenster auszulesen. Für die Funktion erforderlich."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Permite a BetterCmdTab capturar el atajo y leer tus ventanas abiertas. Es obligatorio para funcionar."
+            "value" : "Permite a StayTab capturar el atajo y leer tus ventanas abiertas. Es obligatorio para funcionar."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Permet à BetterCmdTab de capturer le raccourci et de lire vos fenêtres ouvertes. Requis pour fonctionner."
+            "value" : "Permet à StayTab de capturer le raccourci et de lire vos fenêtres ouvertes. Requis pour fonctionner."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pozwala aplikacji BetterCmdTab przechwytywać skrót i odczytywać otwarte okna. Wymagane do działania."
+            "value" : "Pozwala aplikacji StayTab przechwytywać skrót i odczytywać otwarte okna. Wymagane do działania."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "允许 BetterCmdTab 捕获快捷键并读取已打开的窗口。这是正常工作所必需的。"
-          }
-        }
-      }
-    },
-    "Lets BetterCmdTab read Safari's favicon store so Safari tab entries show site icons. Optional — other browsers don't need it." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Erlaubt BetterCmdTab, Safaris Favicon-Speicher zu lesen, damit Safari-Tab-Einträge Website-Symbole zeigen. Optional — andere Browser brauchen es nicht."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Permite a BetterCmdTab leer el almacén de favicons de Safari para que las entradas de pestañas de Safari muestren los iconos de los sitios. Opcional: otros navegadores no lo necesitan."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Permet à BetterCmdTab de lire le stockage des favicons de Safari pour que les entrées d'onglets Safari affichent les icônes des sites. Facultatif — les autres navigateurs n'en ont pas besoin."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pozwala BetterCmdTab odczytywać magazyn favicon Safari, aby wpisy kart Safari pokazywały ikony stron. Opcjonalne — inne przeglądarki tego nie potrzebują."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "允许 BetterCmdTab 读取 Safari 的网站图标存储，使 Safari 标签页条目显示网站图标。可选——其他浏览器不需要此权限。"
+            "value" : "允许 StayTab 捕获快捷键并读取已打开的窗口。这是正常工作所必需的。"
           }
         }
       }
@@ -7937,36 +7868,36 @@
         }
       }
     },
-    "Open BetterCmdTab automatically when you log in." : {
+    "Open StayTab automatically when you log in." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Öffnet BetterCmdTab automatisch, wenn du dich anmeldest."
+            "value" : "Öffnet StayTab automatisch, wenn du dich anmeldest."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Abre BetterCmdTab automáticamente al iniciar sesión."
+            "value" : "Abre StayTab automáticamente al iniciar sesión."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ouvre BetterCmdTab automatiquement à l’ouverture de votre session."
+            "value" : "Ouvre StayTab automatiquement à l’ouverture de votre session."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Otwieraj BetterCmdTab automatycznie po zalogowaniu."
+            "value" : "Otwieraj StayTab automatycznie po zalogowaniu."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "登录时自动打开 BetterCmdTab。"
+            "value" : "登录时自动打开 StayTab。"
           }
         }
       }
@@ -9093,36 +9024,36 @@
         }
       }
     },
-    "Quit BetterCmdTab" : {
+    "Quit StayTab" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "BetterCmdTab beenden"
+            "value" : "StayTab beenden"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Salir de BetterCmdTab"
+            "value" : "Salir de StayTab"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Quitter BetterCmdTab"
+            "value" : "Quitter StayTab"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zakończ BetterCmdTab"
+            "value" : "Zakończ StayTab"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "退出 BetterCmdTab"
+            "value" : "退出 StayTab"
           }
         }
       }
@@ -9195,37 +9126,37 @@
         }
       }
     },
-    "Re-enable the system's ⌘Tab and ⌘` — for example if they got stuck off after a crash. BetterCmdTab hands them back to macOS until you next relaunch it." : {
+    "Re-enable the system's ⌘Tab and ⌘` — for example if they got stuck off after a crash. StayTab hands them back to macOS until you next relaunch it." : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aktiviere ⌘Tab und ⌘` des Systems erneut – etwa wenn sie nach einem Absturz deaktiviert blieben. BetterCmdTab gibt sie an macOS zurück, bis du es neu startest."
+            "value" : "Aktiviere ⌘Tab und ⌘` des Systems erneut – etwa wenn sie nach einem Absturz deaktiviert blieben. StayTab gibt sie an macOS zurück, bis du es neu startest."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vuelve a activar ⌘Tab y ⌘` del sistema, por ejemplo si se quedaron desactivados tras un fallo. BetterCmdTab los devuelve a macOS hasta que lo reinicies."
+            "value" : "Vuelve a activar ⌘Tab y ⌘` del sistema, por ejemplo si se quedaron desactivados tras un fallo. StayTab los devuelve a macOS hasta que lo reinicies."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Réactive ⌘Tab et ⌘` du système — par exemple s'ils sont restés désactivés après un plantage. BetterCmdTab les rend à macOS jusqu'au prochain redémarrage."
+            "value" : "Réactive ⌘Tab et ⌘` du système — par exemple s'ils sont restés désactivés après un plantage. StayTab les rend à macOS jusqu'au prochain redémarrage."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ponownie włącz systemowe ⌘Tab i ⌘` — np. jeśli zostały wyłączone po awarii. BetterCmdTab oddaje je systemowi macOS do następnego uruchomienia aplikacji."
+            "value" : "Ponownie włącz systemowe ⌘Tab i ⌘` — np. jeśli zostały wyłączone po awarii. StayTab oddaje je systemowi macOS do następnego uruchomienia aplikacji."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重新启用系统的 ⌘Tab 和 ⌘` — 例如崩溃后它们卡在关闭状态时。BetterCmdTab 会把它们交还给 macOS，直到你下次重新启动它。"
+            "value" : "重新启用系统的 ⌘Tab 和 ⌘` — 例如崩溃后它们卡在关闭状态时。StayTab 会把它们交还给 macOS，直到你下次重新启动它。"
           }
         }
       }
@@ -12192,6 +12123,41 @@
         }
       }
     },
+    "StayTab needs Accessibility permission to handle ⌘Tab. Re-enable it in System Settings and the switcher reactivates automatically." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "StayTab benötigt die Bedienungshilfen-Berechtigung für ⌘Tab. Aktiviere sie in den Systemeinstellungen erneut, dann reaktiviert sich der Umschalter automatisch."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "StayTab necesita el permiso de Accesibilidad para gestionar ⌘Tab. Vuelve a activarlo en Ajustes del Sistema y el conmutador se reactivará automáticamente."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "StayTab a besoin de l'autorisation d'Accessibilité pour gérer ⌘Tab. Réactive-la dans Réglages Système et le sélecteur se réactive automatiquement."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "StayTab potrzebuje uprawnienia Dostępności, aby obsługiwać ⌘Tab. Włącz je ponownie w Ustawieniach systemowych, a przełącznik uaktywni się automatycznie."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "StayTab 需要辅助功能权限才能处理 ⌘Tab。请在“系统设置”中重新启用，切换器会自动恢复。"
+          }
+        }
+      }
+    },
     "Swipe action" : {
       "localizations" : {
         "de" : {
@@ -12941,70 +12907,70 @@
         }
       }
     },
-    "This file isn't a valid BetterCmdTab settings export." : {
+    "This file isn't a valid StayTab settings export." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Diese Datei ist kein gültiger BetterCmdTab-Einstellungsexport."
+            "value" : "Diese Datei ist kein gültiger StayTab-Einstellungsexport."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Este archivo no es una exportación de ajustes de BetterCmdTab válida."
+            "value" : "Este archivo no es una exportación de ajustes de StayTab válida."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ce fichier n'est pas un export de réglages BetterCmdTab valide."
+            "value" : "Ce fichier n'est pas un export de réglages StayTab valide."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ten plik nie jest prawidłowym eksportem ustawień BetterCmdTab."
+            "value" : "Ten plik nie jest prawidłowym eksportem ustawień StayTab."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此文件不是有效的 BetterCmdTab 设置导出文件。"
+            "value" : "此文件不是有效的 StayTab 设置导出文件。"
           }
         }
       }
     },
-    "This settings file uses a newer format (version %lld) than this version of BetterCmdTab can read. Update the app and try again." : {
+    "This settings file uses a newer format (version %lld) than this version of StayTab can read. Update the app and try again." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Diese Einstellungsdatei verwendet ein neueres Format (Version %lld), als diese Version von BetterCmdTab lesen kann. Aktualisiere die App und versuche es erneut."
+            "value" : "Diese Einstellungsdatei verwendet ein neueres Format (Version %lld), als diese Version von StayTab lesen kann. Aktualisiere die App und versuche es erneut."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Este archivo de ajustes usa un formato más reciente (versión %lld) del que esta versión de BetterCmdTab puede leer. Actualiza la app e inténtalo de nuevo."
+            "value" : "Este archivo de ajustes usa un formato más reciente (versión %lld) del que esta versión de StayTab puede leer. Actualiza la app e inténtalo de nuevo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ce fichier de réglages utilise un format plus récent (version %lld) que celui que cette version de BetterCmdTab peut lire. Mettez l'app à jour et réessayez."
+            "value" : "Ce fichier de réglages utilise un format plus récent (version %lld) que celui que cette version de StayTab peut lire. Mettez l'app à jour et réessayez."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ten plik ustawień używa nowszego formatu (wersja %lld), niż potrafi odczytać ta wersja BetterCmdTab. Zaktualizuj aplikację i spróbuj ponownie."
+            "value" : "Ten plik ustawień używa nowszego formatu (wersja %lld), niż potrafi odczytać ta wersja StayTab. Zaktualizuj aplikację i spróbuj ponownie."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此设置文件使用了更新的格式（版本 %lld），当前版本的 BetterCmdTab 无法读取。请更新应用后重试。"
+            "value" : "此设置文件使用了更新的格式（版本 %lld），当前版本的 StayTab 无法读取。请更新应用后重试。"
           }
         }
       }
