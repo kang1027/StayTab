@@ -1,9 +1,9 @@
 ---
 name: verify
-description: Witness BetterCmdTab product-source changes at the live macOS surface when a diff needs end-to-end runtime evidence.
+description: Witness StayTab product-source changes at the live macOS surface when a diff needs end-to-end runtime evidence.
 ---
 
-# Verify BetterCmdTab
+# Verify StayTab
 
 A **witness** is a captured observation from the freshly built app after real
 user input crosses every changed seam. Build and test results are setup; the
@@ -35,18 +35,18 @@ build is not evidence for them.
 
 ```bash
 VERIFY_ROOT="$PWD/build/verify"
-SCHEME="BetterCmdTab Debug"
+SCHEME="StayTab Debug"
 CONFIGURATION="Debug"
-PRODUCT="BetterCmdTab Debug"
-BUNDLE_ID="pro.bettercmdtab.BetterCmdTab.debug"
+PRODUCT="StayTab Debug"
+BUNDLE_ID="com.kdh.StayTab.debug"
 
 # Release lane:
-# SCHEME="BetterCmdTab"; CONFIGURATION="Release"; PRODUCT="BetterCmdTab"
-# BUNDLE_ID="pro.bettercmdtab.BetterCmdTab"
+# SCHEME="StayTab"; CONFIGURATION="Release"; PRODUCT="StayTab"
+# BUNDLE_ID="com.kdh.StayTab"
 
 DERIVED_DATA="$VERIFY_ROOT/DerivedData-$CONFIGURATION"
 mkdir -p "$VERIFY_ROOT"
-if ! xcodebuild -project BetterCmdTab.xcodeproj \
+if ! xcodebuild -project StayTab.xcodeproj \
   -scheme "$SCHEME" -configuration "$CONFIGURATION" \
   -derivedDataPath "$DERIVED_DATA" build \
   >"$VERIFY_ROOT/build.log" 2>&1; then
@@ -59,8 +59,8 @@ EXEC="$APP/Contents/MacOS/$PRODUCT"
 test -x "$EXEC"
 ```
 
-Every BetterCmdTab process installs global handlers. Before launch, identify all
-running BetterCmdTab processes. Gracefully clean up a recorded prior witness;
+Every StayTab process installs global handlers. Before launch, identify all
+running StayTab processes. Gracefully clean up a recorded prior witness;
 if an installed copy is running, ask before quitting it, record its executable
 path and running state, and restore that exact copy afterward. A declined quit
 makes runtime verification `BLOCKED`.
@@ -102,7 +102,7 @@ state and belongs in the report. Without approval, return `BLOCKED`; preserve
 TCC as-is.
 
 **Complete when:** the recorded PID resolves to `EXEC` and is the sole
-BetterCmdTab process, the intended surface is drivable, verification state is
+StayTab process, the intended surface is drivable, verification state is
 outside the user's defaults and XDG config, and any TCC change was approved.
 
 ## 3. Drive the changed seam
@@ -117,7 +117,7 @@ Swift function is a test, not a witness.
 | `Input/`, `Switcher/` | Hold and send the actual configured chord with System Events; use a real password field for Secure Event Input and ask the user for a real trackpad gesture | Cropped panel capture plus the selected/cancelled app or window outcome |
 | `Settings/`, `Preferences` | Reopen Settings, operate the control, restart with the same isolated state, then exercise its downstream behavior | Restored control state and the changed live behavior |
 | `Catalog/`, `Windows/` | Prepare named real apps/windows, open the switcher, then select or act on one | Visible rows and resulting frontmost app/window state |
-| `ConfigFile`, import/export | Seed `$STATE/xdg/bettercmdtab/config.json` or use the real import/export UI | File contents and the live setting/behavior after reload |
+| `ConfigFile`, import/export | Seed `$STATE/xdg/staytab/config.json` or use the real import/export UI | File contents and the live setting/behavior after reload |
 | updater/About | Use the manual UI action against a safe target | UI result and relevant unified-log lines |
 | hot-path performance | Use separate clean base/target worktrees and SHA-specific Release build/state roots; drive identical seeded scenarios under Instruments with `Log.reveal` | Equal sample counts and median/p95 latency, CPU, or allocation numbers |
 

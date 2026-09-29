@@ -3,7 +3,7 @@
 Use this branch when `build/verify/state-path` exists, AppKit quit failed, or a
 witness exited abnormally. Native ⌘Tab may remain disabled until the same
 isolated state is launched again, so complete recovery before deleting state or
-starting another BetterCmdTab process.
+starting another StayTab process.
 
 ## 1. Reclaim the recorded run
 
@@ -27,14 +27,14 @@ case "$(basename "$STATE")" in state.*) ;; *) exit 1 ;; esac
 case "$EXEC" in "$ROOT_REAL"/*) ;; *) exit 1 ;; esac
 ```
 
-Make the recorded witness the only BetterCmdTab process. Ask before stopping an
+Make the recorded witness the only StayTab process. Ask before stopping an
 installed copy and remember its executable path and original running state. If
 the old witness still exists, first request AppKit termination by its exact PID
 using the command in `SKILL.md`. A PID/bundle mismatch belongs to another
 process and is never signalled. A forced stop is safe only after identity was
 revalidated and when immediately followed by the same-state recovery launch.
 
-**Complete when:** no BetterCmdTab process is running and the recorded state and
+**Complete when:** no StayTab process is running and the recorded state and
 executable are intact.
 
 ## 2. Run startup self-heal

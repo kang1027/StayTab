@@ -4,18 +4,18 @@ on:
   push:
     branches: [main]
     paths:
-      - "BetterCmdTab/**"
-      - "BetterCmdTabTests/**"
-      - "BetterCmdTab.xcodeproj/**"
+      - "StayTab/**"
+      - "StayTabTests/**"
+      - "StayTab.xcodeproj/**"
       - "LICENSE"
       - "NOTICE.md"
       - "scripts/**"
       - ".github/workflows/app-ci.yml"
   pull_request:
     paths:
-      - "BetterCmdTab/**"
-      - "BetterCmdTabTests/**"
-      - "BetterCmdTab.xcodeproj/**"
+      - "StayTab/**"
+      - "StayTabTests/**"
+      - "StayTab.xcodeproj/**"
       - "LICENSE"
       - "NOTICE.md"
       - "scripts/**"
@@ -42,8 +42,8 @@ jobs:
       - name: Build Release without signing
         run: |
           xcodebuild \
-            -project BetterCmdTab.xcodeproj \
-            -scheme BetterCmdTab \
+            -project StayTab.xcodeproj \
+            -scheme StayTab \
             -configuration Release \
             -destination "platform=macOS" \
             CODE_SIGNING_ALLOWED=NO \
@@ -55,12 +55,12 @@ jobs:
       - name: Run portable tests
         run: |
           xcodebuild \
-            -project BetterCmdTab.xcodeproj \
-            -scheme "BetterCmdTab Debug" \
+            -project StayTab.xcodeproj \
+            -scheme "StayTab Debug" \
             -destination "platform=macOS" \
             CODE_SIGNING_ALLOWED=NO \
-            -skip-testing:BetterCmdTabTests/SettingsPortabilityTests \
-            -skip-testing:BetterCmdTabTests/SwitcherReflowTests \
+            -skip-testing:StayTabTests/SettingsPortabilityTests \
+            -skip-testing:StayTabTests/SwitcherReflowTests \
             test
 
       # This suite mutates the process-wide Preferences singleton and the app's
@@ -69,9 +69,9 @@ jobs:
       - name: Run settings portability tests in isolation
         run: |
           xcodebuild \
-            -project BetterCmdTab.xcodeproj \
-            -scheme "BetterCmdTab Debug" \
+            -project StayTab.xcodeproj \
+            -scheme "StayTab Debug" \
             -destination "platform=macOS" \
             CODE_SIGNING_ALLOWED=NO \
-            -only-testing:BetterCmdTabTests/SettingsPortabilityTests \
+            -only-testing:StayTabTests/SettingsPortabilityTests \
             test

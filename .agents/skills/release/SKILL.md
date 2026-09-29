@@ -1,71 +1,77 @@
 ---
 name: release
-description: Ship a BetterCmdTab release end to end. Use when the user wants a new version or beta published on GitHub.
+description: Ship a StayTab release end to end. Use when the user wants a new version or beta published on GitHub.
 ---
 
 # Release runbook
 
-One command does the heavy lifting; this skill is the order of operations and
-the failure points around it.
+`RELEASING.md` holds the one-time setup and the publish checklist; this skill
+is the order of operations and the failure points around it.
 
 ## 1. Preflight
 
-Working tree clean on `main`, and the unit suite green:
+Working tree clean on `main`, `HEAD` equal to `origin/main`, App CI green, and
+the unit suite green:
 
 ```bash
-xcodebuild -scheme "BetterCmdTab Debug" -destination 'platform=macOS' test
+xcodebuild -scheme "StayTab Debug" -destination 'platform=macOS' test
 ```
 
-`scripts/set_version.sh --show` prints the current version. `MAJOR` tracks
-the macOS year; tags are bare (`26.4.3`, `26.0-beta.1` — no `v` prefix on new
-tags).
+`scripts/set_version.sh --show` prints the current version. Tags are
+`v<version>` for stable (`v0.1.1`) and `v<version>-beta.<n>` for betas.
 
 ## 2. Bump the version (stable releases)
 
 ```bash
-scripts/set_version.sh <version>   # sets MARKETING_VERSION and auto-commits "chore: bump …"
+scripts/set_version.sh <version>            # edits project.pbxproj only
+scripts/set_version.sh <version> --commit   # also commits just that file
 ```
 
-Skip for betas — `build_release.sh --beta` derives the next `beta.N` from
-existing GitHub tags itself.
+Push the bump before packaging: `--auto-release` refuses a `HEAD` that differs
+from `origin/main`. Skip this for betas — `build_release.sh --beta` derives the
+next `beta.N` from the existing GitHub release tags.
 
 ## 3. Write the notes
 
 Produce the release body with the `release-changelog` skill and save it to a
-file (e.g. `notes.md` in the scratchpad). The body **is** the GitHub Release
-description; its headings are parsed by `build_release.sh`, so the canonical
-structure from that skill is mandatory.
+file (e.g. `notes.md` in the scratchpad). It follows the changelog format in
+`CLAUDE.md` and keeps the GPL-3.0 / BetterCmdTab attribution.
 
-## 4. Build, sign, notarize, publish
-
-`--notes` takes the notes **text**, not a path — pass the file through `cat`
-or the literal filename becomes the release body:
+## 4. Build, sign, notarize
 
 ```bash
-scripts/build_release.sh --auto-release --notes "$(cat notes.md)"          # stable
-scripts/build_release.sh --beta --auto-release --notes "$(cat notes.md)"   # beta (published as prerelease)
+scripts/build_release.sh --clean          # stable
+scripts/build_release.sh --beta --clean   # beta
 ```
 
-Step 0 is `scripts/release_quality_gate.sh`: a Release-configuration compile
-that fails on high-risk concurrency/Sendable warnings, plus (stable only) the
-localization audit — fix the reported issue, don't bypass the gate; it exists
-so a known-bad build never burns an archive + notarization slot. Signing
-needs the `Developer ID Application: Artur Rok (N529W98U62)` certificate and
-the `BetterCmdTabNotarization` notarytool profile. Without them use
-`--skip-notarization` (dev build only — it refuses `--auto-release`).
+The first step is `scripts/release_quality_gate.sh`: a Release-configuration
+compile that fails on high-risk concurrency/Sendable warnings, plus (stable
+only) the localization audit — fix the reported issue, don't bypass the gate.
+Every build signs with the
+`Developer ID Application: DongHyeon Kang (GGR9HG6DB8)` certificate, so it must
+be installed even for test packages. Notarization also needs the
+`StayTabNotarization` notarytool profile; without it use `--skip-notarization`
+(local test package only — it refuses `--auto-release`).
 
-Artifacts land in `build/release/`. Each build stamps a fresh
-`CURRENT_PROJECT_VERSION` (app target only); `--skip-build-bump` disables
-that.
+Artifacts land in `build/release/`. Each build stamps a timestamp
+`CURRENT_PROJECT_VERSION` into the archive without editing the project
+(`--build-number` overrides it). Install the DMG and check it by hand before
+publishing.
 
-## 5. If publishing manually
+## 5. Publish
 
-When not using `--auto-release`:
+Publishing is outward-facing: confirm with the user first.
 
 ```bash
-gh release create <tag> -R rokartur/BetterCmdTab \
-  --title "BetterCmdTab <version>" --notes-file notes.md   # add --prerelease for betas
+scripts/build_release.sh --skip-build --auto-release --notes-file notes.md          # stable
+scripts/build_release.sh --beta --skip-build --auto-release --notes-file notes.md   # beta (prerelease)
 ```
 
-**Complete when:** the GitHub release exists with the notarized artifacts
-attached and the notes match the release-changelog format.
+This reuses the verified package, requires the `BETTERUPDATER_PRIVATE_KEY`
+Actions secret, and creates the `v…` tag and GitHub Release on
+`kang1027/StayTab`. It never commits or pushes. `sign-release.yml` then
+attaches the signed BetterUpdater manifest, and for stable releases
+`update-homebrew-cask.yml` refreshes `Casks/staytab.rb`.
+
+**Complete when:** the GitHub release exists with the notarized DMG/ZIP and the
+BetterUpdater manifest attached, and the notes match the changelog format.

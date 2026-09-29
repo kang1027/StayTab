@@ -2,7 +2,7 @@
 #
 # set_version.sh — Set StayTab's marketing version (CFBundleShortVersionString).
 #
-# Updates MARKETING_VERSION for the BetterCmdTab app target in project.pbxproj.
+# Updates MARKETING_VERSION for the StayTab app target in project.pbxproj.
 # The test target keeps its own version untouched.
 #
 # Usage:
@@ -22,8 +22,8 @@ set -euo pipefail
 
 # ─── Configuration ───────────────────────────────────────────────────────────
 
-APP_NAME="BetterCmdTab"
-SCHEME="BetterCmdTab"
+APP_NAME="StayTab"
+SCHEME="StayTab"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_PATH="${REPO_ROOT}/${APP_NAME}.xcodeproj"

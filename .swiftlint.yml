@@ -2,13 +2,11 @@
 # Rules that only ever fire on code we write this way on purpose are off, reason inline.
 
 included:
-  - BetterCmdTab
-  - BetterCmdTabTests
+  - StayTab
+  - StayTabTests
 
 excluded:
   - build
-  - web
-  - docs
 
 disabled_rules:
   - trailing_comma # multi-line literals keep the trailing comma: one-line diffs when a case is added

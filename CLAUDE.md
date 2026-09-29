@@ -1,7 +1,11 @@
 ## Product
 
-The shipped app is **StayTab**. The Xcode project, schemes, source module, and some
-upstream compatibility identifiers intentionally retain the BetterCmdTab name.
+The shipped app is **StayTab**, a modified distribution of BetterCmdTab by @rokartur.
+The Xcode project, schemes, source folders, and Swift module are all named StayTab. The
+BetterCmdTab name stays only where it is deliberate: the GPL attribution (`NOTICE.md`,
+About pane, copyright string, README credits), the legacy settings UTI
+`pro.bettercmdtab.settings` that old BetterCmdTab `.cmdtab` exports still carry, and
+comments, migrations, or test fixtures that describe what came from upstream.
 StayTab's defining behavior is a persistent app-level ⌘Tab roster: pinned apps remain
 visible and launchable after quitting, while unpinned apps appear only while running.
 
@@ -17,21 +21,21 @@ works. When two designs are equally correct, ship the cheaper one.
 
 Xcode 26+ and the macOS 26 SDK are required (Liquid Glass paths are SDK-gated; deployment
 target is macOS 13.0, which falls back to `NSVisualEffectView` at runtime). Two schemes
-exist: `BetterCmdTab Debug` and `BetterCmdTab`.
+exist: `StayTab Debug` and `StayTab`.
 
 ```bash
 # Build
-xcodebuild -scheme "BetterCmdTab Debug" -configuration Debug build
-xcodebuild -scheme "BetterCmdTab" -configuration Release build   # ships Liquid Glass
+xcodebuild -scheme "StayTab Debug" -configuration Debug build
+xcodebuild -scheme "StayTab" -configuration Release build   # ships Liquid Glass
 
 # Test (whole suite)
-xcodebuild -scheme "BetterCmdTab Debug" -destination 'platform=macOS' test
+xcodebuild -scheme "StayTab Debug" -destination 'platform=macOS' test
 
 # Single test class / method
-xcodebuild -scheme "BetterCmdTab Debug" -destination 'platform=macOS' \
-  test -only-testing:BetterCmdTabTests/FuzzyMatchTests
-xcodebuild -scheme "BetterCmdTab Debug" -destination 'platform=macOS' \
-  test -only-testing:BetterCmdTabTests/FuzzyMatchTests/noMatch
+xcodebuild -scheme "StayTab Debug" -destination 'platform=macOS' \
+  test -only-testing:StayTabTests/FuzzyMatchTests
+xcodebuild -scheme "StayTab Debug" -destination 'platform=macOS' \
+  test -only-testing:StayTabTests/FuzzyMatchTests/noMatch
 ```
 
 Tests use **Swift Testing** (`import Testing`, `@Suite`/`@Test`), not XCTest — there are
@@ -141,17 +145,17 @@ Data + control flow on the ⌘Tab hot path:
   `.cmdtab` envelope (`schemaVersion`, UTI `pro.bettercmdtab.settings`). Import is partial
   (absent keys keep their current value) and calls `reloadFromDefaults()` to refresh live
   subscribers. `App/ConfigFile.swift` two-way-syncs the same flat format with
-  `~/.config/bettercmdtab/config.json` (`$XDG_CONFIG_HOME` honored) when that file exists —
+  `~/.config/staytab/config.json` (`$XDG_CONFIG_HOME` honored) when that file exists —
   event-driven watcher + debounced write-back, dormant when absent (#117). It also writes a
   sidecar `schema.json` (referenced by the config's `$schema` key) generated from the live
   snapshot — types only, open-ended, so a new preference needs no schema edit.
 - **Localization** — user-facing strings use `String(localized: "…")` and live in the
-  version-controlled `BetterCmdTab/Localizable.xcstrings` (native Xcode string catalog,
+  version-controlled `StayTab/Localizable.xcstrings` (native Xcode string catalog,
   macOS 13+). Enum display names (layout mode, accent, etc.) are localized too.
 
 ## Running locally
 
-Run the `BetterCmdTab Debug` scheme from Xcode. The app is `.accessory` — no Dock icon, it
+Run the `StayTab Debug` scheme from Xcode. The app is `.accessory` — no Dock icon, it
 lives in the menu bar. On first launch grant **Accessibility** under System Settings →
 Privacy & Security → Accessibility, then quit/relaunch (or wait for `AccessibilityWaiter`
 to pick it up). Without that permission the switcher never boots and ⌘Tab does nothing.
@@ -167,9 +171,3 @@ to pick it up). Without that permission the switcher never boots and ⌘Tab does
 - Commits: `type: short summary` (`fix:`/`feat:`/`perf:`/`refactor:`/`docs:`/`chore:`),
   body wrapped ~72 chars explaining *why*. One logical change per PR.
 - New pure-logic behavior ships with at least one test.
-
-## web/ and docs/
-
-These directories are inherited BetterCmdTab website sources and are not part of StayTab's
-release pipeline. Their GitHub Pages workflows are intentionally disabled. Do not publish them
-under the StayTab repository without a separate branding, attribution, and URL review.

@@ -13,24 +13,24 @@ Thanks for taking the time to contribute. Issues and pull requests are both welc
 
 The codebase is small. Read these first:
 
-- `BetterCmdTab/Input/HotkeyTap.swift` — global event tap, runs on its own thread
-- `BetterCmdTab/Switcher/SwitcherController.swift` — switcher state machine
-- `BetterCmdTab/Switcher/SwitcherView.swift` — list and grid layout
-- `BetterCmdTab/Switcher/SwitcherPanel.swift` — non-activating panel + active-state pinning
-- `BetterCmdTab/Catalog/AppCatalog.swift` — AX-based app + window enumeration
-- `BetterCmdTab/Catalog/AppCatalogCache.swift` — incremental cache, observers, MRU bumps
-- `BetterCmdTab/Windows/Activator.swift` — activation, raise, close, hide, quit
-- `BetterCmdTab/Windows/MRUTracker.swift` — most-recently-used app ordering
-- `BetterCmdTab/Settings/` — native AppKit Settings window
-- `BetterCmdTab/Updater/` — GitHub Releases updater and update window
-- `BetterCmdTab/System/PrivateAPIs.swift` — private CGS / SkyLight glue, isolated for review
+- `StayTab/Input/HotkeyTap.swift` — global event tap, runs on its own thread
+- `StayTab/Switcher/SwitcherController.swift` — switcher state machine
+- `StayTab/Switcher/SwitcherView.swift` — list and grid layout
+- `StayTab/Switcher/SwitcherPanel.swift` — non-activating panel + active-state pinning
+- `StayTab/Catalog/AppCatalog.swift` — AX-based app + window enumeration
+- `StayTab/Catalog/AppCatalogCache.swift` — incremental cache, observers, MRU bumps
+- `StayTab/Windows/Activator.swift` — activation, raise, close, hide, quit
+- `StayTab/Windows/MRUTracker.swift` — most-recently-used app ordering
+- `StayTab/Settings/` — native AppKit Settings window
+- `StayTab/App/AppDelegate.swift` — launch wiring, including the BetterUpdater package that runs the GitHub Releases updater and update window
+- `StayTab/System/PrivateAPIs.swift` — private CGS / SkyLight glue, isolated for review
 
 ## Building
 
 ```bash
 git clone https://github.com/kang1027/StayTab.git
 cd StayTab
-xcodebuild -project BetterCmdTab.xcodeproj -scheme "BetterCmdTab Debug" -configuration Debug CODE_SIGNING_ALLOWED=NO build
+xcodebuild -project StayTab.xcodeproj -scheme "StayTab Debug" -configuration Debug CODE_SIGNING_ALLOWED=NO build
 ```
 
 You need Xcode 26+ and the macOS 26 SDK installed. The deployment target remains macOS 13; Liquid Glass is runtime-gated and older systems use `NSVisualEffectView`.
@@ -38,10 +38,10 @@ You need Xcode 26+ and the macOS 26 SDK installed. The deployment target remains
 ## Running tests
 
 ```bash
-xcodebuild -project BetterCmdTab.xcodeproj -scheme "BetterCmdTab Debug" -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO test
+xcodebuild -project StayTab.xcodeproj -scheme "StayTab Debug" -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO test
 ```
 
-Tests live under `BetterCmdTabTests/`. They cover pure logic — switcher metrics, row labelling, updater parsing, Liquid Glass selection — plus a small AppKit-hosted set (`TabStripWindowingTests`, `SwitcherReflowTests`) that needs a live WindowServer and macOS Reduce Motion off. The rest of the UI is verified manually because the switcher needs Accessibility permissions.
+Tests live under `StayTabTests/`. They cover pure logic — switcher metrics, row labelling, updater parsing, Liquid Glass selection — plus a small AppKit-hosted set (`TabStripWindowingTests`, `SwitcherReflowTests`) that needs a live WindowServer and macOS Reduce Motion off. The rest of the UI is verified manually because the switcher needs Accessibility permissions.
 
 ## Pull request checklist
 

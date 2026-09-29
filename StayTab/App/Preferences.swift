@@ -1,0 +1,2496 @@
+import AppKit
+import Combine
+import Foundation
+
+enum SwitcherLayoutMode: String, CaseIterable {
+    case list
+    case gridView = "iconDock"
+    case windowPreview
+
+    var displayName: String {
+        switch self {
+        case .list: return String(localized: "List")
+        case .gridView: return String(localized: "Grid View")
+        case .windowPreview: return String(localized: "Previews")
+        }
+    }
+
+    /// True for the 2-D tile layouts (grid + previews), which share the same
+    /// spatial up/down/left/right navigation, as opposed to the linear list.
+    var isGridLike: Bool {
+        switch self {
+        case .gridView, .windowPreview: return true
+        case .list: return false
+        }
+    }
+}
+
+/// Where the title (app icon + window title pair) sits under each
+/// window-preview tile (#72). The pair stays tight together; this only moves it
+/// to the leading edge, the centre (default), or the trailing edge of the tile.
+enum PreviewTitleAlignment: String, CaseIterable {
+    case leading
+    case center
+    case trailing
+
+    var displayName: String {
+        switch self {
+        case .leading: return String(localized: "Left")
+        case .center: return String(localized: "Center")
+        case .trailing: return String(localized: "Right")
+        }
+    }
+}
+
+/// Which part of a long title is elided with an ellipsis (#90). Users with
+/// meaningful info at both ends of a title (URLs, project paths) can move the
+/// ellipsis; default `.tail` keeps the historical truncate-at-end behavior.
+/// Raw values mirror `NSLineBreakMode` semantics and are frozen on release.
+enum TitleTruncationMode: String, CaseIterable {
+    case head
+    case middle
+    case tail
+
+    var displayName: String {
+        switch self {
+        case .head: return String(localized: "Beginning")
+        case .middle: return String(localized: "Middle")
+        case .tail: return String(localized: "End")
+        }
+    }
+
+    var lineBreakMode: NSLineBreakMode {
+        switch self {
+        case .head: return .byTruncatingHead
+        case .middle: return .byTruncatingMiddle
+        case .tail: return .byTruncatingTail
+        }
+    }
+}
+
+/// Which display the switcher panel opens on (#22).
+enum SwitcherDisplayMode: String, CaseIterable {
+    /// Screen under the mouse pointer. Default — matches pre-#22 behavior.
+    case mouseCursor
+    /// Monitor the user is working on. Which signal answers that depends on the
+    /// "Displays have separate Spaces" setting, so `ScreenSelection.CaptureNeed`
+    /// picks one per open: with it ON the bright-menu-bar display is authoritative
+    /// (and right even on a bare desktop); with it OFF there is a single menu bar
+    /// for the whole arrangement, living on the main display, so only the frontmost
+    /// app's own window geometry distinguishes displays at all.
+    ///
+    /// Raw value stays `activeWindow` from #22 — stored preferences and
+    /// `config.json` files keep working.
+    case activeWindow
+    /// "Main display" from System Settings → Displays (the origin-zero screen).
+    case mainDisplay
+
+    var displayName: String {
+        switch self {
+        case .mouseCursor:  return String(localized: "Monitor with the cursor")
+        case .activeWindow: return String(localized: "Monitor with the active app")
+        case .mainDisplay:  return String(localized: "Main display")
+        }
+    }
+}
+
+/// What keeps the switcher open once fuzzy-search has been activated with `/`.
+enum SearchDismissMode: String, CaseIterable {
+    /// Keep holding the switcher modifier (⌘); releasing it commits the
+    /// selection. Matches the non-search behavior. (Default.)
+    case holdModifier
+    /// After `/`, the switcher stays open even when ⌘ is released, until the
+    /// user picks a row with Return or the mouse.
+    case stayOpen
+
+    var displayName: String {
+        switch self {
+        case .holdModifier: return String(localized: "Hold ⌘")
+        case .stayOpen: return String(localized: "Stay open until I choose")
+        }
+    }
+}
+
+/// Background material for the switcher panel (the blur behind the rows). Maps to
+/// an `NSVisualEffectView.Material`; the macOS 26 glass backdrop ignores it.
+enum BackdropMaterial: String, CaseIterable {
+    case hud
+    case sidebar
+    case menu
+    case popover
+    case fullScreen
+    case underWindow
+
+    var displayName: String {
+        switch self {
+        case .hud: return String(localized: "HUD (default)")
+        case .sidebar: return String(localized: "Sidebar")
+        case .menu: return String(localized: "Menu")
+        case .popover: return String(localized: "Popover")
+        case .fullScreen: return String(localized: "Full Screen")
+        case .underWindow: return String(localized: "Under Window")
+        }
+    }
+
+    var material: NSVisualEffectView.Material {
+        switch self {
+        case .hud: return .hudWindow
+        case .sidebar: return .sidebar
+        case .menu: return .menu
+        case .popover: return .popover
+        case .fullScreen: return .fullScreenUI
+        case .underWindow: return .underWindowBackground
+        }
+    }
+}
+
+/// Order the switcher lists apps/windows in. `.mru` is the default (most
+/// recently used first, the classic ⌘Tab behavior); the others give a stable
+/// ordering that doesn't reshuffle as you switch. Read off the main actor by
+/// `CatalogFilter`, so the raw value is stored in the shared UserDefaults key.
+enum SwitcherSortOrder: String, CaseIterable {
+    /// Most-recently-used first, with the usual status buckets. Default.
+    case mru
+    /// Flat cross-app window recency — each window ordered by when it was last
+    /// focused, regardless of app, so windows of different apps interleave.
+    /// Sorted in `SwitcherController` from `WindowMRUTracker`'s global order.
+    case mruWindows
+    /// Apps A→Z by name; an app's windows stay grouped together.
+    case alphabetical
+    /// By launch order — oldest running process first.
+    case launchOrder
+
+    var displayName: String {
+        switch self {
+        case .mru: return String(localized: "Most recent")
+        case .mruWindows: return String(localized: "Most recent (windows)")
+        case .alphabetical: return String(localized: "Alphabetical")
+        case .launchOrder: return String(localized: "Launch order")
+        }
+    }
+
+    /// Sorts whose list order is independent of recency: the frontmost app is
+    /// not at index 0, so the first primed ⌘Tab step must anchor on its
+    /// position instead of the list head (#88). MRU sorts return false — the
+    /// frontmost app already leads the list after `mru.syncFrontmost()`, and
+    /// `.mruWindows` steps by `primedStepDelta` over windows, not apps.
+    /// Exhaustive on purpose: a new sort case must consciously pick a side.
+    var anchorsPrimedOnFrontmost: Bool {
+        switch self {
+        case .alphabetical, .launchOrder: return true
+        case .mru, .mruWindows: return false
+        }
+    }
+}
+
+/// Which Spaces the switcher shows windows from (#57). Raw values are
+/// persisted under `Keys.spaceScope`, so don't rename cases. Supersedes the
+/// legacy `Keys.currentSpaceOnly` bool, which is kept in sync for older
+/// builds/exports and used as the fallback when the new key is absent.
+enum SpaceScope: String, CaseIterable, Sendable {
+    /// Every window on every Space (default — classic ⌘Tab).
+    case allSpaces
+    /// Only windows on the single Space that has keyboard focus.
+    case currentSpace
+    /// Windows on every Space currently on screen — the active Space of each
+    /// display (#57, multi-monitor "what I can see").
+    case visibleSpaces
+
+    var displayName: String {
+        switch self {
+        case .allSpaces: return String(localized: "All Spaces")
+        case .currentSpace: return String(localized: "Current Space")
+        case .visibleSpaces: return String(localized: "Visible Spaces")
+        }
+    }
+}
+
+/// The subset of windows a scoped custom shortcut opens the switcher onto.
+/// Each user-defined scoped shortcut (Shortcuts settings) carries one of these;
+/// triggering it opens the switcher already filtered to that subset instead of
+/// the full app list. Raw values are persisted, so don't rename cases.
+enum SwitchScope: String, CaseIterable {
+    /// Every open window of every app, flat (one row per window), across Spaces.
+    case allAppsAllSpaces
+    /// Every app's windows, but only those on the Space you're viewing.
+    case allAppsCurrentSpace
+    /// Just the windows of the app that was frontmost when you triggered it.
+    case currentAppWindows
+    /// Only minimized windows, from every app.
+    case minimizedOnly
+
+    var displayName: String {
+        switch self {
+        case .allAppsAllSpaces: return String(localized: "All windows")
+        case .allAppsCurrentSpace: return String(localized: "Windows on this Space")
+        case .currentAppWindows: return String(localized: "Current app's windows")
+        case .minimizedOnly: return String(localized: "Minimized windows")
+        }
+    }
+}
+
+/// Per-shortcut override of the Space-scope behavioral option (#74). A shortcut
+/// can force any concrete `SpaceScope` or inherit the global `spaceScope`
+/// preference. Stored as a raw string on `ShortcutOverride` — don't rename cases.
+enum SpaceScopeOverride: String, CaseIterable, Sendable {
+    /// Use the global `spaceScope` preference. (Default.)
+    case inherit
+    /// Force the shortcut to only show windows on the current Space.
+    case currentSpace
+    /// Force the shortcut to show windows across all Spaces.
+    case allSpaces
+    /// Force the shortcut to show windows on every visible Space (#57).
+    case visibleSpaces
+
+    /// The concrete scope, or `nil` when inheriting the global.
+    var resolvedScope: SpaceScope? {
+        switch self {
+        case .inherit: return nil
+        case .currentSpace: return .currentSpace
+        case .allSpaces: return .allSpaces
+        case .visibleSpaces: return .visibleSpaces
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .inherit: return String(localized: "Use global default")
+        case .currentSpace: return String(localized: "This Space only")
+        case .allSpaces: return String(localized: "All Spaces")
+        case .visibleSpaces: return String(localized: "Visible Spaces")
+        }
+    }
+}
+
+/// Identifies which panel-opening shortcut a `ShortcutOverride` belongs to (#74).
+/// The `storageKey` strings are the persisted contract — never rename them.
+enum SwitchTarget: Hashable, Sendable {
+    case switchApps
+    case switchWindows
+    /// Scoped-shortcut entry, keyed by its stable `ScopedShortcut.id` (monotonic,
+    /// never reused — not a positional slot, so it survives add/remove/reorder).
+    case scoped(Int)
+
+    var storageKey: String {
+        switch self {
+        case .switchApps: return "switchApps"
+        case .switchWindows: return "switchWindows"
+        case .scoped(let i): return "scoped.\(i)"
+        }
+    }
+
+    /// Parse a stored key back into a target. Any non-negative scoped id is valid
+    /// (the list is dynamic); a negative/malformed id is rejected.
+    init?(storageKey: String) {
+        switch storageKey {
+        case "switchApps": self = .switchApps
+        case "switchWindows": self = .switchWindows
+        default:
+            guard storageKey.hasPrefix("scoped."),
+                  let i = Int(storageKey.dropFirst("scoped.".count)),
+                  i >= 0 else { return nil }
+            self = .scoped(i)
+        }
+    }
+}
+
+/// One user-created scoped-switch shortcut (#74): a dynamic, add/remove list
+/// entry (AltTab-style) replacing the old fixed 3 slots. `id` is stable and
+/// monotonic — it keys the entry's per-shortcut override (`SwitchTarget.scoped`)
+/// and its recorded trigger, so removing an entry never disturbs the others.
+/// `shortcutName` is the `BetterShortcuts.Name` raw value the trigger is recorded
+/// under (migrated entries keep the legacy `scopedSwitch1…` names; new entries
+/// use `scopedSwitch.<id>`). Persisted as a plist `[String: String]`.
+struct ScopedShortcut: Equatable, Sendable {
+    var id: Int
+    var scope: SwitchScope
+    var shortcutName: String
+
+    init(id: Int, scope: SwitchScope = .allAppsAllSpaces, shortcutName: String) {
+        self.id = id
+        self.scope = scope
+        self.shortcutName = shortcutName
+    }
+
+    var dictionary: [String: String] {
+        ["id": String(id), "scope": scope.rawValue, "name": shortcutName]
+    }
+
+    init?(dictionary: [String: String]) {
+        guard let idStr = dictionary["id"], let id = Int(idStr), id >= 0,
+              let name = dictionary["name"], !name.isEmpty else { return nil }
+        self.id = id
+        self.scope = dictionary["scope"].flatMap(SwitchScope.init(rawValue:)) ?? .allAppsAllSpaces
+        self.shortcutName = name
+    }
+}
+
+/// A per-shortcut override of the switcher's behavioral + appearance options
+/// (#74). Every field is optional (`spaceScope` uses its own `.inherit` case):
+/// an unset field means "inherit the global preference", so an all-unset
+/// override is a no-op. Persisted as a plist `[String: String]` dictionary —
+/// like `AppException` — so it survives the generic `Switcher.*` settings
+/// export/import (a JSON `Data` blob would be dropped by the portability gates).
+struct ShortcutOverride: Equatable, Sendable {
+    // Behavioral (resolved into `CatalogFilter.Config` + reveal-time reads).
+    var spaceScope: SpaceScopeOverride = .inherit
+    var showMinimized: Bool?
+    var showHidden: Bool?
+    var showWindowless: Bool?
+    var sortOrder: SwitcherSortOrder?
+    var applicationsOnly: Bool?
+    var expandBrowserTabsAsWindows: Bool?
+    var stayOpenOnRelease: Bool?
+    var stayOpenOnQuickTap: Bool?
+    // Appearance (resolved into `EffectiveSettings`).
+    var layoutMode: SwitcherLayoutMode?
+    var panelScalePercent: Int?
+    var panelAppearance: PanelAppearance?
+    var fontScale: SwitcherFontScale?
+    var fontFace: SwitcherFontFace?
+    var gridMaxColumns: Int?
+    var listWidthPercent: Int?
+    var panelOpacity: Int?
+    var panelCornerRadius: Int?
+    var backdropMaterial: BackdropMaterial?
+    var showWindowTitleLabel: Bool?
+    var previewTitleAlignment: PreviewTitleAlignment?
+    var titleTruncationMode: TitleTruncationMode?
+    var boldSelectedLabel: Bool?
+    var showApplicationNames: Bool?
+    var showWindowStatusIcons: Bool?
+    var showUnreadBadges: Bool?
+    var letterHintsEnabled: Bool?
+    /// Stored keys this build doesn't understand — from a newer version or a
+    /// removed feature (e.g. the retired accent override). Carried through
+    /// encode/decode verbatim so re-saving an override on this build doesn't
+    /// strip another build's data (a downgrade would otherwise lose it).
+    var passthrough: [String: String] = [:]
+
+    init() {}
+
+    /// True when no field overrides anything — resolves identically to the
+    /// global preferences, so the override can be dropped from storage.
+    var isEmpty: Bool {
+        spaceScope == .inherit && showMinimized == nil && showHidden == nil
+            && showWindowless == nil && sortOrder == nil && applicationsOnly == nil
+            && expandBrowserTabsAsWindows == nil && stayOpenOnRelease == nil
+            && stayOpenOnQuickTap == nil
+            && layoutMode == nil && panelScalePercent == nil && panelAppearance == nil
+            && fontScale == nil && fontFace == nil
+            && gridMaxColumns == nil && listWidthPercent == nil
+            && panelOpacity == nil && panelCornerRadius == nil && backdropMaterial == nil
+            && showWindowTitleLabel == nil && previewTitleAlignment == nil
+            && titleTruncationMode == nil
+            && boldSelectedLabel == nil && showApplicationNames == nil
+            && showWindowStatusIcons == nil
+            && showUnreadBadges == nil && letterHintsEnabled == nil
+            && passthrough.isEmpty
+    }
+
+    /// Plist-friendly representation: only *set* fields are emitted, so an absent
+    /// key reads back as "inherit". Bools become `"true"`/`"false"`, ints their
+    /// decimal string, enums their raw value.
+    var dictionary: [String: String] {
+        var d = passthrough
+        func put(_ key: String, _ value: Bool?) { if let value { d[key] = value ? "true" : "false" } }
+        func put(_ key: String, _ value: Int?) { if let value { d[key] = String(value) } }
+        if spaceScope != .inherit { d["spaceScope"] = spaceScope.rawValue }
+        put("showMinimized", showMinimized)
+        put("showHidden", showHidden)
+        put("showWindowless", showWindowless)
+        if let sortOrder { d["sortOrder"] = sortOrder.rawValue }
+        put("applicationsOnly", applicationsOnly)
+        put("expandBrowserTabsAsWindows", expandBrowserTabsAsWindows)
+        put("stayOpenOnRelease", stayOpenOnRelease)
+        put("stayOpenOnQuickTap", stayOpenOnQuickTap)
+        if let layoutMode { d["layoutMode"] = layoutMode.rawValue }
+        put("panelScalePercent", panelScalePercent.map(Preferences.clampPanelScalePercent))
+        if let panelAppearance { d["panelAppearance"] = panelAppearance.rawValue }
+        if let fontScale { d["fontScale"] = fontScale.rawValue }
+        if let fontFace { d["fontFace"] = fontFace.rawValue }
+        put("gridMaxColumns", gridMaxColumns)
+        put("listWidthPercent", listWidthPercent.map(Preferences.clampListWidthPercent))
+        put("panelOpacity", panelOpacity)
+        put("panelCornerRadius", panelCornerRadius)
+        if let backdropMaterial { d["backdropMaterial"] = backdropMaterial.rawValue }
+        put("showWindowTitleLabel", showWindowTitleLabel)
+        if let previewTitleAlignment { d["previewTitleAlignment"] = previewTitleAlignment.rawValue }
+        if let titleTruncationMode { d["titleTruncationMode"] = titleTruncationMode.rawValue }
+        put("boldSelectedLabel", boldSelectedLabel)
+        put("showApplicationNames", showApplicationNames)
+        put("showWindowStatusIcons", showWindowStatusIcons)
+        put("showUnreadBadges", showUnreadBadges)
+        put("letterHintsEnabled", letterHintsEnabled)
+        return d
+    }
+
+    /// Every key this build reads or writes, plus the `"target"` envelope key
+    /// stamped by `Preferences.encodeShortcutOverrides`. Anything else in a
+    /// stored entry lands in `passthrough`.
+    private static let knownKeys: Set<String> = [
+        "target",
+        "spaceScope", "showMinimized", "showHidden", "showWindowless", "sortOrder",
+        "applicationsOnly", "expandBrowserTabsAsWindows", "stayOpenOnRelease",
+        "stayOpenOnQuickTap", "layoutMode", "panelSize", "panelScalePercent",
+        "panelAppearance", "fontScale", "fontFace",
+        "gridMaxColumns", "listWidthPercent", "panelOpacity", "panelCornerRadius", "backdropMaterial",
+        "showWindowTitleLabel", "previewTitleAlignment", "titleTruncationMode",
+        "boldSelectedLabel", "showApplicationNames", "showWindowStatusIcons", "showUnreadBadges",
+        "letterHintsEnabled",
+    ]
+
+    /// Parse one stored dictionary. Unparseable values are ignored (they read
+    /// back as "inherit") and unknown keys are preserved in `passthrough`, so a
+    /// partial/forward-version entry degrades gracefully instead of being
+    /// dropped or stripped.
+    init?(dictionary: [String: String]) {
+        func bool(_ key: String) -> Bool? { dictionary[key].map { $0 == "true" } }
+        spaceScope = dictionary["spaceScope"].flatMap(SpaceScopeOverride.init(rawValue:)) ?? .inherit
+        showMinimized = bool("showMinimized")
+        showHidden = bool("showHidden")
+        showWindowless = bool("showWindowless")
+        sortOrder = dictionary["sortOrder"].flatMap(SwitcherSortOrder.init(rawValue:))
+        applicationsOnly = bool("applicationsOnly")
+        expandBrowserTabsAsWindows = bool("expandBrowserTabsAsWindows")
+        stayOpenOnRelease = bool("stayOpenOnRelease")
+        stayOpenOnQuickTap = bool("stayOpenOnQuickTap")
+        layoutMode = dictionary["layoutMode"].flatMap(SwitcherLayoutMode.init(rawValue:))
+        panelScalePercent = dictionary["panelScalePercent"].flatMap(Int.init)
+            .map(Preferences.clampPanelScalePercent)
+            ?? dictionary["panelSize"].flatMap(Preferences.legacyPanelScalePercent)
+        panelAppearance = dictionary["panelAppearance"].flatMap(PanelAppearance.init(rawValue:))
+        fontScale = dictionary["fontScale"].flatMap(SwitcherFontScale.init(rawValue:))
+        fontFace = dictionary["fontFace"].flatMap(SwitcherFontFace.init(rawValue:))
+        gridMaxColumns = dictionary["gridMaxColumns"].flatMap(Int.init)
+        listWidthPercent = dictionary["listWidthPercent"].flatMap(Int.init)
+            .map(Preferences.clampListWidthPercent)
+        panelOpacity = dictionary["panelOpacity"].flatMap(Int.init)
+        panelCornerRadius = dictionary["panelCornerRadius"].flatMap(Int.init)
+        backdropMaterial = dictionary["backdropMaterial"].flatMap(BackdropMaterial.init(rawValue:))
+        showWindowTitleLabel = bool("showWindowTitleLabel")
+        previewTitleAlignment = dictionary["previewTitleAlignment"].flatMap(PreviewTitleAlignment.init(rawValue:))
+        titleTruncationMode = dictionary["titleTruncationMode"].flatMap(TitleTruncationMode.init(rawValue:))
+        boldSelectedLabel = bool("boldSelectedLabel")
+        showApplicationNames = bool("showApplicationNames")
+        showWindowStatusIcons = bool("showWindowStatusIcons")
+        showUnreadBadges = bool("showUnreadBadges")
+        letterHintsEnabled = bool("letterHintsEnabled")
+        passthrough = dictionary.filter { !Self.knownKeys.contains($0.key) }
+    }
+}
+
+/// What a three-finger horizontal trackpad swipe does (when the experimental
+/// swipe trigger is enabled).
+enum SwipeMode: String, CaseIterable {
+    /// Open the switcher and scrub through apps (the original behavior).
+    case openSwitcher
+    /// Switch to the Space on the left/right, one per swipe step.
+    case switchSpaces
+    /// Flip to the previously-used app — one swipe acts like a quick ⌘Tab
+    /// tap-and-release. Repeated swipes bounce between the two most recent apps.
+    case quickSwitch
+
+    var displayName: String {
+        switch self {
+        case .openSwitcher: return String(localized: "Open switcher")
+        case .switchSpaces: return String(localized: "Switch Spaces")
+        case .quickSwitch: return String(localized: "Quick switch (last 2 apps)")
+        }
+    }
+}
+
+/// Light/dark appearance applied to the switcher independently of the rest of
+/// macOS. `.system` leaves AppKit appearance inheritance untouched.
+enum PanelAppearance: String, CaseIterable, Sendable {
+    case system
+    case light
+    case dark
+
+    var displayName: String {
+        switch self {
+        case .system: return String(localized: "System")
+        case .light: return String(localized: "Light")
+        case .dark: return String(localized: "Dark")
+        }
+    }
+}
+
+/// Multiplier applied to the switcher's name/title text only, independent of
+/// the panel scale (#62). Lets users shrink (or grow) just the text while icons,
+/// tiles, and spacing keep following `panelScalePercent`.
+enum SwitcherFontScale: String, CaseIterable, Sendable {
+    case extraSmall
+    case small
+    case standard
+    case large
+    case extraLarge
+
+    var multiplier: CGFloat {
+        switch self {
+        case .extraSmall: return 0.7
+        case .small: return 0.85
+        case .standard: return 1.0
+        case .large: return 1.15
+        case .extraLarge: return 1.3
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .extraSmall: return String(localized: "Extra small")
+        case .small: return String(localized: "Small")
+        case .standard: return String(localized: "Default")
+        case .large: return String(localized: "Large")
+        case .extraLarge: return String(localized: "Extra large")
+        }
+    }
+}
+
+/// Typeface for the switcher's name/title text (#62), expressed as a system
+/// font design so every weight/size stays available and nothing ships a font.
+/// Jump letters and count badges keep their dedicated system/monospaced fonts.
+enum SwitcherFontFace: String, CaseIterable, Sendable {
+    case system
+    case rounded
+    case serif
+    case monospaced
+
+    var systemDesign: NSFontDescriptor.SystemDesign {
+        switch self {
+        case .system: return .default
+        case .rounded: return .rounded
+        case .serif: return .serif
+        case .monospaced: return .monospaced
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .system: return String(localized: "System")
+        case .rounded: return String(localized: "Rounded")
+        case .serif: return String(localized: "Serif")
+        case .monospaced: return String(localized: "Monospaced")
+        }
+    }
+}
+
+/// Per-app override for whether the app's windows appear in the switcher.
+/// Lives on an `AppException`; an app with no exception uses the global
+/// Contents toggles unchanged.
+enum HideWindowsMode: String, CaseIterable, Sendable {
+    /// The exception adds no hiding — the global Contents toggles still apply.
+    /// (Default for a freshly added exception.)
+    case dontHide
+    /// Always hide this app from the switcher entirely (the old "Excluded apps").
+    case always
+    /// Hide this app only while it has no open windows (suppress its windowless
+    /// row) regardless of the global "show apps without windows" toggle.
+    case whenNoWindows
+
+    var displayName: String {
+        switch self {
+        case .dontHide: return String(localized: "Don't hide")
+        case .always: return String(localized: "Always")
+        case .whenNoWindows: return String(localized: "When no open windows")
+        }
+    }
+}
+
+/// Per-app override for whether the switcher trigger (⌘Tab / ⌘`) is suppressed
+/// while this app is frontmost, letting the chord pass straight through to the
+/// app (e.g. a VM / remote-desktop window that wants its own ⌘Tab).
+enum IgnoreShortcutsMode: String, CaseIterable, Sendable {
+    /// The switcher trigger always works. (Default.)
+    case never
+    /// Pass the trigger chord through whenever this app is frontmost.
+    case always
+    /// Pass the trigger chord through only when this app is frontmost and its
+    /// focused window is full screen.
+    case whenFullscreen
+
+    var displayName: String {
+        switch self {
+        case .never: return String(localized: "Never")
+        case .always: return String(localized: "Always")
+        case .whenFullscreen: return String(localized: "When fullscreen")
+        }
+    }
+}
+
+/// A per-app entry in the switcher's Exceptions list, identified by bundle ID.
+/// Carries the hide-windows and ignore-shortcuts overrides shown in the
+/// Exceptions editor. Persisted as a `[String: String]` dictionary so both the
+/// main-actor `Preferences` and the off-main `CatalogFilter` can read it.
+struct AppException: Equatable, Sendable {
+    var bundleID: String
+    var hide: HideWindowsMode
+    var ignore: IgnoreShortcutsMode
+
+    init(bundleID: String, hide: HideWindowsMode = .dontHide, ignore: IgnoreShortcutsMode = .never) {
+        self.bundleID = bundleID
+        self.hide = hide
+        self.ignore = ignore
+    }
+
+    /// Plist-friendly representation for UserDefaults.
+    var dictionary: [String: String] {
+        ["bundleID": bundleID, "hide": hide.rawValue, "ignore": ignore.rawValue]
+    }
+
+    /// Parse one stored dictionary. Missing/unknown modes fall back to the
+    /// neutral default so a half-written entry never silently drops the app.
+    init?(dictionary: [String: String]) {
+        guard let bid = dictionary["bundleID"], !bid.isEmpty else { return nil }
+        self.bundleID = bid
+        self.hide = dictionary["hide"].flatMap(HideWindowsMode.init) ?? .dontHide
+        self.ignore = dictionary["ignore"].flatMap(IgnoreShortcutsMode.init) ?? .never
+    }
+}
+
+@MainActor
+final class Preferences: ObservableObject {
+    static let shared = Preferences()
+
+    // Trigger keys are stored by the BetterShortcuts package
+    // (see BetterShortcuts.Name.switchApps / .switchWindows), not here.
+
+    /// Seeded as a first-run App rule (show only with open windows).
+    static let finderBundleID = "com.apple.finder"
+
+    static let defaultRevealDelayMs = 0
+    nonisolated static let revealDelayRange: ClosedRange<Int> = 0...500
+
+    /// How long a partial letter-jump prefix survives before it expires and the
+    /// switcher returns to its pre-typing order. Default 1000ms.
+    static let defaultLetterChainTimeoutMs = 1000
+    nonisolated static let letterChainTimeoutRange: ClosedRange<Int> = 200...3000
+
+    /// Debounce between a window's AX title-change notification and the refresh
+    /// of the titles shown in the open switcher. Lower = titles update sooner
+    /// but a churning app (a loading page, a scrolling terminal) costs more
+    /// re-reads; higher coalesces bursts into fewer passes. Default 200ms.
+    static let defaultTitleRefreshIntervalMs = 200
+    nonisolated static let titleRefreshIntervalRange: ClosedRange<Int> = 50...2000
+
+    nonisolated static let defaultCommitSoundName = "Tink"
+
+    static let defaultSwipeSensitivity = 5
+    nonisolated static let swipeSensitivityRange: ClosedRange<Int> = 1...10
+
+    /// 100 % is the native macOS Cmd+Tab size (`SwitcherMetrics.nativeScale`),
+    /// so the panel ships matching the switcher it replaces.
+    nonisolated static let defaultPanelScalePercent = 100
+    /// Floored at 35, not 50: #170 re-based 100 % onto the native Cmd+Tab size, so a
+    /// percentage now buys 1.5× the panel it used to. Somebody who had picked the old
+    /// minimum wanted a *small* switcher, and re-basing lands them at 42 — clamped
+    /// straight back to 50 by the old floor, unable to reach their old size in the
+    /// very release that exists because the panel got too big. 35 × 1.5 / 100 = 0.525
+    /// effective scale, which is where the old 50 % sat.
+    nonisolated static let panelScalePercentRange: ClosedRange<Int> = 35...150
+    nonisolated static let panelOpacityRange: ClosedRange<Int> = 30...100
+    /// `0` means "automatic" (track the size-derived metric), `-1` pins fully
+    /// square corners (#129); above `0` the user pins an explicit radius in
+    /// points.
+    nonisolated static let panelCornerRadiusRange: ClosedRange<Int> = -1...40
+
+    /// Grid layout column cap. `0` = automatic (width-driven); above that the
+    /// user pins an explicit count. Bounded so a hand-edited/corrupted import
+    /// can't land a negative or absurd value in the live pref.
+    nonisolated static let gridMaxColumnsRange: ClosedRange<Int> = 0...12
+    /// List layout row width as a percentage of the automatic (screen-scaled)
+    /// width (#124). `100` keeps the automatic width; lower values narrow the
+    /// list without shrinking text or icons. Floored so a hand-edited/corrupted
+    /// import can't shrink rows to slivers.
+    nonisolated static let listWidthPercentRange: ClosedRange<Int> = 30...100
+    /// Upper bound on recently-closed entries surfaced in search. `0` disables.
+    nonisolated static let recentlyClosedLimitRange: ClosedRange<Int> = 0...50
+    /// Valid per-window browser-tab row caps when a limit is set (#144).
+    /// `0` (outside this range) means unlimited.
+    nonisolated static let browserTabRowLimitRange: ClosedRange<Int> = 2...16
+
+    /// Number of direct-activation hotkey slots. Each slot binds a recorded
+    /// shortcut (stored by BetterShortcuts) to a target app bundle ID.
+    nonisolated static let directActivationSlotCount = 9
+
+    /// Number of scoped-switch shortcut slots. Each slot binds a recorded
+    /// shortcut to a `SwitchScope` — triggering it opens the switcher already
+    /// filtered to that subset (all windows / current Space / current app /
+    /// minimized).
+    nonisolated static let scopedShortcutSlotCount = 3
+
+    // Internal (not private): `CatalogFilter` reads the catalog-related keys
+    // directly from `UserDefaults` off the main actor, so the key strings must
+    // be shared rather than duplicated.
+    enum Keys {
+        static let switcherLayoutMode = "Switcher.layoutMode"
+        static let sortOrder = "Switcher.sortOrder"
+        static let revealDelayMs = "Switcher.revealDelayMs"
+        static let letterChainTimeoutMs = "Switcher.letterChainTimeoutMs"
+        static let titleRefreshIntervalMs = "Switcher.titleRefreshIntervalMs"
+        static let panelSize = "Switcher.panelSize" // legacy presets
+        static let panelScalePercent = "Switcher.panelScalePercent"
+        /// Set once `panelScalePercent` (and every per-shortcut override carrying one)
+        /// has been re-based onto the #170 meaning of 100 % — the native Cmd+Tab size.
+        /// Local bookkeeping, never exported: see `preRebasePanelScales` for
+        /// how an imported payload is dated instead.
+        static let panelScaleRebased = "Switcher.panelScaleRebased"
+        static let panelAppearance = "Switcher.panelAppearance"
+        static let fontScale = "Switcher.fontScale"
+        static let fontFace = "Switcher.fontFace"
+        static let gridMaxColumns = "Switcher.gridMaxColumns"
+        static let gridSingleRow = "Switcher.gridSingleRow"
+        static let appExceptions = "Switcher.appExceptions"
+        /// Pre-Exceptions key: a plain bundle-ID array of always-hidden apps.
+        /// Read once at launch and folded into `appExceptions` (hide = .always).
+        static let legacyExcludedBundleIDs = "Switcher.excludedBundleIDs"
+        static let pinnedBundleIDs = "Switcher.pinnedBundleIDs"
+        static let appJumpLetters = "Switcher.appJumpLetters"
+        /// Bundle IDs the "Hide all windows" shortcut leaves visible.
+        static let hideAllExcludedBundleIDs = "Switcher.hideAllExcludedBundleIDs"
+        static let showMinimizedWindows = "Switcher.showMinimizedWindows"
+        static let showHiddenApps = "Switcher.showHiddenApps"
+        static let sinkHiddenApps = "Switcher.sinkHiddenApps"
+        static let sinkMinimizedWindows = "Switcher.sinkMinimizedWindows"
+        static let showWindowlessApps = "Switcher.showWindowlessApps"
+        static let applicationsOnly = "Switcher.applicationsOnly"
+        static let fuzzySearchEnabled = "Switcher.fuzzySearchEnabled"
+        static let letterHintsEnabled = "Switcher.letterHintsEnabled"
+        static let searchDismissMode = "Switcher.searchDismissMode"
+        static let stayOpenOnRelease = "Switcher.stayOpenOnRelease"
+        static let stayOpenOnQuickTap = "Switcher.stayOpenOnQuickTap"
+        static let searchIncludesLaunchableApps = "Switcher.searchIncludesLaunchableApps"
+        static let fuzzySearchRankBestMatchFirst = "Switcher.fuzzySearchRankBestMatchFirst"
+        static let searchExpandsBrowserTabs = "Switcher.searchExpandsBrowserTabs"
+        static let showRecentlyClosed = "Switcher.showRecentlyClosed"
+        static let recentlyClosedLimit = "Switcher.recentlyClosedLimit"
+        static let hapticOnCommit = "Switcher.hapticOnCommit"
+        static let soundOnCommit = "Switcher.soundOnCommit"
+        static let commitSoundName = "Switcher.commitSoundName"
+        static let customCommitSoundFilename = "Switcher.customCommitSoundFilename"
+        static let hideMenuBarIcon = "Switcher.hideMenuBarIcon"
+        static let experimentalSwipeTrigger = "Switcher.experimentalSwipeTrigger"
+        static let swipeMode = "Switcher.swipeMode"
+        static let swipeReverseDirection = "Switcher.swipeReverseDirection"
+        static let swipeCommitOnRelease = "Switcher.swipeCommitOnRelease"
+        static let swipeSensitivity = "Switcher.swipeSensitivity"
+        static let scrollToSwitch = "Switcher.scrollToSwitch"
+        static let scrollReverseDirection = "Switcher.scrollReverseDirection"
+        static let clickOutsideToDismiss = "Switcher.clickOutsideToDismiss"
+        static let cycleTileWidths = "Switcher.cycleTileWidths"
+        /// Jump to another Space / full-screen window with no slide animation.
+        /// Default off — it drives the WindowServer through private SkyLight
+        /// gesture events.
+        static let instantSpaceSwitch = "Switcher.instantSpaceSwitch"
+        /// Pre-graduation key (the instant Space switch used to live behind the
+        /// Experimental tab); read as a fallback so an earlier choice carries over.
+        static let legacyInstantSpaceSwitch = "Switcher.experimentalInstantSpaceSwitch"
+        /// Capture the active browser tab for the Previews layout. Default off —
+        /// it adds a per-trigger screen capture on top of the window shots.
+        static let browserTabPreviews = "Switcher.browserTabPreviews"
+        /// Pre-graduation key (tab previews used to live behind the Experimental
+        /// tab); read as a fallback so a user's earlier choice carries over.
+        static let legacyBrowserTabPreviews = "Switcher.experimentalBrowserTabPreviews"
+        /// Continuously refresh window-preview thumbnails while the panel is
+        /// open, so tiles show live window contents instead of a frame captured
+        /// on reveal. Default off — recurring captures cost CPU/GPU on an
+        /// otherwise idle open panel. Needs macOS 14 (ScreenCaptureKit still
+        /// image API); on macOS 13 the flag is inert.
+        static let livePreviews = "Switcher.livePreviews"
+        /// Pre-graduation key (live previews used to live behind the Experimental
+        /// tab); read as a fallback so a user's earlier choice carries over.
+        static let legacyLivePreviews = "Switcher.experimentalLivePreviews"
+        /// `\` tab drill-in (peek the highlighted window's tabs in a strip).
+        /// Graduated out of the Experimental tab in 26.x and flipped to default
+        /// ON (intentional — the `\` peek is now the standard way to reach tabs).
+        /// The pre-graduation key `Switcher.experimentalTabDrillIn` defaulted OFF
+        /// and is deliberately not migrated: everyone, including users who never
+        /// touched the old toggle, gets the peek on by default now.
+        static let tabDrillEnabled = "Switcher.tabDrillEnabled"
+        static let windowDrillEnabled = "Switcher.windowDrillEnabled"
+        /// Expand native-system-tab windows (Finder, Terminal, TextEdit, …) into
+        /// one switcher row per tab instead of a single collapsed window row.
+        /// Default off — the collapsed row + `\` peek is the default.
+        static let expandTabsAsWindows = "Switcher.expandTabsAsWindows"
+        /// Expand a browser window (Safari/Chromium) into one switcher row per
+        /// tab, surfaced inline among the other windows. Default off — the
+        /// collapsed row + `\` peek is the default. Browser tabs aren't separate
+        /// NSWindows, so the rows are built from an async Apple Events tab scan.
+        static let expandBrowserTabsAsWindows = "Switcher.expandBrowserTabsAsWindows"
+        /// Cap on how many tab rows one browser window expands to (#144).
+        /// `0` = unlimited; otherwise 2…16.
+        static let browserTabRowLimit = "Switcher.browserTabRowLimit"
+        /// Badge each expanded browser-tab row's favicon with the source
+        /// browser's app icon (#131). Default off — favicon-only stays the look.
+        static let showBrowserIconOnTabs = "Switcher.showBrowserIconOnTabs"
+        /// Track each browser tab as its own MRU entry (#39). Default off — it
+        /// needs always-on AX observation of every running browser.
+        static let browserTabMRU = "Switcher.browserTabMRU"
+        /// Pre-graduation key (tab recency used to live behind the Experimental
+        /// tab); read as a fallback so a user's earlier choice carries over.
+        static let legacyBrowserTabMRU = "Switcher.experimentalBrowserTabMRU"
+        static let showUnreadBadges = "Switcher.showUnreadBadges"
+        /// Pre-graduation key (badges used to live behind the Experimental tab);
+        /// read once at launch to carry a user's earlier choice over to the new key.
+        static let legacyUnreadBadges = "Switcher.experimentalUnreadBadges"
+        static let showWindowTitleLabel = "Switcher.showWindowTitleLabel"
+        static let showApplicationNames = "Switcher.showApplicationNames"
+        /// Show the Always / Running now text in the persistent roster's section
+        /// headers. Default on; independent from the adjacent SF Symbols.
+        static let showRosterSectionTitles = "Switcher.showRosterSectionTitles"
+        /// Show the infinity / lightning SF Symbols in the persistent roster's
+        /// section headers. Default on; independent from the adjacent text.
+        static let showRosterSectionIcons = "Switcher.showRosterSectionIcons"
+        /// Show the window-state glyphs (hidden / minimized / no window /
+        /// full-screen) at the end of each entry (#149).
+        static let showWindowStatusIcons = "Switcher.showWindowStatusIcons"
+        static let panelOpacity = "Switcher.panelOpacity"
+        static let panelCornerRadius = "Switcher.panelCornerRadius"
+        static let listWidthPercent = "Switcher.listWidthPercent"
+        static let backdropMaterial = "Switcher.backdropMaterial"
+        /// Legacy pre-#57 bool ("only current Space"). Still written (in sync
+        /// with `spaceScope`) so older builds and old exports stay coherent;
+        /// read only as the fallback when `spaceScope` is absent.
+        static let currentSpaceOnly = "Switcher.currentSpaceOnly"
+        /// `SpaceScope` raw value — which Spaces the switcher shows (#57).
+        static let spaceScope = "Switcher.spaceScope"
+        static let directActivationBindings = "Switcher.directActivationBindings"
+        static let scopedShortcutScopes = "Switcher.scopedShortcutScopes"
+        /// The dynamic scoped-switch list (#74), as `[[String: String]]` of
+        /// `ScopedShortcut.dictionary`. Supersedes the fixed `scopedShortcutScopes`
+        /// array; migrated from it on first launch of the new build.
+        static let scopedShortcutList = "Switcher.scopedShortcutList"
+        /// Monotonic counter for allocating stable `ScopedShortcut.id`s.
+        static let nextScopedShortcutID = "Switcher.nextScopedShortcutID"
+        /// Per-shortcut behavioral + appearance overrides (#74), keyed by
+        /// `SwitchTarget.storageKey`. Stored as `[[String: String]]` (each entry =
+        /// a `ShortcutOverride.dictionary` plus a `"target"` key) so the generic
+        /// `Switcher.*` settings export/import carries it untouched.
+        static let shortcutOverrides = "Switcher.shortcutOverrides"
+        static let mouseHoverSelectionEnabled = "Switcher.mouseHoverSelectionEnabled"
+        static let mouseClickSelectionEnabled = "Switcher.mouseClickSelectionEnabled"
+        static let hoverActionsEnabled = "Switcher.hoverActionsEnabled"
+        static let hoverShowClose = "Switcher.hoverShowClose"
+        static let hoverShowMinimize = "Switcher.hoverShowMinimize"
+        static let hoverShowMaximize = "Switcher.hoverShowMaximize"
+        static let hoverShowHide = "Switcher.hoverShowHide"
+        static let hoverShowQuit = "Switcher.hoverShowQuit"
+        static let hoverShowForceQuit = "Switcher.hoverShowForceQuit"
+        static let hideFromScreenSharing = "Switcher.hideFromScreenSharing"
+        static let animationsEnabled = "Switcher.animationsEnabled"
+        static let vimNavigationEnabled = "Switcher.vimNavigationEnabled"
+        static let shiftTapStepsBackward = "Switcher.shiftTapStepsBackward"
+        static let backtickReversesAppSwitching = "Switcher.backtickReversesAppSwitching"
+        static let switcherDisplayMode = "Switcher.displayMode"
+        static let previewTitleAlignment = "Switcher.previewTitleAlignment"
+        static let titleTruncationMode = "Switcher.titleTruncationMode"
+        static let boldSelectedLabel = "Switcher.boldSelectedLabel"
+    }
+
+    @Published var switcherLayoutMode: SwitcherLayoutMode {
+        didSet {
+            guard oldValue != switcherLayoutMode else { return }
+            UserDefaults.standard.set(switcherLayoutMode.rawValue, forKey: Keys.switcherLayoutMode)
+        }
+    }
+
+    /// Which monitor the switcher panel appears on (#22). Default `.mouseCursor`
+    /// preserves the pre-#22 behavior for existing users.
+    @Published var switcherDisplayMode: SwitcherDisplayMode {
+        didSet {
+            guard oldValue != switcherDisplayMode else { return }
+            UserDefaults.standard.set(switcherDisplayMode.rawValue, forKey: Keys.switcherDisplayMode)
+        }
+    }
+
+    /// Order apps/windows appear in the switcher (most-recent / alphabetical /
+    /// launch order). Read off-main by `CatalogFilter`, so the key is shared.
+    @Published var sortOrder: SwitcherSortOrder {
+        didSet {
+            guard oldValue != sortOrder else { return }
+            UserDefaults.standard.set(sortOrder.rawValue, forKey: Keys.sortOrder)
+        }
+    }
+
+    @Published var revealDelayMs: Int {
+        didSet {
+            let clamped = Self.clampDelay(revealDelayMs)
+            if clamped != revealDelayMs {
+                revealDelayMs = clamped
+                return
+            }
+            guard oldValue != revealDelayMs else { return }
+            UserDefaults.standard.set(revealDelayMs, forKey: Keys.revealDelayMs)
+        }
+    }
+
+    /// How long a typed letter-jump prefix stays active before it expires. On
+    /// expiry the switcher drops the prefix, clears the highlight, and restores
+    /// the order rows had before typing. Read live so a change applies to the
+    /// next keystroke without restart.
+    @Published var letterChainTimeoutMs: Int {
+        didSet {
+            let clamped = Self.clampLetterChainTimeout(letterChainTimeoutMs)
+            if clamped != letterChainTimeoutMs {
+                letterChainTimeoutMs = clamped
+                return
+            }
+            guard oldValue != letterChainTimeoutMs else { return }
+            UserDefaults.standard.set(letterChainTimeoutMs, forKey: Keys.letterChainTimeoutMs)
+        }
+    }
+
+    /// How quickly the titles in the open switcher catch up after an app
+    /// changes a window title. Read live so a change applies to the next
+    /// refresh without restart.
+    @Published var titleRefreshIntervalMs: Int {
+        didSet {
+            let clamped = Self.clampTitleRefreshInterval(titleRefreshIntervalMs)
+            if clamped != titleRefreshIntervalMs {
+                titleRefreshIntervalMs = clamped
+                return
+            }
+            guard oldValue != titleRefreshIntervalMs else { return }
+            UserDefaults.standard.set(titleRefreshIntervalMs, forKey: Keys.titleRefreshIntervalMs)
+        }
+    }
+
+    @Published var panelScalePercent: Int {
+        didSet {
+            let clamped = Self.clampPanelScalePercent(panelScalePercent)
+            if clamped != panelScalePercent {
+                panelScalePercent = clamped
+                return
+            }
+            guard oldValue != panelScalePercent else { return }
+            UserDefaults.standard.set(panelScalePercent, forKey: Keys.panelScalePercent)
+        }
+    }
+
+    @Published var panelAppearance: PanelAppearance {
+        didSet {
+            guard oldValue != panelAppearance else { return }
+            UserDefaults.standard.set(panelAppearance.rawValue, forKey: Keys.panelAppearance)
+        }
+    }
+
+    /// Multiplier applied to the switcher's name/title text only (#62) — icons,
+    /// tiles, and spacing keep following `panelScalePercent`. Default `.standard` (1.0×,
+    /// identical to the pre-#62 rendering).
+    @Published var fontScale: SwitcherFontScale {
+        didSet {
+            guard oldValue != fontScale else { return }
+            UserDefaults.standard.set(fontScale.rawValue, forKey: Keys.fontScale)
+        }
+    }
+
+    /// Typeface for the switcher's name/title text (#62). Default `.system`.
+    @Published var fontFace: SwitcherFontFace {
+        didSet {
+            guard oldValue != fontFace else { return }
+            UserDefaults.standard.set(fontFace.rawValue, forKey: Keys.fontFace)
+        }
+    }
+
+    /// Maximum columns in Grid layout. `0` = automatic (width-driven).
+    @Published var gridMaxColumns: Int {
+        didSet {
+            let clamped = Self.clampGridColumns(gridMaxColumns)
+            if clamped != gridMaxColumns {
+                gridMaxColumns = clamped
+                return
+            }
+            guard oldValue != gridMaxColumns else { return }
+            UserDefaults.standard.set(gridMaxColumns, forKey: Keys.gridMaxColumns)
+        }
+    }
+
+    /// Keep the Grid layout on a single row, shrinking the tiles until everything
+    /// fits across, the way the macOS switcher behaves. On by default. Off wraps
+    /// into rows at full size; a `gridMaxColumns` cap wraps either way.
+    @Published var gridSingleRow: Bool {
+        didSet {
+            guard oldValue != gridSingleRow else { return }
+            UserDefaults.standard.set(gridSingleRow, forKey: Keys.gridSingleRow)
+        }
+    }
+
+    /// Per-app overrides shown in the Exceptions editor (hide-windows +
+    /// ignore-shortcuts). Order is the editor's list order.
+    @Published var appExceptions: [AppException] {
+        didSet {
+            guard oldValue != appExceptions else { return }
+            UserDefaults.standard.set(appExceptions.map(\.dictionary), forKey: Keys.appExceptions)
+        }
+    }
+
+    /// The ignore-shortcuts mode for `bundleID`, or `.never` when the app has no
+    /// exception. Used to decide whether to let the trigger chord pass through.
+    func ignoreMode(for bundleID: String) -> IgnoreShortcutsMode {
+        appExceptions.first { $0.bundleID == bundleID }?.ignore ?? .never
+    }
+
+    /// Bundle identifiers forced to the front of the switcher. Order is the
+    /// pin order (first pinned shows first), independent of MRU.
+    @Published var pinnedBundleIDs: [String] {
+        didSet {
+            guard oldValue != pinnedBundleIDs else { return }
+            UserDefaults.standard.set(pinnedBundleIDs, forKey: Keys.pinnedBundleIDs)
+        }
+    }
+
+    /// Optional direct-jump key per bundle identifier. Values are persisted as
+    /// lower-case one- to three-character ASCII letter/digit sequences by the Apps
+    /// settings editor; imported values are validated again by `RowLabels`.
+    @Published var appJumpLetters: [String: String] {
+        didSet {
+            guard oldValue != appJumpLetters else { return }
+            UserDefaults.standard.set(appJumpLetters, forKey: Keys.appJumpLetters)
+        }
+    }
+
+    /// Bundle identifiers the "Hide all windows" shortcut skips, so chosen apps
+    /// stay visible while everything else is hidden. Empty by default (hide-all
+    /// covers every app, Finder included — add Finder here to keep it visible as
+    /// the desktop owner; see `Activator.hideAllApps`).
+    @Published var hideAllExcludedBundleIDs: [String] {
+        didSet {
+            guard oldValue != hideAllExcludedBundleIDs else { return }
+            UserDefaults.standard.set(hideAllExcludedBundleIDs, forKey: Keys.hideAllExcludedBundleIDs)
+        }
+    }
+
+    /// Include minimized windows in the switcher. Default `true` (matches the
+    /// long-standing behavior of listing them, just sorted lower).
+    @Published var showMinimizedWindows: Bool {
+        didSet {
+            guard oldValue != showMinimizedWindows else { return }
+            UserDefaults.standard.set(showMinimizedWindows, forKey: Keys.showMinimizedWindows)
+        }
+    }
+
+    /// Include hidden apps (Cmd+H) in the switcher. Default `true`.
+    @Published var showHiddenApps: Bool {
+        didSet {
+            guard oldValue != showHiddenApps else { return }
+            UserDefaults.standard.set(showHiddenApps, forKey: Keys.showHiddenApps)
+        }
+    }
+
+    /// Sink hidden apps to the end of the list (the long-standing behavior)
+    /// rather than leaving them in their normal MRU/scan position. Only
+    /// meaningful while `showHiddenApps` is on. Default `true`.
+    @Published var sinkHiddenApps: Bool {
+        didSet {
+            guard oldValue != sinkHiddenApps else { return }
+            UserDefaults.standard.set(sinkHiddenApps, forKey: Keys.sinkHiddenApps)
+        }
+    }
+
+    /// Sink minimized windows into their own bucket, just ahead of the hidden
+    /// one, rather than leaving them in their normal MRU position. Only
+    /// meaningful while `showMinimizedWindows` is on. Default `true`, which
+    /// reproduces the long-standing unconditional behavior; turning it off is
+    /// the opt-out requested in #159 — minimizing a window shouldn't rewrite
+    /// recency order for people who minimize instead of stacking windows.
+    @Published var sinkMinimizedWindows: Bool {
+        didSet {
+            guard oldValue != sinkMinimizedWindows else { return }
+            UserDefaults.standard.set(sinkMinimizedWindows, forKey: Keys.sinkMinimizedWindows)
+        }
+    }
+
+    /// Include running apps that have no open windows. Default `true`.
+    @Published var showWindowlessApps: Bool {
+        didSet {
+            guard oldValue != showWindowlessApps else { return }
+            UserDefaults.standard.set(showWindowlessApps, forKey: Keys.showWindowlessApps)
+        }
+    }
+
+    /// Collapse the switcher to one row per application instead of one row per
+    /// window — classic macOS ⌘Tab. The representative row is the app's frontmost
+    /// window (so selecting it activates the app); native/browser tab expansion is
+    /// suppressed while on. Default `false` (per-window). Read directly off
+    /// `UserDefaults` by `CatalogFilter` on the catalog thread, so the key string
+    /// is the contract.
+    @Published var applicationsOnly: Bool {
+        didSet {
+            guard oldValue != applicationsOnly else { return }
+            UserDefaults.standard.set(applicationsOnly, forKey: Keys.applicationsOnly)
+        }
+    }
+
+    /// Enable the type-to-filter fuzzy search mode (entered with `/`).
+    @Published var fuzzySearchEnabled: Bool {
+        didSet {
+            guard oldValue != fuzzySearchEnabled else { return }
+            UserDefaults.standard.set(fuzzySearchEnabled, forKey: Keys.fuzzySearchEnabled)
+        }
+    }
+
+    /// Show per-window letter hints and let a typed letter jump to and select
+    /// that window. Default on. When off, the hint letters are hidden and typing
+    /// a letter does nothing (so letters stay free for type-to-filter search).
+    @Published var letterHintsEnabled: Bool {
+        didSet {
+            guard oldValue != letterHintsEnabled else { return }
+            UserDefaults.standard.set(letterHintsEnabled, forKey: Keys.letterHintsEnabled)
+        }
+    }
+
+    /// Whether activating search detaches the switcher from the held modifier.
+    @Published var searchDismissMode: SearchDismissMode {
+        didSet {
+            guard oldValue != searchDismissMode else { return }
+            UserDefaults.standard.set(searchDismissMode.rawValue, forKey: Keys.searchDismissMode)
+        }
+    }
+
+    /// Keep the switcher open when the trigger modifier is released while the
+    /// panel is visible (#77) — pick with Return, a quick-jump letter, or the
+    /// mouse; Esc dismisses. A quick tap released before the panel appears
+    /// still commits instantly. Default off (classic release-to-pick).
+    @Published var stayOpenOnRelease: Bool {
+        didSet {
+            guard oldValue != stayOpenOnRelease else { return }
+            UserDefaults.standard.set(stayOpenOnRelease, forKey: Keys.stayOpenOnRelease)
+        }
+    }
+
+    /// Also park the panel open when the trigger chord is released *before*
+    /// the panel appears (#91) — shortcuts mapped to mouse buttons or gestures
+    /// synthesize a quick press+release, so the release lands pre-visible and
+    /// would otherwise commit instantly. Only takes effect when
+    /// `stayOpenOnRelease` is also on. Default off.
+    @Published var stayOpenOnQuickTap: Bool {
+        didSet {
+            guard oldValue != stayOpenOnQuickTap else { return }
+            UserDefaults.standard.set(stayOpenOnQuickTap, forKey: Keys.stayOpenOnQuickTap)
+        }
+    }
+
+    /// While searching, also offer matching apps that aren't running yet so they
+    /// can be launched straight from the switcher. Default on.
+    @Published var searchIncludesLaunchableApps: Bool {
+        didSet {
+            guard oldValue != searchIncludesLaunchableApps else { return }
+            UserDefaults.standard.set(searchIncludesLaunchableApps, forKey: Keys.searchIncludesLaunchableApps)
+        }
+    }
+
+    /// Off by default. Rank fuzzy-search results best-match-first (contiguous and
+    /// word-boundary matches in the app name win) instead of showing them in
+    /// catalog/MRU order.
+    @Published var fuzzySearchRankBestMatchFirst: Bool {
+        didSet {
+            guard oldValue != fuzzySearchRankBestMatchFirst else { return }
+            UserDefaults.standard.set(fuzzySearchRankBestMatchFirst, forKey: Keys.fuzzySearchRankBestMatchFirst)
+        }
+    }
+
+    /// Off by default. While the search field is active, expand browser windows
+    /// into one row per tab — for the search only — so a query can match a
+    /// background tab. Transient: the rows never enter the canonical list and
+    /// collapse back on exit. No effect when `expandBrowserTabsAsWindows` is on
+    /// (the list is already expanded).
+    @Published var searchExpandsBrowserTabs: Bool {
+        didSet {
+            guard oldValue != searchExpandsBrowserTabs else { return }
+            UserDefaults.standard.set(searchExpandsBrowserTabs, forKey: Keys.searchExpandsBrowserTabs)
+        }
+    }
+
+    /// Show recently closed windows/apps in the switcher (at the end of the
+    /// list, and matched while searching) so they can be reopened. Default off
+    /// so it doesn't change the default switcher list until opted into.
+    @Published var showRecentlyClosed: Bool {
+        didSet {
+            guard oldValue != showRecentlyClosed else { return }
+            UserDefaults.standard.set(showRecentlyClosed, forKey: Keys.showRecentlyClosed)
+        }
+    }
+
+    /// How many recently closed entries to surface in search at most. Default 5.
+    @Published var recentlyClosedLimit: Int {
+        didSet {
+            let clamped = Self.clampRecentlyClosedLimit(recentlyClosedLimit)
+            if clamped != recentlyClosedLimit {
+                recentlyClosedLimit = clamped
+                return
+            }
+            guard oldValue != recentlyClosedLimit else { return }
+            UserDefaults.standard.set(recentlyClosedLimit, forKey: Keys.recentlyClosedLimit)
+        }
+    }
+
+    /// Fire a trackpad haptic tap when a selection is committed. Only Force
+    /// Touch trackpads produce a sensation; elsewhere it's a no-op. Default off.
+    @Published var hapticOnCommit: Bool {
+        didSet {
+            guard oldValue != hapticOnCommit else { return }
+            UserDefaults.standard.set(hapticOnCommit, forKey: Keys.hapticOnCommit)
+        }
+    }
+
+    /// Play the selected sound when a selection is committed. Default off.
+    @Published var soundOnCommit: Bool {
+        didSet {
+            guard oldValue != soundOnCommit else { return }
+            UserDefaults.standard.set(soundOnCommit, forKey: Keys.soundOnCommit)
+        }
+    }
+
+    /// System sound used for commit feedback. Kept even while a custom sound is
+    /// selected so it remains the fallback if that local file disappears.
+    @Published var commitSoundName: String {
+        didSet {
+            guard oldValue != commitSoundName else { return }
+            UserDefaults.standard.set(commitSoundName, forKey: Keys.commitSoundName)
+        }
+    }
+
+    /// File owned by StayTab under Application Support. Machine-local by
+    /// design: settings exports carry the system fallback, not a filesystem path.
+    @Published var customCommitSoundFilename: String? {
+        didSet {
+            guard oldValue != customCommitSoundFilename else { return }
+            if let customCommitSoundFilename {
+                UserDefaults.standard.set(customCommitSoundFilename, forKey: Keys.customCommitSoundFilename)
+            } else {
+                UserDefaults.standard.removeObject(forKey: Keys.customCommitSoundFilename)
+            }
+        }
+    }
+
+    /// Hide the menu bar (status) icon. With it hidden there's no in-menu way
+    /// to reach Settings, so `AppDelegate` reopens this window when the app is
+    /// launched again (e.g. from Spotlight). Default off.
+    @Published var hideMenuBarIcon: Bool {
+        didSet {
+            guard oldValue != hideMenuBarIcon else { return }
+            UserDefaults.standard.set(hideMenuBarIcon, forKey: Keys.hideMenuBarIcon)
+        }
+    }
+
+    /// Experimental: open the switcher with a horizontal three-finger trackpad
+    /// swipe. Relies on global swipe events the system may also consume, so it's
+    /// best-effort and off by default. [[experimental-features]]
+    @Published var experimentalSwipeTrigger: Bool {
+        didSet {
+            guard oldValue != experimentalSwipeTrigger else { return }
+            UserDefaults.standard.set(experimentalSwipeTrigger, forKey: Keys.experimentalSwipeTrigger)
+        }
+    }
+
+    /// What the three-finger swipe does: open the switcher (default) or switch
+    /// Spaces left/right. Only meaningful while `experimentalSwipeTrigger` is on.
+    @Published var swipeMode: SwipeMode {
+        didSet {
+            guard oldValue != swipeMode else { return }
+            UserDefaults.standard.set(swipeMode.rawValue, forKey: Keys.swipeMode)
+        }
+    }
+
+    /// When false (default), sliding fingers right moves the selection right;
+    /// when true the axis is flipped. Only affects the three-finger swipe.
+    @Published var swipeReverseDirection: Bool {
+        didSet {
+            guard oldValue != swipeReverseDirection else { return }
+            UserDefaults.standard.set(swipeReverseDirection, forKey: Keys.swipeReverseDirection)
+        }
+    }
+
+    /// When true, lifting all fingers off the trackpad commits the three-finger
+    /// swipe's current selection. When false (default), the switcher stays open
+    /// so you commit with a click or Return.
+    @Published var swipeCommitOnRelease: Bool {
+        didSet {
+            guard oldValue != swipeCommitOnRelease else { return }
+            UserDefaults.standard.set(swipeCommitOnRelease, forKey: Keys.swipeCommitOnRelease)
+        }
+    }
+
+    /// Step the open switcher's selection with a mouse scroll wheel. Off for
+    /// trackpads — a continuous (precise) scroll is ignored, so trackpad users
+    /// keep the three-finger swipe and two-finger scrolling stays free. Only
+    /// acts while the switcher is already showing; never opens it from idle.
+    @Published var scrollToSwitch: Bool {
+        didSet {
+            guard oldValue != scrollToSwitch else { return }
+            UserDefaults.standard.set(scrollToSwitch, forKey: Keys.scrollToSwitch)
+        }
+    }
+
+    /// When false (default), scrolling down advances the selection forward; when
+    /// true the axis is flipped. Only affects mouse scroll-to-switch.
+    @Published var scrollReverseDirection: Bool {
+        didSet {
+            guard oldValue != scrollReverseDirection else { return }
+            UserDefaults.standard.set(scrollReverseDirection, forKey: Keys.scrollReverseDirection)
+        }
+    }
+
+    /// Dismiss the switcher when the user clicks outside the panel, leaving the
+    /// currently focused window untouched — like a macOS context menu or
+    /// Spotlight. The click is swallowed so it doesn't also activate whatever
+    /// was under the pointer. Default on.
+    @Published var clickOutsideToDismiss: Bool {
+        didSet {
+            guard oldValue != clickOutsideToDismiss else { return }
+            UserDefaults.standard.set(clickOutsideToDismiss, forKey: Keys.clickOutsideToDismiss)
+        }
+    }
+
+    /// Treat the vim motion keys h/j/k/l as navigation while the switcher is
+    /// open: h/l step horizontally (grid columns or list columns), j/k step
+    /// vertically. Mirrors the bare arrow keys exactly — no modifier, opt-in
+    /// because h overlaps the default "hide app" panel binding and j/k overlap
+    /// letter-jump. Default off; ignored while search mode is active so a
+    /// typed query can still contain those letters.
+    @Published var vimNavigationEnabled: Bool {
+        didSet {
+            guard oldValue != vimNavigationEnabled else { return }
+            UserDefaults.standard.set(vimNavigationEnabled, forKey: Keys.vimNavigationEnabled)
+        }
+    }
+
+    /// Whether tapping Shift on its own steps the open switcher's selection
+    /// backwards (#45). Default off so the native ⌘⇧Tab chord produces exactly
+    /// one reverse step. Users who want bare-Shift stepping can opt in. Only the
+    /// bare-Shift step is gated — ⌘⇧Tab keeps working through the keyDown path.
+    @Published var shiftTapStepsBackward: Bool {
+        didSet {
+            guard oldValue != shiftTapStepsBackward else { return }
+            UserDefaults.standard.set(shiftTapStepsBackward, forKey: Keys.shiftTapStepsBackward)
+        }
+    }
+
+    /// While an app-switch session is already open, treat the window-switch key
+    /// (`⌘`` by default) as a backwards app step. Default off so the shortcut
+    /// keeps its existing window-switch meaning unless the user opts into
+    /// native-like app-switcher reverse navigation.
+    @Published var backtickReversesAppSwitching: Bool {
+        didSet {
+            guard oldValue != backtickReversesAppSwitching else { return }
+            UserDefaults.standard.set(backtickReversesAppSwitching, forKey: Keys.backtickReversesAppSwitching)
+        }
+    }
+
+    /// Move the switcher selection to the row under the pointer. Default on.
+    /// Off keeps the keyboard selection put so the mouse can't change the
+    /// highlighted row by accident (issue #47). Hover-action buttons still
+    /// appear under the pointer when `hoverActionsEnabled` is on.
+    @Published var mouseHoverSelectionEnabled: Bool {
+        didSet {
+            guard oldValue != mouseHoverSelectionEnabled else { return }
+            UserDefaults.standard.set(mouseHoverSelectionEnabled, forKey: Keys.mouseHoverSelectionEnabled)
+        }
+    }
+
+    /// Commit the switcher selection when a row is clicked. Default on. Off
+    /// ignores clicks inside the panel so the mouse can't pick a window by
+    /// accident (issue #47); the tab strip and hover-action buttons still work,
+    /// and click-outside-to-dismiss is unaffected.
+    @Published var mouseClickSelectionEnabled: Bool {
+        didSet {
+            guard oldValue != mouseClickSelectionEnabled else { return }
+            UserDefaults.standard.set(mouseClickSelectionEnabled, forKey: Keys.mouseClickSelectionEnabled)
+        }
+    }
+
+    /// When on, repeatedly pressing the tile-left / tile-right window-management
+    /// shortcut cycles the window through half → two-thirds → one-third width on
+    /// that side instead of always snapping to half. Default off.
+    @Published var cycleTileWidths: Bool {
+        didSet {
+            guard oldValue != cycleTileWidths else { return }
+            UserDefaults.standard.set(cycleTileWidths, forKey: Keys.cycleTileWidths)
+        }
+    }
+
+    /// How far fingers must slide to advance one app in the three-finger swipe,
+    /// as a 1–10 level. Higher = more sensitive (shorter slide per app).
+    @Published var swipeSensitivity: Int {
+        didSet {
+            let clamped = Self.clampSwipeSensitivity(swipeSensitivity)
+            if clamped != swipeSensitivity {
+                swipeSensitivity = clamped
+                return
+            }
+            guard oldValue != swipeSensitivity else { return }
+            UserDefaults.standard.set(swipeSensitivity, forKey: Keys.swipeSensitivity)
+        }
+    }
+
+    /// When true, committing to an app on another Space or in full screen jumps
+    /// there instantly with no slide animation (private SkyLight Space APIs).
+    /// Off by default — the animation is what macOS does out of the box.
+    @Published var instantSpaceSwitch: Bool {
+        didSet {
+            guard oldValue != instantSpaceSwitch else { return }
+            let defaults = UserDefaults.standard
+            defaults.set(instantSpaceSwitch, forKey: Keys.instantSpaceSwitch)
+            // Keep the pre-graduation key in step so a downgraded build, or a
+            // second Mac on an older version sharing this config.json, reads
+            // the same value instead of silently losing the opt-in.
+            defaults.set(instantSpaceSwitch, forKey: Keys.legacyInstantSpaceSwitch)
+        }
+    }
+
+    /// When true (and "Show browser tabs as separate entries" is on), browser tabs
+    /// are tracked as first-class MRU entries so ⌘Tab returns to the previously
+    /// used tab, not just the previously used window. Requires always-on AX title
+    /// observation of running browsers, so it's off by default — opt-in cost on a
+    /// hot-path app. See `BrowserTabMRUTracker` / `BrowserTabFocusObserver`.
+    @Published var browserTabMRU: Bool {
+        didSet {
+            guard oldValue != browserTabMRU else { return }
+            let defaults = UserDefaults.standard
+            defaults.set(browserTabMRU, forKey: Keys.browserTabMRU)
+            // Keep the pre-graduation key in step so a downgraded build, or a
+            // second Mac on an older version sharing this config.json, reads
+            // the same value instead of silently losing the opt-in.
+            defaults.set(browserTabMRU, forKey: Keys.legacyBrowserTabMRU)
+        }
+    }
+
+    /// Capture the active browser tab once per switcher trigger for the
+    /// Previews layout. Off by default because it requires screen capture work.
+    @Published var browserTabPreviews: Bool {
+        didSet {
+            guard oldValue != browserTabPreviews else { return }
+            let defaults = UserDefaults.standard
+            defaults.set(browserTabPreviews, forKey: Keys.browserTabPreviews)
+            // Keep the pre-graduation key in step so a downgraded build, or a
+            // second Mac on an older version sharing this config.json, reads
+            // the same value instead of silently losing the opt-in.
+            defaults.set(browserTabPreviews, forKey: Keys.legacyBrowserTabPreviews)
+        }
+    }
+
+    /// When true, preview tiles take short, tile-sized ScreenCaptureKit snapshots
+    /// at roughly 10 fps while the switcher is open. This is smoother than a
+    /// reveal-time still without using persistent streams, whose system sharing
+    /// indicators would be shown on every captured window. Off by default because
+    /// each visible window adds capture work while the panel is up.
+    @Published var livePreviews: Bool {
+        didSet {
+            guard oldValue != livePreviews else { return }
+            let defaults = UserDefaults.standard
+            defaults.set(livePreviews, forKey: Keys.livePreviews)
+            // Keep the pre-graduation key in step so a downgraded build, or a
+            // second Mac on an older version sharing this config.json, reads
+            // the same value instead of silently losing the opt-in.
+            defaults.set(livePreviews, forKey: Keys.legacyLivePreviews)
+        }
+    }
+
+    /// Tab drill-in: pressing the drill key on a row whose window has a tab group
+    /// reveals a horizontal tab strip beneath the switcher so a specific tab can
+    /// be picked. The key is the `.panelTabDrill` binding — `\` by default,
+    /// rebindable per shortcut target. Native AX `AXTabs` for Finder/Terminal/…;
+    /// AppleScript for Safari/Chromium. Default on.
+    @Published var tabDrillEnabled: Bool {
+        didSet {
+            guard oldValue != tabDrillEnabled else { return }
+            UserDefaults.standard.set(tabDrillEnabled, forKey: Keys.tabDrillEnabled)
+        }
+    }
+
+    /// Window drill-down (#80): in applications-only mode, `↓` or `\` on an app
+    /// with several windows opens the strip UI listing that app's windows —
+    /// native ⌘Tab parity. Cache-sourced and keypress-driven. Default on.
+    @Published var windowDrillEnabled: Bool {
+        didSet {
+            guard oldValue != windowDrillEnabled else { return }
+            UserDefaults.standard.set(windowDrillEnabled, forKey: Keys.windowDrillEnabled)
+        }
+    }
+
+    /// Show each native-system-tab window's tabs as their own switcher rows
+    /// (one entry per tab) instead of a single collapsed window row. Applies to
+    /// apps that expose AppKit `AXTabs` (Finder, Terminal, TextEdit, Ghostty,
+    /// …); browsers keep a single row and the `\` peek. Default off. Read
+    /// off-main by `WindowEnumerator`, so the key is shared.
+    @Published var expandTabsAsWindows: Bool {
+        didSet {
+            guard oldValue != expandTabsAsWindows else { return }
+            UserDefaults.standard.set(expandTabsAsWindows, forKey: Keys.expandTabsAsWindows)
+        }
+    }
+
+    /// Show each browser window's tabs (Safari, Chrome, Arc, Brave, Edge, …) as
+    /// their own switcher rows, inline among the other windows, instead of one
+    /// collapsed window row. Browser tabs aren't separate NSWindows — the rows
+    /// are filled in by an off-main Apple Events scan after the panel opens.
+    /// Default off; the collapsed row + `\` peek stays the default.
+    @Published var expandBrowserTabsAsWindows: Bool {
+        didSet {
+            guard oldValue != expandBrowserTabsAsWindows else { return }
+            UserDefaults.standard.set(expandBrowserTabsAsWindows, forKey: Keys.expandBrowserTabsAsWindows)
+        }
+    }
+
+    /// At most this many tab rows per expanded browser window — the first N
+    /// tabs, slid right just enough to keep the active tab visible (#144).
+    /// `0` (default) shows every tab; otherwise clamped to 2…16.
+    @Published var browserTabRowLimit: Int {
+        didSet {
+            let clamped = Self.clampBrowserTabRowLimit(browserTabRowLimit)
+            if clamped != browserTabRowLimit {
+                browserTabRowLimit = clamped
+                return
+            }
+            guard oldValue != browserTabRowLimit else { return }
+            UserDefaults.standard.set(browserTabRowLimit, forKey: Keys.browserTabRowLimit)
+        }
+    }
+
+    /// Badge each browser-tab row's favicon with the source browser's app
+    /// icon, so the same site open in two browsers is tellable apart (#131).
+    /// Applies to tab rows from `expandBrowserTabsAsWindows` (global or
+    /// per-shortcut override) and the `\` drill-in. Default off.
+    @Published var showBrowserIconOnTabs: Bool {
+        didSet {
+            guard oldValue != showBrowserIconOnTabs else { return }
+            UserDefaults.standard.set(showBrowserIconOnTabs, forKey: Keys.showBrowserIconOnTabs)
+            // Off → release the composited favicons right away instead of
+            // holding ~8 MB until NSCache memory pressure.
+            if !showBrowserIconOnTabs { IconCache.clearBadges() }
+        }
+    }
+
+    /// Show app unread-badge counts (e.g. Mail's unread mail) on switcher rows,
+    /// read from the Dock via the Accessibility API. On by default.
+    @Published var showUnreadBadges: Bool {
+        didSet {
+            guard oldValue != showUnreadBadges else { return }
+            let defaults = UserDefaults.standard
+            defaults.set(showUnreadBadges, forKey: Keys.showUnreadBadges)
+            // Keep the pre-graduation key in step so a downgraded build, or a
+            // second Mac on an older version sharing this config.json, reads
+            // the same value instead of silently reverting to the default.
+            defaults.set(showUnreadBadges, forKey: Keys.legacyUnreadBadges)
+        }
+    }
+
+    /// Show the per-window title label under the icon in Grid and Previews
+    /// layouts. Default on. (No effect on the List layout, which always shows it.)
+    @Published var showWindowTitleLabel: Bool {
+        didSet {
+            guard oldValue != showWindowTitleLabel else { return }
+            UserDefaults.standard.set(showWindowTitleLabel, forKey: Keys.showWindowTitleLabel)
+        }
+    }
+
+    /// Horizontal placement of the title (app icon + window title) under each
+    /// window-preview tile (#72). Default centred — unchanged from before.
+    @Published var previewTitleAlignment: PreviewTitleAlignment {
+        didSet {
+            guard oldValue != previewTitleAlignment else { return }
+            UserDefaults.standard.set(previewTitleAlignment.rawValue, forKey: Keys.previewTitleAlignment)
+        }
+    }
+
+    /// Which part of a long title is shortened with an ellipsis, in every
+    /// layout and the tab strip (#90). Default `.tail` — unchanged from before.
+    @Published var titleTruncationMode: TitleTruncationMode {
+        didSet {
+            guard oldValue != titleTruncationMode else { return }
+            UserDefaults.standard.set(titleTruncationMode.rawValue, forKey: Keys.titleTruncationMode)
+        }
+    }
+
+    /// Bold the selected row's title in the Grid and Previews layouts. Default
+    /// on. When off, the selected title only brightens (white) with no weight or
+    /// width change — avoids the "text grows on select" wobble (#72).
+    @Published var boldSelectedLabel: Bool {
+        didSet {
+            guard oldValue != boldSelectedLabel else { return }
+            UserDefaults.standard.set(boldSelectedLabel, forKey: Keys.boldSelectedLabel)
+        }
+    }
+
+    /// Show the application name in every switcher layout (List right column,
+    /// Grid name-under-icon, and any app-name fallback in Previews). Default on.
+    /// Off = strict icon-only.
+    @Published var showApplicationNames: Bool {
+        didSet {
+            guard oldValue != showApplicationNames else { return }
+            UserDefaults.standard.set(showApplicationNames, forKey: Keys.showApplicationNames)
+        }
+    }
+
+    /// Show the Always / Running now names above the persistent roster sections.
+    /// Default on. The section cards and their grouping remain when this is off.
+    @Published var showRosterSectionTitles: Bool {
+        didSet {
+            guard oldValue != showRosterSectionTitles else { return }
+            UserDefaults.standard.set(showRosterSectionTitles, forKey: Keys.showRosterSectionTitles)
+        }
+    }
+
+    /// Show the infinity / lightning symbols above the persistent roster
+    /// sections. Default on and independently configurable from their names.
+    @Published var showRosterSectionIcons: Bool {
+        didSet {
+            guard oldValue != showRosterSectionIcons else { return }
+            UserDefaults.standard.set(showRosterSectionIcons, forKey: Keys.showRosterSectionIcons)
+        }
+    }
+
+    /// Show the window-state glyphs — hidden, minimized, no open window,
+    /// full-screen — at the end of each List row and under each Grid tile
+    /// (#149). Default on. The audio, Launch and Reopen cues are unaffected:
+    /// they signal activity and available actions, not window state.
+    @Published var showWindowStatusIcons: Bool {
+        didSet {
+            guard oldValue != showWindowStatusIcons else { return }
+            UserDefaults.standard.set(showWindowStatusIcons, forKey: Keys.showWindowStatusIcons)
+        }
+    }
+
+    /// Panel opacity as a 30–100 percentage. Default 100 (fully opaque).
+    @Published var panelOpacity: Int {
+        didSet {
+            let clamped = Self.clampOpacity(panelOpacity)
+            if clamped != panelOpacity { panelOpacity = clamped; return }
+            guard oldValue != panelOpacity else { return }
+            UserDefaults.standard.set(panelOpacity, forKey: Keys.panelOpacity)
+        }
+    }
+
+    /// Explicit panel corner radius in points; `0` = automatic (size-derived).
+    @Published var panelCornerRadius: Int {
+        didSet {
+            let clamped = Self.clampCornerRadius(panelCornerRadius)
+            if clamped != panelCornerRadius { panelCornerRadius = clamped; return }
+            guard oldValue != panelCornerRadius else { return }
+            UserDefaults.standard.set(panelCornerRadius, forKey: Keys.panelCornerRadius)
+        }
+    }
+
+    /// List-layout row width as a percentage of the automatic (screen-scaled)
+    /// width; `100` = full automatic width. Narrows the List layout on large
+    /// displays without shrinking text or icons (#124).
+    @Published var listWidthPercent: Int {
+        didSet {
+            let clamped = Self.clampListWidthPercent(listWidthPercent)
+            if clamped != listWidthPercent { listWidthPercent = clamped; return }
+            guard oldValue != listWidthPercent else { return }
+            UserDefaults.standard.set(listWidthPercent, forKey: Keys.listWidthPercent)
+        }
+    }
+
+    /// Background blur material for the panel (NSVisualEffectView fallback path).
+    @Published var backdropMaterial: BackdropMaterial {
+        didSet {
+            guard oldValue != backdropMaterial else { return }
+            UserDefaults.standard.set(backdropMaterial.rawValue, forKey: Keys.backdropMaterial)
+        }
+    }
+
+    /// Which Spaces the switcher shows windows from (#57). Default all Spaces.
+    /// Reads window Space membership via the same private APIs as instant Space
+    /// switching; degrades to showing everything when those are unavailable.
+    @Published var spaceScope: SpaceScope {
+        didSet {
+            guard oldValue != spaceScope else { return }
+            let defaults = UserDefaults.standard
+            defaults.set(spaceScope.rawValue, forKey: Keys.spaceScope)
+            // Keep the legacy bool in step so pre-#57 builds and settings
+            // exports read a consistent value.
+            defaults.set(spaceScope == .currentSpace, forKey: Keys.currentSpaceOnly)
+        }
+    }
+
+    /// Target app bundle IDs for the direct-activation hotkey slots. Index maps
+    /// to the slot number (0 = slot 1). An empty string means the slot is unset.
+    /// Always normalized to `directActivationSlotCount` entries.
+    @Published var directActivationBindings: [String] {
+        didSet {
+            let normalized = Self.normalizeBindings(directActivationBindings)
+            if normalized != directActivationBindings { directActivationBindings = normalized; return }
+            guard oldValue != directActivationBindings else { return }
+            UserDefaults.standard.set(directActivationBindings, forKey: Keys.directActivationBindings)
+        }
+    }
+
+    /// Scope for each scoped-switch shortcut slot, as `SwitchScope` raw values.
+    /// Index maps to the slot number. Always normalized to
+    /// `scopedShortcutSlotCount` entries; an unset slot defaults to `.allAppsAllSpaces`.
+    /// The slot is only *live* when the user has recorded a shortcut for it
+    /// (BetterShortcuts stores that separately); the scope just says what the
+    /// shortcut shows.
+    @Published var scopedShortcutScopes: [SwitchScope] {
+        didSet {
+            let normalized = Self.normalizeScopes(scopedShortcutScopes)
+            if normalized != scopedShortcutScopes { scopedShortcutScopes = normalized; return }
+            guard oldValue != scopedShortcutScopes else { return }
+            UserDefaults.standard.set(scopedShortcutScopes.map(\.rawValue), forKey: Keys.scopedShortcutScopes)
+        }
+    }
+
+    /// The dynamic, user-managed scoped-switch list (#74). Add/remove entries from
+    /// the Shortcuts pane; each carries a stable `id`, a `scope`, and the
+    /// `BetterShortcuts.Name` its trigger is recorded under. Persisted as
+    /// `[[String: String]]` so the generic settings export/import carries it.
+    @Published var scopedShortcuts: [ScopedShortcut] {
+        didSet {
+            guard oldValue != scopedShortcuts else { return }
+            UserDefaults.standard.set(scopedShortcuts.map(\.dictionary), forKey: Keys.scopedShortcutList)
+        }
+    }
+
+    /// Monotonic id allocator for `scopedShortcuts`. Never decreases, so a removed
+    /// entry's id is never reused (keeps stale recorded triggers/overrides inert).
+    @Published var nextScopedShortcutID: Int {
+        didSet {
+            guard oldValue != nextScopedShortcutID else { return }
+            UserDefaults.standard.set(nextScopedShortcutID, forKey: Keys.nextScopedShortcutID)
+        }
+    }
+
+    /// Append a new scoped-switch entry with a fresh id and the default scope, and
+    /// return it. The caller wires its BetterShortcuts handler + UI row.
+    @discardableResult
+    func appendScopedShortcut(scope: SwitchScope = .allAppsAllSpaces) -> ScopedShortcut {
+        let id = nextScopedShortcutID
+        nextScopedShortcutID = id + 1
+        let entry = ScopedShortcut(id: id, scope: scope, shortcutName: "scopedSwitch.\(id)")
+        scopedShortcuts.append(entry)
+        return entry
+    }
+
+    /// Remove the entry with `id`, returning its `shortcutName` so the caller can
+    /// clear the recorded trigger + override. No-op (nil) if the id is unknown.
+    @discardableResult
+    func removeScopedShortcut(id: Int) -> String? {
+        guard let i = scopedShortcuts.firstIndex(where: { $0.id == id }) else { return nil }
+        let name = scopedShortcuts[i].shortcutName
+        scopedShortcuts.remove(at: i)
+        setOverride(ShortcutOverride(), for: .scoped(id))
+        return name
+    }
+
+    /// Update the scope of the entry with `id`.
+    func setScope(_ scope: SwitchScope, forScopedID id: Int) {
+        guard let i = scopedShortcuts.firstIndex(where: { $0.id == id }), scopedShortcuts[i].scope != scope else { return }
+        scopedShortcuts[i].scope = scope
+    }
+
+    static func decodeScopedShortcuts(_ raw: [[String: String]]?) -> [ScopedShortcut] {
+        (raw ?? []).compactMap(ScopedShortcut.init(dictionary:))
+    }
+
+    /// The stored Space scope (#57): the `spaceScope` key when present, else
+    /// derived from the legacy pre-#57 `currentSpaceOnly` bool (true → current
+    /// Space, absent/false → all Spaces). Pure read, no persisting — the key is
+    /// only written when the user changes the setting, so old-format settings
+    /// imports keep applying through the fallback. `nonisolated` because the
+    /// off-main catalog path (`CatalogFilter.config()`) shares it.
+    nonisolated static func storedSpaceScope(_ defaults: UserDefaults) -> SpaceScope {
+        if let scope = defaults.string(forKey: Keys.spaceScope).flatMap(SpaceScope.init(rawValue:)) {
+            return scope
+        }
+        return (defaults.object(forKey: Keys.currentSpaceOnly) as? Bool ?? false) ? .currentSpace : .allSpaces
+    }
+
+    /// Build the initial list from the legacy fixed `scopedShortcutScopes` (the
+    /// pre-#74 3 slots): keep only slots the user actually used — a recorded
+    /// trigger or a non-default scope — so a clean install starts empty instead of
+    /// with three blank rows. Names stay `scopedSwitch1…3` so existing recorded
+    /// triggers carry over untouched.
+    static func migrateScopedShortcuts(legacyScopes: [SwitchScope]) -> [ScopedShortcut] {
+        var out: [ScopedShortcut] = []
+        for (i, scope) in legacyScopes.enumerated() {
+            let name = "scopedSwitch\(i + 1)"
+            let hasTrigger = UserDefaults.standard.object(forKey: "BetterShortcuts_\(name)") != nil
+                || UserDefaults.standard.object(forKey: "KeyboardShortcuts_\(name)") != nil
+            guard hasTrigger || scope != .allAppsAllSpaces else { continue }
+            out.append(ScopedShortcut(id: i, scope: scope, shortcutName: name))
+        }
+        return out
+    }
+
+    /// Per-shortcut behavioral + appearance overrides (#74), keyed by
+    /// `SwitchTarget.storageKey`. An absent key means the shortcut inherits the
+    /// global preferences; empty overrides are never stored. Read on the main
+    /// actor when a trigger fires (`SwitcherController.resolveActiveOptions`).
+    @Published var shortcutOverrides: [String: ShortcutOverride] {
+        didSet {
+            guard oldValue != shortcutOverrides else { return }
+            UserDefaults.standard.set(Self.encodeShortcutOverrides(shortcutOverrides), forKey: Keys.shortcutOverrides)
+        }
+    }
+
+    /// The override for `target`, or an empty (all-inherit) override if none.
+    func override(for target: SwitchTarget) -> ShortcutOverride {
+        shortcutOverrides[target.storageKey] ?? ShortcutOverride()
+    }
+
+    /// Set or clear a target's override. An empty override removes the key so the
+    /// shortcut falls back to the global preferences.
+    func setOverride(_ override: ShortcutOverride, for target: SwitchTarget) {
+        if override.isEmpty {
+            shortcutOverrides.removeValue(forKey: target.storageKey)
+        } else {
+            shortcutOverrides[target.storageKey] = override
+        }
+    }
+
+    /// Encode to the plist `[[String: String]]` form: drop empty overrides, stamp
+    /// each with its `"target"` key, sorted for deterministic output.
+    static func encodeShortcutOverrides(_ map: [String: ShortcutOverride]) -> [[String: String]] {
+        map.filter { !$0.value.isEmpty }
+            .sorted { $0.key < $1.key }
+            .map { key, override in
+                var d = override.dictionary
+                d["target"] = key
+                return d
+            }
+    }
+
+    /// Decode the stored `[[String: String]]` form. Entries with an unknown
+    /// `target`, or that resolve to an empty override, are dropped.
+    static func decodeShortcutOverrides(_ raw: [[String: String]]?) -> [String: ShortcutOverride] {
+        var out: [String: ShortcutOverride] = [:]
+        for entry in raw ?? [] {
+            // Re-key by the canonical `storageKey`: a hand-edited/corrupt import
+            // could carry a non-canonical-but-valid target (e.g. "scoped.007"),
+            // which every consumer looks up as "scoped.7" and would otherwise miss.
+            guard let key = entry["target"], let target = SwitchTarget(storageKey: key),
+                  let override = ShortcutOverride(dictionary: entry), !override.isEmpty else { continue }
+            out[target.storageKey] = override
+        }
+        return out
+    }
+
+    // In-panel action keys (#5) and window-management chords (#7) are
+    // BetterShortcuts names now (`BetterShortcuts.Name.panelActionKeys` /
+    // `.windowMgmt`); the package owns their recording + persistence.
+
+    /// Master switch for the hover action buttons shown on each switcher row.
+    /// Default off. Per-button visibility lives in `hoverShow*`.
+    @Published var hoverActionsEnabled: Bool {
+        didSet {
+            guard oldValue != hoverActionsEnabled else { return }
+            UserDefaults.standard.set(hoverActionsEnabled, forKey: Keys.hoverActionsEnabled)
+        }
+    }
+
+    @Published var hoverShowClose: Bool {
+        didSet {
+            guard oldValue != hoverShowClose else { return }
+            UserDefaults.standard.set(hoverShowClose, forKey: Keys.hoverShowClose)
+        }
+    }
+
+    @Published var hoverShowMinimize: Bool {
+        didSet {
+            guard oldValue != hoverShowMinimize else { return }
+            UserDefaults.standard.set(hoverShowMinimize, forKey: Keys.hoverShowMinimize)
+        }
+    }
+
+    @Published var hoverShowMaximize: Bool {
+        didSet {
+            guard oldValue != hoverShowMaximize else { return }
+            UserDefaults.standard.set(hoverShowMaximize, forKey: Keys.hoverShowMaximize)
+        }
+    }
+
+    @Published var hoverShowHide: Bool {
+        didSet {
+            guard oldValue != hoverShowHide else { return }
+            UserDefaults.standard.set(hoverShowHide, forKey: Keys.hoverShowHide)
+        }
+    }
+
+    @Published var hoverShowQuit: Bool {
+        didSet {
+            guard oldValue != hoverShowQuit else { return }
+            UserDefaults.standard.set(hoverShowQuit, forKey: Keys.hoverShowQuit)
+        }
+    }
+
+    /// Force-quit button visibility — defaults off so the bar stays uncluttered;
+    /// ⌘+⌥+Q is always available regardless of this toggle.
+    @Published var hoverShowForceQuit: Bool {
+        didSet {
+            guard oldValue != hoverShowForceQuit else { return }
+            UserDefaults.standard.set(hoverShowForceQuit, forKey: Keys.hoverShowForceQuit)
+        }
+    }
+
+    /// Number of hover-action dots the bar will show, or 0 when the feature is
+    /// off. The List layout reserves a column this wide when app names are hidden
+    /// so the bar doesn't overlap the window title.
+    var enabledHoverActionCount: Int {
+        guard hoverActionsEnabled else { return 0 }
+        var n = 0
+        if hoverShowClose { n += 1 }
+        if hoverShowMinimize { n += 1 }
+        if hoverShowMaximize { n += 1 }
+        if hoverShowHide { n += 1 }
+        if hoverShowQuit { n += 1 }
+        if hoverShowForceQuit { n += 1 }
+        return n
+    }
+
+    /// Hide the switcher panel from screen recording / sharing capture
+    /// (Zoom, Meet, Teams, QuickTime, ScreenCaptureKit). Default off.
+    /// Requires macOS 14.6+ for `NSWindowSharingType.none` to be honored by
+    /// modern capture APIs; on older systems the toggle is a no-op.
+    @Published var hideFromScreenSharing: Bool {
+        didSet {
+            guard oldValue != hideFromScreenSharing else { return }
+            UserDefaults.standard.set(hideFromScreenSharing, forKey: Keys.hideFromScreenSharing)
+        }
+    }
+
+    /// Global switch for the switcher's motion: the tab strip's sliding
+    /// selection, the panel resizing itself when the content changes, and the
+    /// tiles gliding to their new slots when the grid reflows. Off makes every
+    /// such transition a hard cut — and skips the per-frame layout it costs.
+    /// Default on. Read through `SwitcherMotion.isEnabled`, which also honors
+    /// the system's Reduce Motion setting.
+    @Published var animationsEnabled: Bool {
+        didSet {
+            guard oldValue != animationsEnabled else { return }
+            UserDefaults.standard.set(animationsEnabled, forKey: Keys.animationsEnabled)
+        }
+    }
+
+    static func clampDelay(_ value: Int) -> Int {
+        min(revealDelayRange.upperBound, max(revealDelayRange.lowerBound, value))
+    }
+
+    static func clampLetterChainTimeout(_ value: Int) -> Int {
+        min(letterChainTimeoutRange.upperBound, max(letterChainTimeoutRange.lowerBound, value))
+    }
+
+    static func clampTitleRefreshInterval(_ value: Int) -> Int {
+        min(titleRefreshIntervalRange.upperBound, max(titleRefreshIntervalRange.lowerBound, value))
+    }
+
+    static func clampSwipeSensitivity(_ value: Int) -> Int {
+        min(swipeSensitivityRange.upperBound, max(swipeSensitivityRange.lowerBound, value))
+    }
+
+    nonisolated static func clampPanelScalePercent(_ value: Int) -> Int {
+        min(panelScalePercentRange.upperBound, max(panelScalePercentRange.lowerBound, value))
+    }
+
+    /// Convert the three pre-#105 persisted presets to their effective
+    /// percentages. Re-pointed for #170, which re-based 100 % onto the native
+    /// Cmd+Tab size: the presets keep their old *relative* sizes (small = 5/6 of
+    /// standard, large = 5/4) rather than their old numbers, which now mean
+    /// something 1.5× larger. Kept nonisolated so profile dictionaries migrate too.
+    nonisolated static func legacyPanelScalePercent(_ rawValue: String) -> Int? {
+        switch rawValue {
+        case "small": return 83
+        case "standard": return 100
+        case "large": return 125
+        default: return nil
+        }
+    }
+
+    /// Old default (#105…#170), and the neutral point every stored percentage was
+    /// picked relative to before 100 % came to mean the native Cmd+Tab size.
+    private nonisolated static let preNativeDefaultPercent = 120.0
+
+    /// Re-base a percentage stored before #170. Those numbers were relative to a
+    /// 120 % default that rendered *smaller* than today's 100 %, so carrying them
+    /// over verbatim would enlarge every slider user's panel by half — the very
+    /// complaint #170 is about. Rescaling preserves each user's ratio to the
+    /// default (150 % of the old default stays 125 % of the new one); the absolute
+    /// size still moves, because the baseline being wrong is what was fixed.
+    nonisolated static func rebasedPanelScalePercent(_ stored: Int) -> Int {
+        clampPanelScalePercent(Int((Double(stored) * Double(defaultPanelScalePercent)
+            / preNativeDefaultPercent).rounded()))
+    }
+
+    /// Re-base every stored panel percentage — the global one and each per-shortcut
+    /// override — onto the #170 meaning of 100 %, exactly once, then record that with
+    /// `Keys.panelScaleRebased`.
+    ///
+    /// One place owns the whole migration so the readers stay pure decoders: without
+    /// this, `ShortcutOverride.init(dictionary:)` would have to know about #170 and
+    /// would re-base on every decode, shrinking the value each time it round-trips.
+    ///
+    /// Runs from `init`, before anything can read a percentage. The flag read/write is
+    /// what makes a repeat call idempotent — never move it into a value getter.
+    static func rebasePanelScalesIfNeeded(_ defaults: UserDefaults) {
+        guard !defaults.bool(forKey: Keys.panelScaleRebased) else { return }
+        defaults.set(true, forKey: Keys.panelScaleRebased)
+
+        var migratedFrom: (percent: Int?, overrides: [String: Int]) = (nil, [:])
+        if let stored = defaults.object(forKey: Keys.panelScalePercent) as? Int {
+            defaults.set(rebasedPanelScalePercent(stored), forKey: Keys.panelScalePercent)
+            migratedFrom.percent = stored
+        }
+        // Per-shortcut overrides carry their own percentage as a decimal string, under
+        // the old baseline too, so that shortcut would still open an oversized panel.
+        if let raw = defaults.array(forKey: Keys.shortcutOverrides) as? [[String: String]] {
+            var migrated = raw
+            for (index, entry) in raw.enumerated() {
+                guard let percent = entry["panelScalePercent"].flatMap(Int.init) else { continue }
+                migrated[index]["panelScalePercent"] = String(rebasedPanelScalePercent(percent))
+                if let target = entry["target"] { migratedFrom.overrides[target] = percent }
+            }
+            if migrated != raw { defaults.set(migrated, forKey: Keys.shortcutOverrides) }
+        }
+        if migratedFrom.percent != nil || !migratedFrom.overrides.isEmpty {
+            preRebasePanelScales = migratedFrom
+        }
+    }
+
+    /// The percentages this launch just re-based, keyed as the payload spells them, held
+    /// only until this launch's `config.json` has been dated against them — spent by
+    /// `importSettings` on the read, or by `ConfigFile` when there is no file to read.
+    ///
+    /// A settings file carries no version, so this is the only handle on the age of the
+    /// one file the app re-reads by itself: `config.json` is imported a moment *after*
+    /// `init` migrated the defaults, and the two-way sync means the file still holds the
+    /// very numbers that were migrated. A payload that carries them was therefore
+    /// written by the pre-#170 build and means the old baseline.
+    ///
+    /// Matching on the value rather than on "a migration happened" is what keeps a
+    /// hand-written or templated config (the documented dotfiles use) and the user's own
+    /// edits later in the same session verbatim: both differ from the migrated number.
+    /// Nil on a fresh install — nothing was stored, so there is no local history to date
+    /// a file against.
+    ///
+    /// Known limit, one case, one shrink: two Macs sharing the file, upgraded days apart.
+    /// The second Mac's stored percentage is whatever the first Mac's migration wrote and
+    /// the sync carried over, so it re-bases that once more (100 → 83) and syncs it back.
+    /// Nothing local separates "the old build's 100" from "another Mac's new 100" — only a
+    /// marker inside the file would, and that means putting an internal migration flag in
+    /// a file people hand-edit. The slider fixes it in one drag; the marker would be
+    /// permanent.
+    static var preRebasePanelScales: (percent: Int?, overrides: [String: Int])?
+
+    /// Prefer the continuous value, otherwise migrate the legacy preset once.
+    /// Called on import reload too, so old `.cmdtab` files upgrade in place.
+    ///
+    /// Pure loader: re-basing stored percentages onto the #170 baseline happens in
+    /// `rebasePanelScalesIfNeeded`, which must already have run.
+    private static func loadPanelScalePercent(_ defaults: UserDefaults) -> Int {
+        if let stored = defaults.object(forKey: Keys.panelScalePercent) as? Int {
+            let clamped = clampPanelScalePercent(stored)
+            if clamped != stored { defaults.set(clamped, forKey: Keys.panelScalePercent) }
+            defaults.removeObject(forKey: Keys.panelSize)
+            return clamped
+        }
+        if let raw = defaults.string(forKey: Keys.panelSize),
+           let migrated = legacyPanelScalePercent(raw) {
+            defaults.set(migrated, forKey: Keys.panelScalePercent)
+            defaults.removeObject(forKey: Keys.panelSize)
+            return migrated
+        }
+        defaults.removeObject(forKey: Keys.panelSize)
+        return defaultPanelScalePercent
+    }
+
+    static func clampOpacity(_ value: Int) -> Int {
+        min(panelOpacityRange.upperBound, max(panelOpacityRange.lowerBound, value))
+    }
+
+    static func clampCornerRadius(_ value: Int) -> Int {
+        min(panelCornerRadiusRange.upperBound, max(panelCornerRadiusRange.lowerBound, value))
+    }
+
+    static func clampGridColumns(_ value: Int) -> Int {
+        min(gridMaxColumnsRange.upperBound, max(gridMaxColumnsRange.lowerBound, value))
+    }
+
+    nonisolated static func clampListWidthPercent(_ value: Int) -> Int {
+        min(listWidthPercentRange.upperBound, max(listWidthPercentRange.lowerBound, value))
+    }
+
+    static func clampRecentlyClosedLimit(_ value: Int) -> Int {
+        min(recentlyClosedLimitRange.upperBound, max(recentlyClosedLimitRange.lowerBound, value))
+    }
+
+    /// `<= 0` normalizes to `0` (unlimited); anything else snaps into 2…16.
+    static func clampBrowserTabRowLimit(_ value: Int) -> Int {
+        value <= 0 ? 0 : min(browserTabRowLimitRange.upperBound, max(browserTabRowLimitRange.lowerBound, value))
+    }
+
+    /// A preference that graduated out of the Experimental pane. Each one keeps
+    /// *reading* its pre-graduation key as a fallback — an old settings export or
+    /// a hand-written `config.json` can still carry only that key — and keeps
+    /// *writing* it back, so a downgraded build, or a second Mac on an older
+    /// version sharing this `config.json`, reads the same value instead of
+    /// silently losing the choice.
+    ///
+    /// Adding a case here is all a newly graduated preference needs: the launch
+    /// read, the reload read and the import fixup all walk `allCases`.
+    enum GraduatedPreference: CaseIterable {
+        case instantSpaceSwitch
+        case browserTabMRU
+        case browserTabPreviews
+        case livePreviews
+        case showUnreadBadges
+
+        var key: String {
+            switch self {
+            case .instantSpaceSwitch: return Keys.instantSpaceSwitch
+            case .browserTabMRU: return Keys.browserTabMRU
+            case .browserTabPreviews: return Keys.browserTabPreviews
+            case .livePreviews: return Keys.livePreviews
+            case .showUnreadBadges: return Keys.showUnreadBadges
+            }
+        }
+
+        var legacyKey: String {
+            switch self {
+            case .instantSpaceSwitch: return Keys.legacyInstantSpaceSwitch
+            case .browserTabMRU: return Keys.legacyBrowserTabMRU
+            case .browserTabPreviews: return Keys.legacyBrowserTabPreviews
+            case .livePreviews: return Keys.legacyLivePreviews
+            case .showUnreadBadges: return Keys.legacyUnreadBadges
+            }
+        }
+
+        /// Value when neither key is stored. Badges graduated on, the rest off.
+        var fallback: Bool {
+            switch self {
+            case .showUnreadBadges: return true
+            case .instantSpaceSwitch, .browserTabMRU, .browserTabPreviews, .livePreviews: return false
+            }
+        }
+    }
+
+    /// Read a graduated preference: new key first, then the pre-graduation key,
+    /// then the default. Used both at launch and on every `reloadFromDefaults`.
+    /// `nonisolated` like `storedSpaceScope` — it only reads the `defaults` it is
+    /// handed.
+    nonisolated static func stored(_ pref: GraduatedPreference, _ defaults: UserDefaults) -> Bool {
+        defaults.object(forKey: pref.key) as? Bool
+            ?? defaults.object(forKey: pref.legacyKey) as? Bool
+            ?? pref.fallback
+    }
+
+    /// Pads/truncates to exactly `directActivationSlotCount` entries.
+    static func normalizeBindings(_ value: [String]) -> [String] {
+        var out = Array(value.prefix(directActivationSlotCount))
+        while out.count < directActivationSlotCount { out.append("") }
+        return out
+    }
+
+    /// Pads/truncates to exactly `scopedShortcutSlotCount` entries, filling
+    /// missing slots with the neutral `.allAppsAllSpaces` default.
+    static func normalizeScopes(_ value: [SwitchScope]) -> [SwitchScope] {
+        var out = Array(value.prefix(scopedShortcutSlotCount))
+        while out.count < scopedShortcutSlotCount { out.append(.allAppsAllSpaces) }
+        return out
+    }
+
+    /// Parse the stored `[String]` raw values into `[SwitchScope]`, normalized.
+    static func loadScopes(_ raw: [String]?) -> [SwitchScope] {
+        normalizeScopes((raw ?? []).map { SwitchScope(rawValue: $0) ?? .allAppsAllSpaces })
+    }
+
+
+    private init() {
+        let defaults = UserDefaults.standard
+
+        // Retired keys (26.7): the accent-color option was removed — the switcher
+        // always follows the macOS accent now. Scrub stragglers so they stop
+        // riding along in every settings export.
+        defaults.removeObject(forKey: "Switcher.accentChoice")
+        defaults.removeObject(forKey: "Switcher.customAccentHex")
+
+        // Before any percentage is read below, so the values this init publishes are
+        // already on the #170 baseline.
+        Self.rebasePanelScalesIfNeeded(defaults)
+
+        let layoutRaw = defaults.string(forKey: Keys.switcherLayoutMode)
+        self.switcherLayoutMode = layoutRaw.flatMap(SwitcherLayoutMode.init(rawValue:)) ?? .gridView
+        self.switcherDisplayMode = defaults.string(forKey: Keys.switcherDisplayMode)
+            .flatMap(SwitcherDisplayMode.init(rawValue:)) ?? .mouseCursor
+
+        let sortRaw = defaults.string(forKey: Keys.sortOrder)
+        self.sortOrder = sortRaw.flatMap(SwitcherSortOrder.init(rawValue:)) ?? .mru
+
+        let delay = defaults.object(forKey: Keys.revealDelayMs) as? Int ?? Self.defaultRevealDelayMs
+        self.revealDelayMs = Self.clampDelay(delay)
+
+        let letterTimeout = defaults.object(forKey: Keys.letterChainTimeoutMs) as? Int ?? Self.defaultLetterChainTimeoutMs
+        self.letterChainTimeoutMs = Self.clampLetterChainTimeout(letterTimeout)
+
+        let titleRefresh = defaults.object(forKey: Keys.titleRefreshIntervalMs) as? Int ?? Self.defaultTitleRefreshIntervalMs
+        self.titleRefreshIntervalMs = Self.clampTitleRefreshInterval(titleRefresh)
+
+        self.panelScalePercent = Self.loadPanelScalePercent(defaults)
+        self.panelAppearance = defaults.string(forKey: Keys.panelAppearance)
+            .flatMap(PanelAppearance.init(rawValue:)) ?? .system
+
+        self.fontScale = defaults.string(forKey: Keys.fontScale).flatMap(SwitcherFontScale.init(rawValue:)) ?? .standard
+        self.fontFace = defaults.string(forKey: Keys.fontFace).flatMap(SwitcherFontFace.init(rawValue:)) ?? .system
+
+        self.gridMaxColumns = defaults.object(forKey: Keys.gridMaxColumns) as? Int ?? 0
+        self.gridSingleRow = defaults.object(forKey: Keys.gridSingleRow) as? Bool ?? true
+
+        // Exceptions: honor the new key if present, otherwise build a first-run
+        // default — carry over the pre-Exceptions excluded-app list as hide=.always
+        // entries, and seed Finder to "show only with open windows". Persisted
+        // immediately because `CatalogFilter` reads the new key from UserDefaults
+        // off-main and never sees the legacy key.
+        if let stored = defaults.array(forKey: Keys.appExceptions) as? [[String: String]] {
+            self.appExceptions = stored.compactMap(AppException.init(dictionary:))
+        } else {
+            var initial = (defaults.stringArray(forKey: Keys.legacyExcludedBundleIDs) ?? [])
+                .map { AppException(bundleID: $0, hide: .always, ignore: .never) }
+            if !initial.contains(where: { $0.bundleID == Self.finderBundleID }) {
+                initial.append(AppException(bundleID: Self.finderBundleID, hide: .whenNoWindows, ignore: .never))
+            }
+            self.appExceptions = initial
+            defaults.set(initial.map(\.dictionary), forKey: Keys.appExceptions)
+        }
+        self.pinnedBundleIDs = defaults.stringArray(forKey: Keys.pinnedBundleIDs) ?? []
+        self.appJumpLetters = defaults.dictionary(forKey: Keys.appJumpLetters) as? [String: String] ?? [:]
+        self.hideAllExcludedBundleIDs = defaults.stringArray(forKey: Keys.hideAllExcludedBundleIDs) ?? []
+        self.showMinimizedWindows = defaults.object(forKey: Keys.showMinimizedWindows) as? Bool ?? true
+        self.showHiddenApps = defaults.object(forKey: Keys.showHiddenApps) as? Bool ?? true
+        self.sinkHiddenApps = defaults.object(forKey: Keys.sinkHiddenApps) as? Bool ?? true
+        self.sinkMinimizedWindows = defaults.object(forKey: Keys.sinkMinimizedWindows) as? Bool ?? true
+        self.showWindowlessApps = defaults.object(forKey: Keys.showWindowlessApps) as? Bool ?? true
+        self.applicationsOnly = defaults.object(forKey: Keys.applicationsOnly) as? Bool ?? true
+        self.fuzzySearchEnabled = defaults.object(forKey: Keys.fuzzySearchEnabled) as? Bool ?? true
+        self.letterHintsEnabled = defaults.object(forKey: Keys.letterHintsEnabled) as? Bool ?? true
+
+        let dismissRaw = defaults.string(forKey: Keys.searchDismissMode)
+        self.searchDismissMode = dismissRaw.flatMap(SearchDismissMode.init(rawValue:)) ?? .holdModifier
+        self.stayOpenOnRelease = defaults.object(forKey: Keys.stayOpenOnRelease) as? Bool ?? false
+        self.stayOpenOnQuickTap = defaults.object(forKey: Keys.stayOpenOnQuickTap) as? Bool ?? false
+
+        self.searchIncludesLaunchableApps = defaults.object(forKey: Keys.searchIncludesLaunchableApps) as? Bool ?? true
+        self.fuzzySearchRankBestMatchFirst = defaults.object(forKey: Keys.fuzzySearchRankBestMatchFirst) as? Bool ?? false
+        self.searchExpandsBrowserTabs = defaults.object(forKey: Keys.searchExpandsBrowserTabs) as? Bool ?? false
+        self.showRecentlyClosed = defaults.object(forKey: Keys.showRecentlyClosed) as? Bool ?? false
+        self.recentlyClosedLimit = defaults.object(forKey: Keys.recentlyClosedLimit) as? Int ?? 5
+
+        self.hapticOnCommit = defaults.object(forKey: Keys.hapticOnCommit) as? Bool ?? false
+        self.soundOnCommit = defaults.object(forKey: Keys.soundOnCommit) as? Bool ?? false
+        self.commitSoundName = defaults.string(forKey: Keys.commitSoundName) ?? Self.defaultCommitSoundName
+        self.customCommitSoundFilename = defaults.string(forKey: Keys.customCommitSoundFilename)
+
+        self.hideMenuBarIcon = defaults.object(forKey: Keys.hideMenuBarIcon) as? Bool ?? false
+
+        self.experimentalSwipeTrigger = defaults.object(forKey: Keys.experimentalSwipeTrigger) as? Bool ?? false
+        let swipeModeRaw = defaults.string(forKey: Keys.swipeMode)
+        self.swipeMode = swipeModeRaw.flatMap(SwipeMode.init(rawValue:)) ?? .openSwitcher
+        self.swipeReverseDirection = defaults.object(forKey: Keys.swipeReverseDirection) as? Bool ?? false
+        self.swipeCommitOnRelease = defaults.object(forKey: Keys.swipeCommitOnRelease) as? Bool ?? false
+        let sensitivity = defaults.object(forKey: Keys.swipeSensitivity) as? Int ?? Self.defaultSwipeSensitivity
+        self.swipeSensitivity = Self.clampSwipeSensitivity(sensitivity)
+        self.scrollToSwitch = defaults.object(forKey: Keys.scrollToSwitch) as? Bool ?? true
+        self.scrollReverseDirection = defaults.object(forKey: Keys.scrollReverseDirection) as? Bool ?? false
+        self.clickOutsideToDismiss = defaults.object(forKey: Keys.clickOutsideToDismiss) as? Bool ?? true
+        self.vimNavigationEnabled = defaults.object(forKey: Keys.vimNavigationEnabled) as? Bool ?? false
+        self.shiftTapStepsBackward = defaults.object(forKey: Keys.shiftTapStepsBackward) as? Bool ?? false
+        self.backtickReversesAppSwitching = defaults.object(forKey: Keys.backtickReversesAppSwitching) as? Bool ?? false
+        self.cycleTileWidths = defaults.object(forKey: Keys.cycleTileWidths) as? Bool ?? false
+        self.instantSpaceSwitch = Self.stored(.instantSpaceSwitch, defaults)
+        self.tabDrillEnabled = defaults.object(forKey: Keys.tabDrillEnabled) as? Bool ?? true
+        self.windowDrillEnabled = defaults.object(forKey: Keys.windowDrillEnabled) as? Bool ?? true
+        self.expandTabsAsWindows = defaults.object(forKey: Keys.expandTabsAsWindows) as? Bool ?? false
+        self.expandBrowserTabsAsWindows = defaults.object(forKey: Keys.expandBrowserTabsAsWindows) as? Bool ?? false
+        self.browserTabRowLimit = Self.clampBrowserTabRowLimit(defaults.object(forKey: Keys.browserTabRowLimit) as? Int ?? 0)
+        self.showBrowserIconOnTabs = defaults.object(forKey: Keys.showBrowserIconOnTabs) as? Bool ?? false
+        self.browserTabMRU = Self.stored(.browserTabMRU, defaults)
+        self.browserTabPreviews = Self.stored(.browserTabPreviews, defaults)
+        self.livePreviews = Self.stored(.livePreviews, defaults)
+        self.showUnreadBadges = Self.stored(.showUnreadBadges, defaults)
+
+        self.showWindowTitleLabel = defaults.object(forKey: Keys.showWindowTitleLabel) as? Bool ?? true
+        self.showApplicationNames = defaults.object(forKey: Keys.showApplicationNames) as? Bool ?? true
+        self.showRosterSectionTitles = defaults.object(forKey: Keys.showRosterSectionTitles) as? Bool ?? true
+        self.showRosterSectionIcons = defaults.object(forKey: Keys.showRosterSectionIcons) as? Bool ?? true
+        self.showWindowStatusIcons = defaults.object(forKey: Keys.showWindowStatusIcons) as? Bool ?? true
+        self.previewTitleAlignment = defaults.string(forKey: Keys.previewTitleAlignment)
+            .flatMap(PreviewTitleAlignment.init(rawValue:)) ?? .center
+        self.titleTruncationMode = defaults.string(forKey: Keys.titleTruncationMode)
+            .flatMap(TitleTruncationMode.init(rawValue:)) ?? .tail
+        self.boldSelectedLabel = defaults.object(forKey: Keys.boldSelectedLabel) as? Bool ?? true
+        let opacity = defaults.object(forKey: Keys.panelOpacity) as? Int ?? 100
+        self.panelOpacity = Self.clampOpacity(opacity)
+        let radius = defaults.object(forKey: Keys.panelCornerRadius) as? Int ?? 0
+        self.panelCornerRadius = Self.clampCornerRadius(radius)
+        let listWidth = defaults.object(forKey: Keys.listWidthPercent) as? Int ?? 100
+        self.listWidthPercent = Self.clampListWidthPercent(listWidth)
+        let materialRaw = defaults.string(forKey: Keys.backdropMaterial)
+        self.backdropMaterial = materialRaw.flatMap(BackdropMaterial.init(rawValue:)) ?? .hud
+        self.spaceScope = Self.storedSpaceScope(defaults)
+        self.directActivationBindings = Self.normalizeBindings(defaults.stringArray(forKey: Keys.directActivationBindings) ?? [])
+        let legacyScopes = Self.loadScopes(defaults.stringArray(forKey: Keys.scopedShortcutScopes))
+        self.scopedShortcutScopes = legacyScopes
+        // Dynamic scoped list (#74): use the stored list if present, else migrate
+        // once from the legacy fixed slots.
+        let storedList = defaults.array(forKey: Keys.scopedShortcutList) as? [[String: String]]
+        let migrated: [ScopedShortcut]
+        if let storedList {
+            migrated = Self.decodeScopedShortcuts(storedList)
+        } else {
+            migrated = Self.migrateScopedShortcuts(legacyScopes: legacyScopes)
+        }
+        self.scopedShortcuts = migrated
+        let storedNextID = defaults.object(forKey: Keys.nextScopedShortcutID) as? Int
+        let resolvedNextID = max(storedNextID ?? 0, (migrated.map(\.id).max() ?? -1) + 1)
+        self.nextScopedShortcutID = resolvedNextID
+        // `didSet` doesn't fire for assignments inside init, so a freshly migrated
+        // list would never reach UserDefaults until the user first edits it —
+        // leaving the authoritative key absent (and missing from settings export,
+        // forcing a lossy re-migration on import). Persist it once here so the
+        // dynamic list is the source of truth immediately after an upgrade.
+        if storedList == nil {
+            defaults.set(migrated.map(\.dictionary), forKey: Keys.scopedShortcutList)
+            defaults.set(resolvedNextID, forKey: Keys.nextScopedShortcutID)
+        }
+        let rawOverrides = defaults.array(forKey: Keys.shortcutOverrides) as? [[String: String]]
+        let decodedOverrides = Self.decodeShortcutOverrides(rawOverrides)
+        self.shortcutOverrides = decodedOverrides
+        if rawOverrides?.contains(where: { $0["panelSize"] != nil }) == true {
+            defaults.set(Self.encodeShortcutOverrides(decodedOverrides), forKey: Keys.shortcutOverrides)
+        }
+        self.mouseHoverSelectionEnabled = defaults.object(forKey: Keys.mouseHoverSelectionEnabled) as? Bool ?? true
+        self.mouseClickSelectionEnabled = defaults.object(forKey: Keys.mouseClickSelectionEnabled) as? Bool ?? true
+        self.hoverActionsEnabled = defaults.object(forKey: Keys.hoverActionsEnabled) as? Bool ?? false
+        self.hoverShowClose = defaults.object(forKey: Keys.hoverShowClose) as? Bool ?? true
+        self.hoverShowMinimize = defaults.object(forKey: Keys.hoverShowMinimize) as? Bool ?? true
+        self.hoverShowMaximize = defaults.object(forKey: Keys.hoverShowMaximize) as? Bool ?? true
+        self.hoverShowHide = defaults.object(forKey: Keys.hoverShowHide) as? Bool ?? true
+        self.hoverShowQuit = defaults.object(forKey: Keys.hoverShowQuit) as? Bool ?? true
+        self.hoverShowForceQuit = defaults.object(forKey: Keys.hoverShowForceQuit) as? Bool ?? false
+        self.hideFromScreenSharing = defaults.object(forKey: Keys.hideFromScreenSharing) as? Bool ?? false
+        self.animationsEnabled = defaults.object(forKey: Keys.animationsEnabled) as? Bool ?? true
+    }
+
+    /// Re-read every preference from `UserDefaults` into the published
+    /// properties. Used after importing a settings file so open Settings panes
+    /// and the live switcher pick up the new values without a restart — the
+    /// `@Published` assignments fire `objectWillChange` and the per-property
+    /// publishers `SwitcherController` subscribes to. The didSet observers
+    /// persist the same value back (a no-op when unchanged), so this is safe to
+    /// call repeatedly. Legacy panel-size values are migrated here too so old
+    /// settings imports take effect without a relaunch.
+    func reloadFromDefaults() {
+        let defaults = UserDefaults.standard
+
+        switcherLayoutMode = defaults.string(forKey: Keys.switcherLayoutMode).flatMap(SwitcherLayoutMode.init(rawValue:)) ?? .gridView
+        switcherDisplayMode = defaults.string(forKey: Keys.switcherDisplayMode)
+            .flatMap(SwitcherDisplayMode.init(rawValue:)) ?? .mouseCursor
+        sortOrder = defaults.string(forKey: Keys.sortOrder).flatMap(SwitcherSortOrder.init(rawValue:)) ?? .mru
+        revealDelayMs = Self.clampDelay(defaults.object(forKey: Keys.revealDelayMs) as? Int ?? Self.defaultRevealDelayMs)
+        letterChainTimeoutMs = Self.clampLetterChainTimeout(defaults.object(forKey: Keys.letterChainTimeoutMs) as? Int ?? Self.defaultLetterChainTimeoutMs)
+        titleRefreshIntervalMs = Self.clampTitleRefreshInterval(defaults.object(forKey: Keys.titleRefreshIntervalMs) as? Int ?? Self.defaultTitleRefreshIntervalMs)
+        panelScalePercent = Self.loadPanelScalePercent(defaults)
+        panelAppearance = defaults.string(forKey: Keys.panelAppearance)
+            .flatMap(PanelAppearance.init(rawValue:)) ?? .system
+        fontScale = defaults.string(forKey: Keys.fontScale).flatMap(SwitcherFontScale.init(rawValue:)) ?? .standard
+        fontFace = defaults.string(forKey: Keys.fontFace).flatMap(SwitcherFontFace.init(rawValue:)) ?? .system
+        gridMaxColumns = defaults.object(forKey: Keys.gridMaxColumns) as? Int ?? 0
+        gridSingleRow = defaults.object(forKey: Keys.gridSingleRow) as? Bool ?? true
+
+        if let stored = defaults.array(forKey: Keys.appExceptions) as? [[String: String]] {
+            appExceptions = stored.compactMap(AppException.init(dictionary:))
+        } else {
+            appExceptions = []
+        }
+        pinnedBundleIDs = defaults.stringArray(forKey: Keys.pinnedBundleIDs) ?? []
+        appJumpLetters = defaults.dictionary(forKey: Keys.appJumpLetters) as? [String: String] ?? [:]
+        hideAllExcludedBundleIDs = defaults.stringArray(forKey: Keys.hideAllExcludedBundleIDs) ?? []
+
+        showMinimizedWindows = defaults.object(forKey: Keys.showMinimizedWindows) as? Bool ?? true
+        showHiddenApps = defaults.object(forKey: Keys.showHiddenApps) as? Bool ?? true
+        sinkHiddenApps = defaults.object(forKey: Keys.sinkHiddenApps) as? Bool ?? true
+        sinkMinimizedWindows = defaults.object(forKey: Keys.sinkMinimizedWindows) as? Bool ?? true
+        showWindowlessApps = defaults.object(forKey: Keys.showWindowlessApps) as? Bool ?? true
+        applicationsOnly = defaults.object(forKey: Keys.applicationsOnly) as? Bool ?? true
+        fuzzySearchEnabled = defaults.object(forKey: Keys.fuzzySearchEnabled) as? Bool ?? true
+        letterHintsEnabled = defaults.object(forKey: Keys.letterHintsEnabled) as? Bool ?? true
+        searchDismissMode = defaults.string(forKey: Keys.searchDismissMode).flatMap(SearchDismissMode.init(rawValue:)) ?? .holdModifier
+        stayOpenOnRelease = defaults.object(forKey: Keys.stayOpenOnRelease) as? Bool ?? false
+        stayOpenOnQuickTap = defaults.object(forKey: Keys.stayOpenOnQuickTap) as? Bool ?? false
+        searchIncludesLaunchableApps = defaults.object(forKey: Keys.searchIncludesLaunchableApps) as? Bool ?? true
+        fuzzySearchRankBestMatchFirst = defaults.object(forKey: Keys.fuzzySearchRankBestMatchFirst) as? Bool ?? false
+        searchExpandsBrowserTabs = defaults.object(forKey: Keys.searchExpandsBrowserTabs) as? Bool ?? false
+        showRecentlyClosed = defaults.object(forKey: Keys.showRecentlyClosed) as? Bool ?? false
+        recentlyClosedLimit = defaults.object(forKey: Keys.recentlyClosedLimit) as? Int ?? 5
+
+        hapticOnCommit = defaults.object(forKey: Keys.hapticOnCommit) as? Bool ?? false
+        soundOnCommit = defaults.object(forKey: Keys.soundOnCommit) as? Bool ?? false
+        commitSoundName = defaults.string(forKey: Keys.commitSoundName) ?? Self.defaultCommitSoundName
+        customCommitSoundFilename = defaults.string(forKey: Keys.customCommitSoundFilename)
+        hideMenuBarIcon = defaults.object(forKey: Keys.hideMenuBarIcon) as? Bool ?? false
+
+        experimentalSwipeTrigger = defaults.object(forKey: Keys.experimentalSwipeTrigger) as? Bool ?? false
+        swipeMode = defaults.string(forKey: Keys.swipeMode).flatMap(SwipeMode.init(rawValue:)) ?? .openSwitcher
+        swipeReverseDirection = defaults.object(forKey: Keys.swipeReverseDirection) as? Bool ?? false
+        swipeCommitOnRelease = defaults.object(forKey: Keys.swipeCommitOnRelease) as? Bool ?? false
+        swipeSensitivity = Self.clampSwipeSensitivity(defaults.object(forKey: Keys.swipeSensitivity) as? Int ?? Self.defaultSwipeSensitivity)
+        scrollToSwitch = defaults.object(forKey: Keys.scrollToSwitch) as? Bool ?? true
+        scrollReverseDirection = defaults.object(forKey: Keys.scrollReverseDirection) as? Bool ?? false
+        clickOutsideToDismiss = defaults.object(forKey: Keys.clickOutsideToDismiss) as? Bool ?? true
+        vimNavigationEnabled = defaults.object(forKey: Keys.vimNavigationEnabled) as? Bool ?? false
+        shiftTapStepsBackward = defaults.object(forKey: Keys.shiftTapStepsBackward) as? Bool ?? false
+        backtickReversesAppSwitching = defaults.object(forKey: Keys.backtickReversesAppSwitching) as? Bool ?? false
+        mouseHoverSelectionEnabled = defaults.object(forKey: Keys.mouseHoverSelectionEnabled) as? Bool ?? true
+        mouseClickSelectionEnabled = defaults.object(forKey: Keys.mouseClickSelectionEnabled) as? Bool ?? true
+        cycleTileWidths = defaults.object(forKey: Keys.cycleTileWidths) as? Bool ?? false
+        instantSpaceSwitch = Self.stored(.instantSpaceSwitch, defaults)
+        tabDrillEnabled = defaults.object(forKey: Keys.tabDrillEnabled) as? Bool ?? true
+        windowDrillEnabled = defaults.object(forKey: Keys.windowDrillEnabled) as? Bool ?? true
+        expandTabsAsWindows = defaults.object(forKey: Keys.expandTabsAsWindows) as? Bool ?? false
+        expandBrowserTabsAsWindows = defaults.object(forKey: Keys.expandBrowserTabsAsWindows) as? Bool ?? false
+        browserTabRowLimit = defaults.object(forKey: Keys.browserTabRowLimit) as? Int ?? 0
+        showBrowserIconOnTabs = defaults.object(forKey: Keys.showBrowserIconOnTabs) as? Bool ?? false
+        browserTabMRU = Self.stored(.browserTabMRU, defaults)
+        browserTabPreviews = Self.stored(.browserTabPreviews, defaults)
+        livePreviews = Self.stored(.livePreviews, defaults)
+        showUnreadBadges = Self.stored(.showUnreadBadges, defaults)
+
+        showWindowTitleLabel = defaults.object(forKey: Keys.showWindowTitleLabel) as? Bool ?? true
+        showWindowStatusIcons = defaults.object(forKey: Keys.showWindowStatusIcons) as? Bool ?? true
+        showApplicationNames = defaults.object(forKey: Keys.showApplicationNames) as? Bool ?? true
+        showRosterSectionTitles = defaults.object(forKey: Keys.showRosterSectionTitles) as? Bool ?? true
+        showRosterSectionIcons = defaults.object(forKey: Keys.showRosterSectionIcons) as? Bool ?? true
+        previewTitleAlignment = defaults.string(forKey: Keys.previewTitleAlignment).flatMap(PreviewTitleAlignment.init(rawValue:)) ?? .center
+        titleTruncationMode = defaults.string(forKey: Keys.titleTruncationMode).flatMap(TitleTruncationMode.init(rawValue:)) ?? .tail
+        boldSelectedLabel = defaults.object(forKey: Keys.boldSelectedLabel) as? Bool ?? true
+        panelOpacity = Self.clampOpacity(defaults.object(forKey: Keys.panelOpacity) as? Int ?? 100)
+        panelCornerRadius = Self.clampCornerRadius(defaults.object(forKey: Keys.panelCornerRadius) as? Int ?? 0)
+        listWidthPercent = Self.clampListWidthPercent(defaults.object(forKey: Keys.listWidthPercent) as? Int ?? 100)
+        backdropMaterial = defaults.string(forKey: Keys.backdropMaterial).flatMap(BackdropMaterial.init(rawValue:)) ?? .hud
+        spaceScope = Self.storedSpaceScope(defaults)
+        directActivationBindings = Self.normalizeBindings(defaults.stringArray(forKey: Keys.directActivationBindings) ?? [])
+        let reloadedScopes = Self.loadScopes(defaults.stringArray(forKey: Keys.scopedShortcutScopes))
+        scopedShortcutScopes = reloadedScopes
+        if let raw = defaults.array(forKey: Keys.scopedShortcutList) as? [[String: String]] {
+            scopedShortcuts = Self.decodeScopedShortcuts(raw)
+        } else {
+            scopedShortcuts = Self.migrateScopedShortcuts(legacyScopes: reloadedScopes)
+        }
+        nextScopedShortcutID = max(defaults.object(forKey: Keys.nextScopedShortcutID) as? Int ?? 0, (scopedShortcuts.map(\.id).max() ?? -1) + 1)
+        let rawOverrides = defaults.array(forKey: Keys.shortcutOverrides) as? [[String: String]]
+        let decodedOverrides = Self.decodeShortcutOverrides(rawOverrides)
+        shortcutOverrides = decodedOverrides
+        if rawOverrides?.contains(where: { $0["panelSize"] != nil }) == true {
+            defaults.set(Self.encodeShortcutOverrides(decodedOverrides), forKey: Keys.shortcutOverrides)
+        }
+
+        hoverActionsEnabled = defaults.object(forKey: Keys.hoverActionsEnabled) as? Bool ?? false
+        hoverShowClose = defaults.object(forKey: Keys.hoverShowClose) as? Bool ?? true
+        hoverShowMinimize = defaults.object(forKey: Keys.hoverShowMinimize) as? Bool ?? true
+        hoverShowMaximize = defaults.object(forKey: Keys.hoverShowMaximize) as? Bool ?? true
+        hoverShowHide = defaults.object(forKey: Keys.hoverShowHide) as? Bool ?? true
+        hoverShowQuit = defaults.object(forKey: Keys.hoverShowQuit) as? Bool ?? true
+        hoverShowForceQuit = defaults.object(forKey: Keys.hoverShowForceQuit) as? Bool ?? false
+        hideFromScreenSharing = defaults.object(forKey: Keys.hideFromScreenSharing) as? Bool ?? false
+        animationsEnabled = defaults.object(forKey: Keys.animationsEnabled) as? Bool ?? true
+    }
+}

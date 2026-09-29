@@ -79,14 +79,14 @@ git clone https://github.com/kang1027/StayTab.git
 cd StayTab
 
 xcodebuild \
-  -project BetterCmdTab.xcodeproj \
-  -scheme "BetterCmdTab Debug" \
+  -project StayTab.xcodeproj \
+  -scheme "StayTab Debug" \
   -configuration Debug \
   CODE_SIGNING_ALLOWED=NO \
   build
 ```
 
-업스트림 기록과 호환성을 보존하기 위해 Xcode 프로젝트와 소스 모듈 이름은 `BetterCmdTab`을 유지해요. 생성되는 제품은 `StayTab`이고 번들 식별자는 `com.kdh.StayTab`이에요.
+Xcode 프로젝트, 스킴, Swift 모듈 이름은 모두 `StayTab`이에요. Release 빌드는 `StayTab.app`(`com.kdh.StayTab`), Debug 빌드는 `StayTab Debug.app`(`com.kdh.StayTab.debug`)을 만들어요.
 
 ## 권한과 개인정보
 
@@ -100,8 +100,8 @@ StayTab은 전환 단축키를 확인하고 선택한 창에 포커스를 주기
 
 ```sh
 xcodebuild \
-  -project BetterCmdTab.xcodeproj \
-  -scheme "BetterCmdTab Debug" \
+  -project StayTab.xcodeproj \
+  -scheme "StayTab Debug" \
   -destination "platform=macOS" \
   CODE_SIGNING_ALLOWED=NO \
   test

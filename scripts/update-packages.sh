@@ -12,8 +12,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT="$SCRIPT_DIR/../BetterCmdTab.xcodeproj"
-SCHEME="BetterCmdTab Debug"
+PROJECT="$SCRIPT_DIR/../StayTab.xcodeproj"
+SCHEME="StayTab Debug"
 RESOLVED="$PROJECT/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
 
 echo "==> Updating Swift packages for $(basename "$PROJECT")"
