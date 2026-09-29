@@ -178,6 +178,18 @@ enum RowLabels {
         })
     }
 
+    /// Whether a row stays lit while a letter chain is being typed. Type-to-jump
+    /// keeps the roster order and only dims rows the typed prefix can no longer
+    /// reach; an empty prefix keeps every row lit.
+    static func reachable(label: String, typedPrefix: String) -> Bool {
+        typedPrefix.isEmpty || label.hasPrefix(typedPrefix)
+    }
+
+    /// First row the typed prefix still reaches, so selection lands on a lit row.
+    static func firstReachableIndex(in labels: [String], typedPrefix: String) -> Int? {
+        labels.firstIndex { reachable(label: $0, typedPrefix: typedPrefix) }
+    }
+
     /// Lower-case ASCII alphanumerics from the app name, preserving order and
     /// dropping punctuation/spaces. Returns each leading prefix up to length 3.
     private static func automaticCandidates(_ raw: String) -> [String] {

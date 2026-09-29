@@ -100,7 +100,7 @@ final class SwitcherController: SwitcherViewDelegate {
     /// onto the window rows in `reveal()` / `commit()` for that mode.
     private var primedStepDelta: Int = 0
     /// Canonical catalog set for the current reveal. `rows`/`labels` are the
-    /// *displayed* derivation (fuzzy-filtered or letter-prefix-reordered);
+    /// *displayed* derivation (fuzzy-filtered, or the roster plus recently closed);
     /// `baseRows`/`baseLabels` are the unfiltered source so the search query
     /// can widen again on backspace. Kept in sync by every refresh path.
     private var baseRows: [SwitcherRow] = [] {
@@ -5680,13 +5680,13 @@ final class SwitcherController: SwitcherViewDelegate {
     }
 
     /// Persistent rows are a fixed prefix only in the unfiltered app roster.
-    /// Search and type-to-jump reorder the visible rows, so section chrome is
-    /// deliberately disabled there instead of labelling a mixed block as pinned.
+    /// Search reorders the visible rows, so section chrome is deliberately
+    /// disabled there instead of labelling a mixed block as pinned. Type-to-jump
+    /// keeps the order (it only dims), so the sections stay.
     private func persistentPrefixCount(in displayedRows: [SwitcherRow]) -> Int {
         guard !windowsOnlyMode,
               activeScope == nil,
-              !searchActive,
-              letterBuffer.isEmpty else { return 0 }
+              !searchActive else { return 0 }
         let pinned = Set(Preferences.shared.pinnedBundleIDs)
         return displayedRows.prefix { row in
             row.bundleIdentifier.map(pinned.contains) == true
@@ -5765,8 +5765,8 @@ final class SwitcherController: SwitcherViewDelegate {
     }
 
     /// Single funnel that derives the displayed `rows`/`labels` from the
-    /// canonical `baseRows`, honoring the active mode: fuzzy-search filter,
-    /// letter-prefix reorder, or plain pass-through. Selection is restored by
+    /// canonical `baseRows`, honoring the active mode: fuzzy-search filter or
+    /// roster pass-through (type-to-jump only dims, in the view). Selection is restored by
     /// identity (then `anchorPid`, then clamped), and the result is pushed to
     /// the panel. Replaces the old `applyPrefixReorder`.
     private func refreshDisplay(resetSelectionToTop: Bool = false, anchorPid: pid_t? = nil) {
@@ -5896,22 +5896,16 @@ final class SwitcherController: SwitcherViewDelegate {
                 ? baseLabels
                 : RowLabels.labels(for: combined)
 
-            if !letterBuffer.isEmpty {
-                let prefix = letterBuffer
-                var orderIdx: [Int] = []
-                orderIdx.reserveCapacity(combined.count)
-                for i in combined.indices where combinedLabels[i].hasPrefix(prefix) { orderIdx.append(i) }
-                for i in combined.indices where !combinedLabels[i].hasPrefix(prefix) { orderIdx.append(i) }
-                rows = orderIdx.map { combined[$0] }
-                labels = orderIdx.map { combinedLabels[$0] }
-            } else {
-                rows = combined
-                labels = combinedLabels
-            }
+            // Type-to-jump keeps the roster layout; the view dims rows the
+            // typed prefix can no longer reach instead of reordering them.
+            rows = combined
+            labels = combinedLabels
         }
 
         if resetSelectionToTop {
-            index = 0
+            index = searchActive
+                ? 0
+                : RowLabels.firstReachableIndex(in: labels, typedPrefix: letterBuffer) ?? 0
         } else if let selectedRow,
                   let restored = Self.windowSelectionIndex(in: rows, selected: selectedRow) {
             index = restored

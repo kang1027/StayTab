@@ -247,4 +247,13 @@ struct RowLabelsTests {
         )
         #expect(labels == ["s", "se", "set", ""])
     }
+
+    @Test("typed prefix keeps order and only marks unreachable rows")
+    func typedPrefixReachability() {
+        let labels = ["s", "wa", "t", "w"]
+        #expect(labels.map { RowLabels.reachable(label: $0, typedPrefix: "w") } == [false, true, false, true])
+        #expect(labels.allSatisfy { RowLabels.reachable(label: $0, typedPrefix: "") })
+        #expect(RowLabels.firstReachableIndex(in: labels, typedPrefix: "w") == 1)
+        #expect(RowLabels.firstReachableIndex(in: labels, typedPrefix: "x") == nil)
+    }
 }

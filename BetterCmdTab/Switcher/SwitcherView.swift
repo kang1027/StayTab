@@ -692,6 +692,8 @@ final class SwitcherView: NSView {
         }
     }
 
+    private static let unreachableRowAlpha: CGFloat = 0.25
+
     private func rebuildItemPool() {
         while itemViews.count < rows.count {
             let view = makeItemView()
@@ -732,6 +734,9 @@ final class SwitcherView: NSView {
                 effective: effective
             )
             itemViews[i].isHovered = (i == hoveredIndex)
+            // Type-to-jump dims rows the typed letters can no longer reach.
+            itemViews[i].alphaValue = searchActive || RowLabels.reachable(label: label, typedPrefix: highlightPrefix)
+                ? 1 : Self.unreachableRowAlpha
             itemViews[i].isHidden = false
         }
     }
