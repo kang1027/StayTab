@@ -86,7 +86,7 @@ xcodebuild \
   build
 ```
 
-The Xcode project, schemes, and Swift module are named `StayTab`. The built product is `StayTab`, with bundle identifier `com.kdh.StayTab`.
+The Xcode project, schemes, and Swift module are named `StayTab`. Release builds produce `StayTab.app` (`com.kdh.StayTab`); Debug builds produce `StayTab Debug.app` (`com.kdh.StayTab.debug`).
 
 ## Permissions and privacy
 

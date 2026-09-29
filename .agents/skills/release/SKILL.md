@@ -47,9 +47,11 @@ scripts/build_release.sh --beta --clean   # beta
 The first step is `scripts/release_quality_gate.sh`: a Release-configuration
 compile that fails on high-risk concurrency/Sendable warnings, plus (stable
 only) the localization audit — fix the reported issue, don't bypass the gate.
-Signing needs the `Developer ID Application: DongHyeon Kang (GGR9HG6DB8)`
-certificate and the `StayTabNotarization` notarytool profile. Without them use
-`--skip-notarization` (local test package only — it refuses `--auto-release`).
+Every build signs with the
+`Developer ID Application: DongHyeon Kang (GGR9HG6DB8)` certificate, so it must
+be installed even for test packages. Notarization also needs the
+`StayTabNotarization` notarytool profile; without it use `--skip-notarization`
+(local test package only — it refuses `--auto-release`).
 
 Artifacts land in `build/release/`. Each build stamps a timestamp
 `CURRENT_PROJECT_VERSION` into the archive without editing the project

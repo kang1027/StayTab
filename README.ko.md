@@ -86,7 +86,7 @@ xcodebuild \
   build
 ```
 
-Xcode 프로젝트, 스킴, Swift 모듈 이름은 모두 `StayTab`이에요. 생성되는 제품은 `StayTab`이고 번들 식별자는 `com.kdh.StayTab`이에요.
+Xcode 프로젝트, 스킴, Swift 모듈 이름은 모두 `StayTab`이에요. Release 빌드는 `StayTab.app`(`com.kdh.StayTab`), Debug 빌드는 `StayTab Debug.app`(`com.kdh.StayTab.debug`)을 만들어요.
 
 ## 권한과 개인정보
 

@@ -72,6 +72,7 @@ After a blank line, end with:
 Use the intended `v` release tag as `TARGET-REF` when the user supplied it;
 otherwise use the resolved target commit SHA.
 
-**Complete when:** the first line is the canonical Highlights heading, all
-headings exactly match `CLAUDE.md`, empty sections are absent, every
+**Complete when:** the first line is the canonical Highlights heading, the
+change sections use exactly the `CLAUDE.md` headings (known issues and the
+attribution section are the only additions), empty sections are absent, every
 bullet is user-facing, and the footer represents the inspected range.
