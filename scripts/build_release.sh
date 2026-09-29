@@ -231,8 +231,9 @@ if [[ $skip_build -eq 0 ]]; then
 		mkdir -p "$DMG_STAGE_DIR"
 	fi
 	ditto "$APP_PATH" "${DMG_STAGE_DIR}/StayTab.app"
+	# The GPL attribution travels inside the app (Resources/NOTICE.md, checked
+	# above) and in the About pane, so the installer window stays app-first.
 	ditto "${REPO_ROOT}/LICENSE" "${DMG_STAGE_DIR}/LICENSE.txt"
-	ditto "${REPO_ROOT}/NOTICE.md" "${DMG_STAGE_DIR}/NOTICE.md"
 	ln -s /Applications "${DMG_STAGE_DIR}/Applications"
 	hdiutil create \
 		-volname "StayTab ${ARTIFACT_VERSION}" \
