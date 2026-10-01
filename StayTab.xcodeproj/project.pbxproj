@@ -577,7 +577,7 @@
 			repositoryURL = "https://github.com/rokartur/BetterPermissions.git";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 1.0.0;
+				minimumVersion = 1.0.2;
 			};
 		};
 		BS0000000000000000000001 /* XCRemoteSwiftPackageReference "BetterSettings" */ = {
