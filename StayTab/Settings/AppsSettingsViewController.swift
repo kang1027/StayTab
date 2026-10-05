@@ -35,6 +35,9 @@ final class AppsSettingsViewController: SettingsTabViewController {
     private var jumpLetters: [String: String] = Preferences.shared.appJumpLetters
     /// The last rejected edit, shown inline instead of failing with only a beep.
     private var jumpKeyValidationMessage: String?
+    /// A free key offered next to `jumpKeyValidationMessage` when the rejected
+    /// edit was a conflict or a reserved key; one click assigns it.
+    private var jumpKeySuggestion: (bundleID: String, key: String)?
     private var appsSheet: AppsPickerSheetWindowController?
     private var addSheet: AppsPickerSheetWindowController?
 
@@ -196,9 +199,30 @@ final class AppsSettingsViewController: SettingsTabViewController {
         label.textColor = color
         label.maximumNumberOfLines = 0
 
-        let row = NSStackView(views: [icon, label])
-        row.orientation = .horizontal
-        row.alignment = .firstBaseline
+        guard jumpKeyValidationMessage != nil, let suggestion = jumpKeySuggestion else {
+            let row = NSStackView(views: [icon, label])
+            row.orientation = .horizontal
+            row.alignment = .firstBaseline
+            row.spacing = 6
+            label.widthAnchor.constraint(equalTo: row.widthAnchor, constant: -22).isActive = true
+            return row
+        }
+
+        let button = NSButton(
+            title: String(format: String(localized: "Use %@"), suggestion.key.uppercased()),
+            target: self,
+            action: #selector(applyJumpKeySuggestion)
+        )
+        button.bezelStyle = .rounded
+        button.controlSize = .small
+        button.setContentHuggingPriority(.required, for: .horizontal)
+        let message = NSStackView(views: [icon, label])
+        message.orientation = .horizontal
+        message.alignment = .firstBaseline
+        message.spacing = 6
+        let row = NSStackView(views: [message, button])
+        row.orientation = .vertical
+        row.alignment = .leading
         row.spacing = 6
         label.widthAnchor.constraint(equalTo: row.widthAnchor, constant: -22).isActive = true
         return row
@@ -312,34 +336,72 @@ final class AppsSettingsViewController: SettingsTabViewController {
             reservedLetters: RowLabels.reserved
         ) {
         case .cleared:
-            jumpKeyValidationMessage = nil
+            clearJumpKeyRejection()
             jumpLetters.removeValue(forKey: bundleID)
             Preferences.shared.appJumpLetters = jumpLetters
             rebuildPinnedCard()
         case let .valid(sequence):
-            jumpKeyValidationMessage = nil
+            clearJumpKeyRejection()
             jumpLetters[bundleID] = sequence
             Preferences.shared.appJumpLetters = jumpLetters
             rebuildPinnedCard()
         case .invalid:
+            clearJumpKeyRejection()
             jumpKeyValidationMessage = String(localized: "Use one to three A–Z letters or 0–9 digits.")
             NSSound.beep()
             rebuildPinnedCard()
         case let .reserved(letter):
+            clearJumpKeyRejection()
             jumpKeyValidationMessage = String(
                 format: String(localized: "%@ is unavailable because it is assigned to a switcher control."),
                 String(letter).uppercased()
             )
             NSSound.beep()
             rebuildPinnedCard()
+            suggestJumpKey(for: bundleID)
         case let .conflict(sequence):
+            clearJumpKeyRejection()
             jumpKeyValidationMessage = String(
                 format: String(localized: "%@ conflicts with another pinned app jump key."),
                 sequence.uppercased()
             )
             NSSound.beep()
             rebuildPinnedCard()
+            suggestJumpKey(for: bundleID)
         }
+    }
+
+    private func clearJumpKeyRejection() {
+        jumpKeyValidationMessage = nil
+        jumpKeySuggestion = nil
+    }
+
+    /// Resolve the app's display name off the main actor (a cold LaunchServices
+    /// lookup can hitch the UI), pick a free key, and re-show the hint with a
+    /// one-click button. Dropped if the user moved on to another edit meanwhile.
+    private func suggestJumpKey(for bundleID: String) {
+        let assignments = jumpLetters
+        let reserved = RowLabels.reserved
+        DispatchQueue.global(qos: .userInitiated).async {
+            let name = Self.appName(for: bundleID)
+            let key = JumpKeySuggestion.suggest(
+                appName: name,
+                bundleID: bundleID,
+                assignments: assignments,
+                reservedLetters: reserved
+            )
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.jumpKeyValidationMessage != nil,
+                      self.jumpKeySuggestion == nil, let key else { return }
+                self.jumpKeySuggestion = (bundleID, key)
+                self.rebuildPinnedCard()
+            }
+        }
+    }
+
+    @objc private func applyJumpKeySuggestion() {
+        guard let suggestion = jumpKeySuggestion else { return }
+        updateJumpLetter(bundleID: suggestion.bundleID, rawValue: suggestion.key)
     }
 
     override func viewWillAppear() {
