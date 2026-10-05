@@ -45,6 +45,9 @@ extension Preferences {
         // Migration bookkeeping for THIS Mac's stored percentages, not a setting
         // — see `Preferences.preRebasePanelScales`.
         "Switcher.panelScaleRebased",
+        // First-run walkthrough bookkeeping for THIS Mac — importing a config
+        // from another machine must neither replay nor suppress it.
+        "Switcher.onboardingCompleted",
         // `$schema` is the editor's schema pointer in the config file, not a
         // setting — never store or re-export it.
         "Switcher.$schema",

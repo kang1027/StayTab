@@ -1,6 +1,108 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Access granted" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zugriff erlaubt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acceso concedido"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accès autorisé"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dostęp przyznany"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已允许访问"
+          }
+        }
+      }
+    },
+    "Allow Accessibility access" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bedienungshilfen-Zugriff erlauben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permitir el acceso de Accesibilidad"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autoriser l’accès à l’Accessibilité"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zezwól na dostęp do Dostępności"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许辅助功能访问"
+          }
+        }
+      }
+    },
+    "Choose apps to keep in ⌘Tab" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apps für ⌘Tab auswählen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elige las apps que quedarán en ⌘Tab"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez les apps à garder dans ⌘Tab"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wybierz aplikacje do zachowania w ⌘Tab"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择要保留在 ⌘Tab 中的 App"
+          }
+        }
+      }
+    },
     "%@ conflicts with another pinned app jump key." : {
       "localizations" : {
         "de" : {
@@ -31,6 +133,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 与另一个固定应用的跳转键冲突。"
+          }
+        }
+      }
+    },
+    "Continue" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fortfahren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuer"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kontynuuj"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "继续"
+          }
+        }
+      }
+    },
+    "Hold ⌘ and press Tab. Pinned apps stay in the list even after they quit." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Halte ⌘ gedrückt und drücke Tab. Angeheftete Apps bleiben auch nach dem Beenden in der Liste."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantén pulsado ⌘ y pulsa Tab. Las apps fijadas permanecen en la lista aunque se cierren."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maintenez ⌘ et appuyez sur Tab. Les apps épinglées restent dans la liste même après leur fermeture."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przytrzymaj ⌘ i naciśnij Tab. Przypięte aplikacje pozostają na liście nawet po zamknięciu."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按住 ⌘ 再按 Tab。固定的 App 即使退出也会保留在列表中。"
           }
         }
       }
@@ -7527,6 +7697,40 @@
         }
       }
     },
+    "No other apps are running. You can pin apps later in Apps settings." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Es laufen keine weiteren Apps. Du kannst Apps später in den App-Einstellungen anheften."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No hay otras apps abiertas. Puedes fijar apps más tarde en los ajustes de Apps."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune autre app n’est ouverte. Vous pourrez épingler des apps plus tard dans les réglages Apps."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie działają żadne inne aplikacje. Aplikacje możesz przypiąć później w ustawieniach Aplikacji."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有其他正在运行的 App。你可以稍后在“App”设置中固定。"
+          }
+        }
+      }
+    },
     "No pinned apps yet." : {
       "localizations" : {
         "de" : {
@@ -8578,6 +8782,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "固定应用会强制排在切换器最前面，位于最近使用之前。拖动可设置它们的顺序。"
+          }
+        }
+      }
+    },
+    "Pinned apps stay in the list after they quit and launch from the same slot. You can change this any time in Apps settings." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Angeheftete Apps bleiben nach dem Beenden in der Liste und starten am selben Platz. Du kannst das jederzeit in den App-Einstellungen ändern."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las apps fijadas permanecen en la lista tras cerrarse y se abren desde el mismo lugar. Puedes cambiarlo cuando quieras en los ajustes de Apps."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les apps épinglées restent dans la liste après leur fermeture et se lancent depuis le même emplacement. Vous pouvez modifier cela à tout moment dans les réglages Apps."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przypięte aplikacje pozostają na liście po zamknięciu i uruchamiają się z tego samego miejsca. Możesz to zmienić w dowolnym momencie w ustawieniach Aplikacji."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定的 App 退出后仍保留在列表中，并从同一位置启动。你可以随时在“App”设置中更改。"
+          }
+        }
+      }
+    },
+    "Pin Selected Apps" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausgewählte Apps anheften"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fijar las apps seleccionadas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Épingler les apps sélectionnées"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przypnij wybrane aplikacje"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定所选 App"
           }
         }
       }
@@ -11715,6 +11987,40 @@
         }
       }
     },
+    "Skip" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Überspringen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Omitir"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ignorer"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pomiń"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳过"
+          }
+        }
+      }
+    },
     "Slide right to move left and left to move right." : {
       "localizations" : {
         "de" : {
@@ -12154,6 +12460,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "StayTab 需要辅助功能权限才能处理 ⌘Tab。请在“系统设置”中重新启用，切换器会自动恢复。"
+          }
+        }
+      }
+    },
+    "StayTab needs it to read your windows and take over ⌘Tab. It continues on its own once you allow it." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "StayTab benötigt ihn, um deine Fenster zu lesen und ⌘Tab zu übernehmen. Sobald du ihn erlaubst, geht es automatisch weiter."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "StayTab lo necesita para leer tus ventanas y encargarse de ⌘Tab. Continuará solo en cuanto lo permitas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "StayTab en a besoin pour lire vos fenêtres et prendre en charge ⌘Tab. La suite démarre automatiquement dès que vous l’autorisez."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "StayTab potrzebuje go, aby odczytywać okna i przejąć ⌘Tab. Po udzieleniu zgody przejdziemy dalej automatycznie."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "StayTab 需要此权限来读取你的窗口并接管 ⌘Tab。允许后会自动继续。"
+          }
+        }
+      }
+    },
+    "Step %d of %d" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schritt %d von %d"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paso %d de %d"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Étape %d sur %d"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Krok %d z %d"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %d 步，共 %d 步"
           }
         }
       }
@@ -12733,6 +13107,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "文字大小"
+          }
+        }
+      }
+    },
+    "That's it — you're all set." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das war’s – alles bereit."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Listo, todo está preparado."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Et voilà, tout est prêt."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To wszystko – wszystko gotowe."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成，一切就绪。"
           }
         }
       }
@@ -13486,6 +13894,40 @@
         }
       }
     },
+    "Try it" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausprobieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pruébalo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Essayez"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wypróbuj"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "试一试"
+          }
+        }
+      }
+    },
     "Turn on “Show hidden apps” above first." : {
       "localizations" : {
         "de" : {
@@ -14061,6 +14503,108 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "可见空间"
+          }
+        }
+      }
+    },
+    "Waiting for permission…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Warte auf Erlaubnis …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esperando el permiso…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente de l’autorisation…"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oczekiwanie na zgodę…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在等待授权…"
+          }
+        }
+      }
+    },
+    "Waiting for you to open the switcher…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Warte darauf, dass du den Umschalter öffnest …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esperando a que abras el selector…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente de l’ouverture du sélecteur…"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Czekam na otwarcie przełącznika…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在等待你打开切换器…"
+          }
+        }
+      }
+    },
+    "Welcome to StayTab" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Willkommen bei StayTab"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Te damos la bienvenida a StayTab"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bienvenue dans StayTab"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Witamy w StayTab"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "欢迎使用 StayTab"
           }
         }
       }

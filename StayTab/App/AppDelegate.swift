@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var controller: SwitcherController?
     private var statusItem: NSStatusItem?
     private var axWaiter: AccessibilityWaiter?
+    private var onboarding: OnboardingWindowController?
     private var cancellables = Set<AnyCancellable>()
 
     /// Process-lifetime App Nap opt-out. A `.accessory` app is always fully
@@ -111,7 +112,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.handleAccessibilityGranted()
         }
         axWaiter = waiter
-        waiter.start()
+        let showOnboarding = prepareOnboarding()
+        waiter.start(prompt: !showOnboarding)
+        if showOnboarding { onboarding?.present() }
 
         // StayTab uses its own signed release feed. Keep network access opt-in
         // for a fresh install, but preserve any cadence the user later chooses
@@ -130,6 +133,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.notifyAccessibilityRevoked()
         }
         controller = c
+        c.onDidReveal = onboarding == nil ? nil : { [weak self] in self?.onboarding?.switcherRevealed() }
         c.start()
         // Close the trust-check → tap-install TOCTOU window without a lifetime
         // poll: the controller reports the revoke and the waiter resumes only
@@ -153,12 +157,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Boot after the initial grant, or re-arm the dead tap after a re-grant.
     private func handleAccessibilityGranted() {
         accessibilityLostShown = false
+        onboarding?.accessibilityGranted()
         if controller == nil {
             bootController()
         } else {
             controller?.reinstallHotkeyTap()
             controller?.reassertNativeOverrideAfterRegrant()
         }
+    }
+
+    /// Builds the first-run walkthrough when this looks like a fresh install.
+    /// An existing setup (trusted + pins) is marked done without showing anything.
+    private func prepareOnboarding() -> Bool {
+        let pinned = Preferences.shared.pinnedBundleIDs.count
+        let trusted = AccessibilityCheck.isTrusted
+        guard OnboardingPolicy.shouldShow(
+            completed: OnboardingWindowController.isCompleted,
+            accessibilityTrusted: trusted,
+            pinnedCount: pinned
+        ) else {
+            if !OnboardingWindowController.isCompleted { OnboardingWindowController.markCompleted() }
+            return false
+        }
+        let window = OnboardingWindowController(accessibilityTrusted: trusted)
+        window.onClose = { [weak self] in
+            self?.onboarding = nil
+            self?.controller?.onDidReveal = nil
+        }
+        onboarding = window
+        return true
     }
 
     private func notifyAccessibilityRevoked() {

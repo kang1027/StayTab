@@ -10,6 +10,9 @@ final class SwitcherController: SwitcherViewDelegate {
     /// App-level recovery hook: the live event tap is the revoke detector while
     /// trusted, so the permission waiter can stay asleep until this fires.
     var onAccessibilityRevoked: () -> Void = {}
+    /// Fired each time the panel is presented. Set only while the first-run
+    /// walkthrough waits for the user's first ⌘Tab; nil otherwise.
+    var onDidReveal: (() -> Void)?
 
     enum Phase {
         case idle
@@ -3382,6 +3385,7 @@ final class SwitcherController: SwitcherViewDelegate {
         )
         panel.present(opacity: effective.panelOpacity)
         phase = .visible
+        onDidReveal?()
         cache.setPanelVisible(true)
         dockBadgeObserver.start(enabled: effective.showUnreadBadges)
         // Inline browser-tab mode: start scanning the visible browser windows'
@@ -3482,6 +3486,7 @@ final class SwitcherController: SwitcherViewDelegate {
         view.configure(rows: rows, labels: displayLabels, selectedIndex: index, metrics: currentMetrics, effective: effective, highlightPrefix: letterBuffer)
         panel.present(opacity: effective.panelOpacity)
         phase = .visible
+        onDidReveal?()
         cache.setPanelVisible(true)
         dockBadgeObserver.start(enabled: effective.showUnreadBadges)
         // Forced for the same reason as the apps-mode reveal: fresh tab state
