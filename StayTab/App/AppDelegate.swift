@@ -183,6 +183,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.onClose = { [weak self] in
             self?.onboarding = nil
             self?.controller?.onDidReveal = nil
+            // The walkthrough replaced the launch-time system prompt; if it was
+            // dismissed before the permission step finished, ask the usual way.
+            if !AccessibilityCheck.isTrusted { AccessibilityCheck.promptIfNeeded() }
         }
         onboarding = window
         return true
