@@ -569,7 +569,7 @@
 			repositoryURL = "https://github.com/rokartur/BetterShortcuts.git";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 0.1.1;
+				minimumVersion = 0.3.8;
 			};
 		};
 		BP0000000000000000000001 /* XCRemoteSwiftPackageReference "BetterPermissions" */ = {
