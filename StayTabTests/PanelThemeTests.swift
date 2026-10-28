@@ -24,6 +24,8 @@ struct PanelThemeTests {
         theme.strength = 0.7
         theme.tone = true
         theme.scrim = 0.12
+        theme.title = "Daily"
+        theme.symbol = "star.fill"
         theme.passthrough = ["futureKey": "x"]
         #expect(AreaTheme(dictionary: theme.dictionary, area: .always) == theme)
     }
@@ -43,6 +45,15 @@ struct PanelThemeTests {
         #expect(theme.strength == AreaTheme.strengthRange.lowerBound)
         #expect(theme.scrim == 0)
         #expect(theme.passthrough.isEmpty)
+    }
+
+    @Test("a section title is one trimmed line of bounded length")
+    func titleCleaning() {
+        #expect(AreaTheme.cleanTitle("  Work\nstuff  ") == "Work stuff")
+        #expect(AreaTheme.cleanTitle(String(repeating: "x", count: 50)).count == AreaTheme.titleMaxLength)
+        let theme = AreaTheme(dictionary: ["title": "  Mine ", "symbol": "../evil"], area: .always)
+        #expect(theme.title == "Mine")
+        #expect(theme.symbol.isEmpty)
     }
 
     @Test("stored numbers don't depend on the locale and drop trailing zeros")

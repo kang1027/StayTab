@@ -980,9 +980,14 @@ final class SwitcherView: NSView {
     /// moment ago gets no entry and simply appears in its slot.
     /// Stays a hard cut when the panel isn't showing this content yet (a reveal
     /// has to land in one frame) or the user turned animations off.
+    /// Whether a reconfigure that moves rows glides them. The Theme editor's
+    /// preview turns it off while it resizes, where every step is a new layout.
+    var reflowGlides = true
+
     private func armReflow(incoming: [SwitcherRow], geometryChanged: Bool) {
         reflowOrigins = nil
         reflowAnimates = false
+        guard reflowGlides else { return }
         // The panel exists from launch on, so its mere presence proves nothing:
         // the reveal reconfigures rows over a layout that has never run, and
         // gliding from that would fly the grid in from the window corner.
@@ -1522,9 +1527,13 @@ private final class RosterSectionBackdropView: NSView {
     private let fill = ThemeFillView()
     private var theme = AreaTheme()
     private var picture: CGImage?
+    private let defaultTitle: String
+    private let defaultSymbol: String
 
     init(title: String, symbolName: String, style: Style) {
         self.style = style
+        defaultTitle = title
+        defaultSymbol = symbolName
         super.init(frame: .zero)
         wantsLayer = true
         layer?.cornerCurve = .continuous
@@ -1568,6 +1577,10 @@ private final class RosterSectionBackdropView: NSView {
         self.theme = theme
         self.picture = picture
         fill.apply(theme: theme, picture: picture, veil: CGFloat(theme.scrim))
+        title.stringValue = theme.title.isEmpty ? defaultTitle : theme.title
+        icon.image = (theme.symbol.isEmpty ? nil : NSImage(systemSymbolName: theme.symbol, accessibilityDescription: nil))
+            ?? NSImage(systemSymbolName: defaultSymbol, accessibilityDescription: nil)
+        needsLayout = true
         updateAppearance()
     }
 

@@ -16,6 +16,44 @@ final class ThemeSettingsViewController: SettingsTabViewController {
     private let areaControl = NSSegmentedControl()
     private var previewView: SwitcherView?
     private var previewRows: [SwitcherRow] = []
+    private var previewHeight: NSLayoutConstraint?
+    private let expandButton = ThemeSettingsViewController.overlayButton()
+    private let actualSizeButton = ThemeSettingsViewController.overlayButton()
+    /// The draft at its real size and position, over the real desktop.
+    private var actualPanel: SwitcherPanel?
+    private var actualView: SwitcherView?
+    private var actualSizeMonitors: [Any] = []
+    private static let previewHeights: (compact: CGFloat, expanded: CGFloat) = (210, 400)
+    /// Drives the bigger/smaller preview: the box height steps every frame and
+    /// the preview is laid out again at each step. Glass ignores ancestor
+    /// scaling, so a zoom transform can't do this.
+    private var resizeTimer: Timer?
+    /// The scale the last layout settled on and the box it fitted, so the next
+    /// layout (each step of a resize) starts close and converges in a pass or two.
+    private var lastFit: (scale: CGFloat, design: NSSize)?
+    private var resize: (start: CFTimeInterval, from: CGFloat, to: CGFloat, duration: CFTimeInterval)?
+    private var previewPersistentCount = 0
+    private let alwaysCount = PreviewCountControl(symbol: "infinity",
+                                                  help: String(localized: "Sample apps in the Always section"))
+    private let runningCount = PreviewCountControl(symbol: "bolt.fill",
+                                                   help: String(localized: "Sample apps in the Running now section"))
+
+    // Label
+    private var labelSection: SettingsSectionView?
+    private let titleField = NSTextField(string: "")
+    private let symbolPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private static let sectionSymbols: [(symbol: String, name: String)] = [
+        ("infinity", String(localized: "Infinity")),
+        ("pin.fill", String(localized: "Pin")),
+        ("star.fill", String(localized: "Star")),
+        ("heart.fill", String(localized: "Heart")),
+        ("bolt.fill", String(localized: "Bolt")),
+        ("flame.fill", String(localized: "Flame")),
+        ("sparkles", String(localized: "Sparkles")),
+        ("leaf.fill", String(localized: "Leaf")),
+        ("moon.fill", String(localized: "Moon")),
+        ("bookmark.fill", String(localized: "Bookmark")),
+    ]
     private var configuredAppearance: PanelAppearance?
     private var configuredAccent: ThemeAccent?
 
@@ -129,6 +167,27 @@ final class ThemeSettingsViewController: SettingsTabViewController {
                subtitle: String(localized: "Back to the standard look for this area. Nothing changes until you save."),
                accessory: resetButton)
 
+        let label = addSection(title: String(localized: "Label"), anchor: SettingsAnchor.themeLabel)
+        labelSection = label
+        titleField.controlSize = .small
+        titleField.delegate = self
+        titleField.translatesAutoresizingMaskIntoConstraints = false
+        titleField.widthAnchor.constraint(equalToConstant: 180).isActive = true
+        titleField.setAccessibilityLabel(String(localized: "Title"))
+        addRow(to: label, title: String(localized: "Title"),
+               subtitle: String(localized: "Leave empty for the standard name."),
+               accessory: titleField, searchItemID: SearchID.themeLabel)
+        symbolPopup.controlSize = .small
+        symbolPopup.removeAllItems()
+        symbolPopup.addItem(withTitle: String(localized: "Default"))
+        for entry in Self.sectionSymbols {
+            symbolPopup.addItem(withTitle: entry.name)
+            symbolPopup.lastItem?.image = NSImage(systemSymbolName: entry.symbol, accessibilityDescription: nil)
+        }
+        symbolPopup.target = self
+        symbolPopup.action = #selector(symbolChanged)
+        addRow(to: label, title: String(localized: "Icon"), accessory: symbolPopup)
+
         let picture = addSection(title: String(localized: "Picture"), anchor: SettingsAnchor.themePicture)
         pictureSection = picture
         thumbnail.imageScaling = .scaleProportionallyUpOrDown
@@ -154,17 +213,15 @@ final class ThemeSettingsViewController: SettingsTabViewController {
                accessory: pictureStack, searchItemID: SearchID.themePicture)
 
         cropView.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            cropView.widthAnchor.constraint(equalToConstant: 240),
-            cropView.heightAnchor.constraint(equalToConstant: 150),
-        ])
+        cropView.heightAnchor.constraint(equalToConstant: 260).isActive = true
         cropView.onFocusChange = { [weak self] focus in
             self?.session.updateArea { $0.focusX = focus.x; $0.focusY = focus.y }
         }
         cropView.onDropFile = { [weak self] url in self?.loadPicture(from: url) }
         addRow(to: picture, title: String(localized: "Visible area"),
-               subtitle: String(localized: "Drag the frame, or drop a picture on it. The frame keeps the area's shape as apps come and go."),
-               accessory: cropView)
+               subtitle: String(localized: "Drag the frame, or drop a picture on it. The frame keeps the area's shape as apps come and go."))
+        // Full card width: framing a picture needs room more than any other row.
+        picture.addContent(cropView)
         addRow(to: picture, title: String(localized: "Zoom"),
                accessory: slider(zoomSlider, value: zoomValue, range: 100...300, label: String(localized: "Zoom")))
         addRow(to: picture, title: String(localized: "Blur"),
@@ -220,11 +277,15 @@ final class ThemeSettingsViewController: SettingsTabViewController {
         super.viewWillDisappear()
         // The draft stays in the session; only this pane stops listening.
         session.onChange = nil
+        hideActualSize()
     }
 
     override func prepareForMemoryRelease() {
         super.prepareForMemoryRelease()
         session.onChange = nil
+        hideActualSize()
+        resizeTimer?.invalidate()
+        resizeTimer = nil
         session.releaseIfClean()
         previewView?.releaseIdleResources()
         previewView?.removeFromSuperview()
@@ -260,8 +321,27 @@ final class ThemeSettingsViewController: SettingsTabViewController {
             self.refresh()
         }
         previewBox.onLayout = { [weak self] in self?.layoutPreview() }
+        expandButton.target = self
+        expandButton.action = #selector(toggleExpandedPreview)
+        actualSizeButton.target = self
+        actualSizeButton.action = #selector(showActualSize)
+        actualSizeButton.image = NSImage(systemSymbolName: "macwindow.on.rectangle", accessibilityDescription: nil)
+        actualSizeButton.toolTip = String(localized: "Show at actual size. Click anywhere or press Esc to close.")
+        actualSizeButton.setAccessibilityLabel(String(localized: "Show at actual size"))
+        updateExpandButton()
+        for control in [alwaysCount, runningCount] {
+            control.stepper.target = self
+            control.stepper.action = #selector(sampleCountChanged)
+        }
+        // A strip under the picture rather than over it, so nothing covers the
+        // panel however wide a long roster makes it.
+        let spacer = NSView()
+        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        let toolbar = NSStackView(views: [alwaysCount, runningCount, spacer, actualSizeButton, expandButton])
+        toolbar.spacing = 6
+        toolbar.alignment = .centerY
 
-        for subview in [previewBox, areaControl] as [NSView] {
+        for subview in [previewBox, toolbar, areaControl] as [NSView] {
             subview.translatesAutoresizingMaskIntoConstraints = false
             header.addSubview(subview)
         }
@@ -286,6 +366,9 @@ final class ThemeSettingsViewController: SettingsTabViewController {
         saveBar.layer?.masksToBounds = true
         view.addSubview(saveBar)
 
+        let previewHeight = previewBox.heightAnchor.constraint(
+            equalToConstant: session.previewExpanded ? Self.previewHeights.expanded : Self.previewHeights.compact)
+        self.previewHeight = previewHeight
         let saveBarHeight = saveBar.heightAnchor.constraint(equalToConstant: 0)
         self.saveBarHeight = saveBarHeight
         NSLayoutConstraint.activate([
@@ -295,8 +378,11 @@ final class ThemeSettingsViewController: SettingsTabViewController {
             previewBox.topAnchor.constraint(equalTo: header.topAnchor),
             previewBox.leadingAnchor.constraint(equalTo: header.leadingAnchor),
             previewBox.trailingAnchor.constraint(equalTo: header.trailingAnchor),
-            previewBox.heightAnchor.constraint(equalToConstant: 210),
-            areaControl.topAnchor.constraint(equalTo: previewBox.bottomAnchor, constant: 10),
+            previewHeight,
+            toolbar.topAnchor.constraint(equalTo: previewBox.bottomAnchor, constant: 8),
+            toolbar.leadingAnchor.constraint(equalTo: header.leadingAnchor),
+            toolbar.trailingAnchor.constraint(equalTo: header.trailingAnchor),
+            areaControl.topAnchor.constraint(equalTo: toolbar.bottomAnchor, constant: 8),
             areaControl.leadingAnchor.constraint(equalTo: header.leadingAnchor),
             areaControl.trailingAnchor.constraint(equalTo: header.trailingAnchor),
             areaControl.bottomAnchor.constraint(equalTo: header.bottomAnchor),
@@ -320,25 +406,75 @@ final class ThemeSettingsViewController: SettingsTabViewController {
         preview.acceptsPointer = false
         previewBox.addSubview(preview, positioned: .below, relativeTo: previewBox.clickCatcher)
         previewView = preview
-        previewRows = Self.makePreviewRows()
+        rebuildPreviewRows()
         configuredAppearance = nil
     }
 
-    /// Up to six running apps, split between the two sections so both show.
-    private static func makePreviewRows() -> [SwitcherRow] {
+    private func rebuildPreviewRows() {
+        let counts = session.previewCounts ?? Self.defaultSampleCounts()
+        session.previewCounts = counts
+        let built = Self.makePreviewRows(always: counts.always, running: counts.running)
+        previewRows = built.rows
+        previewPersistentCount = built.persistent
+        lastFit = nil
+        alwaysCount.count = counts.always
+        runningCount.count = counts.running
+    }
+
+    /// Starts from the user's own roster size: their pinned apps, and the apps
+    /// running beside them.
+    private static func defaultSampleCounts() -> (always: Int, running: Int) {
+        let pinned = Preferences.shared.pinnedBundleIDs
+        let running = regularRunningApps().filter { !pinned.contains($0.bundleIdentifier ?? "") }.count
+        let limit = Int(PreviewCountControl.range.upperBound)
+        return (pinned.isEmpty ? 3 : min(pinned.count, limit), running == 0 ? 3 : min(running, limit))
+    }
+
+    private static func regularRunningApps() -> [NSRunningApplication] {
         var seen = Set<String>()
-        var apps: [NSRunningApplication] = []
-        for app in NSWorkspace.shared.runningApplications
-        where !app.isTerminated && app.activationPolicy == .regular {
-            let identity = app.bundleIdentifier ?? "pid.\(app.processIdentifier)"
-            guard seen.insert(identity).inserted, app.localizedName?.isEmpty == false else { continue }
-            apps.append(app)
-            if apps.count == 6 { break }
+        return NSWorkspace.shared.runningApplications.filter { app in
+            guard !app.isTerminated, app.activationPolicy == .regular, app.localizedName?.isEmpty == false else { return false }
+            return seen.insert(app.bundleIdentifier ?? "pid.\(app.processIdentifier)").inserted
         }
-        if apps.isEmpty { apps = [.current] }
-        return apps.map {
-            SwitcherRow(app: $0, window: nil, windowTitle: "", isMinimized: false, isPlaceholder: true)
+    }
+
+    /// Sample rows for the preview. Always starts with the user's pinned apps
+    /// (a closed one draws as it does in the switcher, dashed with Launch) and
+    /// Running now with unpinned running apps; past that, running apps repeat
+    /// so a section can be grown to any length the user wants to see.
+    private static func makePreviewRows(always: Int, running: Int) -> (rows: [SwitcherRow], persistent: Int) {
+        let pinned = Preferences.shared.pinnedBundleIDs
+        let apps = regularRunningApps()
+        let pool = apps.isEmpty ? [NSRunningApplication.current] : apps
+        let byBundle = Dictionary(apps.compactMap { app in app.bundleIdentifier.map { ($0, app) } }, uniquingKeysWith: { first, _ in first })
+        let row = { (app: NSRunningApplication) in
+            SwitcherRow(app: app, window: nil, windowTitle: "", isMinimized: false, isPlaceholder: true)
         }
+        var alwaysRows: [SwitcherRow] = []
+        for bundleID in pinned where alwaysRows.count < always {
+            if let app = byBundle[bundleID] {
+                alwaysRows.append(row(app))
+            } else if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+                let name = FileManager.default.displayName(atPath: url.path)
+                    .replacingOccurrences(of: ".app", with: "")
+                alwaysRows.append(SwitcherRow(launchable: InstalledApp(name: name, bundleID: bundleID, url: url)))
+            }
+        }
+        var index = 0
+        while alwaysRows.count < always {
+            alwaysRows.append(row(pool[index % pool.count]))
+            index += 1
+        }
+        let unpinned = apps.filter { !pinned.contains($0.bundleIdentifier ?? "") }
+        var runningRows: [SwitcherRow] = []
+        index = 0
+        while runningRows.count < running {
+            let app = index < unpinned.count ? unpinned[index] : pool[(index - unpinned.count) % pool.count]
+            runningRows.append(row(app))
+            index += 1
+        }
+        if alwaysRows.isEmpty && runningRows.isEmpty { runningRows = [row(pool[0])] }
+        return (alwaysRows + runningRows, alwaysRows.count)
     }
 
     /// Configures the preview at a scale that fits the box and centers it.
@@ -348,12 +484,21 @@ final class ThemeSettingsViewController: SettingsTabViewController {
         var override = ShortcutOverride()
         override.panelAppearance = session.appearance
         let effective = prefs.effectiveSettings(for: override)
-        let available = NSSize(width: previewBox.bounds.width - 28, height: previewBox.bounds.height - 24)
-        var scale = SwitcherMetrics.scale(forPercent: effective.panelScalePercent)
+        let design = NSSize(width: previewBox.bounds.width - 28, height: previewBox.bounds.height - 24)
+        let base = SwitcherMetrics.scale(forPercent: effective.panelScalePercent)
+        var scale = base
+        if let lastFit, lastFit.design.width > 0, lastFit.design.height > 0 {
+            // Optimistic: grow by the roomier axis, and let the loop below step
+            // back down if the other axis was the one that bound.
+            let growth = max(design.width / lastFit.design.width, design.height / lastFit.design.height)
+            scale = min(base, lastFit.scale * max(growth, 0.5))
+        }
         var fitting = NSSize.zero
         // Before configuring, so the rows pick up the draft's accent.
         previewView.setTheme(session.draft, pictures: previewPictures)
-        for _ in 0..<2 {
+        // The switcher also shrinks itself to fit the screen, so the size doesn't
+        // follow the requested scale linearly: step down until it fits the box.
+        for _ in 0..<8 {
             let metrics = SwitcherMetrics.forScale(
                 scale,
                 layoutMode: effective.layoutMode,
@@ -369,21 +514,24 @@ final class ThemeSettingsViewController: SettingsTabViewController {
                 selectedIndex: 0,
                 metrics: metrics,
                 effective: effective,
-                persistentRowCount: previewRows.count > 1 ? (previewRows.count + 1) / 2 : previewRows.count
+                persistentRowCount: previewPersistentCount
             )
             previewView.layoutSubtreeIfNeeded()
             fitting = previewView.fittingSize
-            let shrink = min(1, available.width / max(fitting.width, 1), available.height / max(fitting.height, 1))
-            if shrink >= 0.98 { break }
-            scale *= shrink
+            let shrink = min(design.width / max(fitting.width, 1), design.height / max(fitting.height, 1))
+            if shrink >= 1 { break }
+            scale *= max(0.5, shrink * 0.97)
         }
-        let size = NSSize(width: min(fitting.width, available.width), height: min(fitting.height, available.height))
-        previewView.frame = NSRect(x: (previewBox.bounds.width - size.width) / 2,
-                                   y: (previewBox.bounds.height - size.height) / 2,
-                                   width: size.width, height: size.height).integral
+        lastFit = (scale, design)
+        let size = NSSize(width: ceil(min(fitting.width, design.width)), height: ceil(min(fitting.height, design.height)))
+        previewView.frame = NSRect(origin: Self.centeredOrigin(of: size, in: previewBox.bounds.size), size: size)
         configuredAppearance = session.appearance
         configuredAccent = session.draft.accent
         previewView.setTheme(session.draft, pictures: previewPictures)
+    }
+
+    private static func centeredOrigin(of size: NSSize, in box: NSSize) -> NSPoint {
+        NSPoint(x: ((box.width - size.width) / 2).rounded(), y: ((box.height - size.height) / 2).rounded())
     }
 
     private func loadDesktopPicture() {
@@ -428,6 +576,13 @@ final class ThemeSettingsViewController: SettingsTabViewController {
         borderRow?.isHidden = !colored || area == .panel
         tintRow?.update(title: area == .panel ? String(localized: "Tint") : String(localized: "Fill"))
         pictureSection?.isHidden = theme.backdrop != .image
+        labelSection?.isHidden = area == .panel
+        titleField.placeholderString = area.displayName
+        if titleField.currentEditor() == nil, titleField.stringValue != theme.title {
+            titleField.stringValue = theme.title
+        }
+        let symbolIndex = Self.sectionSymbols.firstIndex { $0.symbol == theme.symbol }.map { $0 + 1 } ?? 0
+        symbolPopup.selectItem(at: symbolIndex)
         for (index, swatch) in swatches.enumerated() {
             let preset = Self.presets[index]
             swatch.isChosen = colored && preset.hue == theme.hue && preset.tint == theme.tint
@@ -453,6 +608,7 @@ final class ThemeSettingsViewController: SettingsTabViewController {
         }
 
         updatePreviewPictures()
+        if actualPanel != nil { renderActualSize() }
         // Light/dark and the accent reach the rows only through a configure pass;
         // everything else is a theme property on the existing preview.
         if configuredAppearance != session.appearance || configuredAccent != session.draft.accent {
@@ -655,6 +811,20 @@ final class ThemeSettingsViewController: SettingsTabViewController {
         }
     }
 
+    @objc private func sampleCountChanged() {
+        session.previewCounts = (alwaysCount.stepper.integerValue, runningCount.stepper.integerValue)
+        rebuildPreviewRows()
+        layoutPreview()
+        if actualPanel != nil { renderActualSize() }
+        updateReadability()
+    }
+
+    @objc private func symbolChanged() {
+        let index = symbolPopup.indexOfSelectedItem
+        let symbol = index > 0 && index <= Self.sectionSymbols.count ? Self.sectionSymbols[index - 1].symbol : ""
+        session.updateArea { $0.symbol = symbol }
+    }
+
     @objc private func revert() {
         session.revert()
     }
@@ -676,6 +846,141 @@ final class ThemeSettingsViewController: SettingsTabViewController {
         } else {
             alert.runModal()
         }
+    }
+
+    // MARK: - Bigger previews
+
+    @objc private func toggleExpandedPreview() {
+        session.previewExpanded.toggle()
+        updateExpandButton()
+        let target = session.previewExpanded ? Self.previewHeights.expanded : Self.previewHeights.compact
+        let current = previewHeight?.constant ?? target
+        resizeTimer?.invalidate()
+        guard SwitcherMotion.isEnabled else {
+            previewHeight?.constant = target
+            view.layoutSubtreeIfNeeded()
+            return
+        }
+        // Rows re-lay out at every step; gliding them would chase each step.
+        previewView?.reflowGlides = false
+        resize = (CACurrentMediaTime(), current, target, 0.25)
+        resizeTimer = Timer.scheduledTimer(timeInterval: 1.0 / 60, target: self,
+                                           selector: #selector(resizeStep), userInfo: nil, repeats: true)
+    }
+
+    @objc private func resizeStep() {
+        guard let resize else {
+            resizeTimer?.invalidate()
+            return
+        }
+        let t = min(1, (CACurrentMediaTime() - resize.start) / resize.duration)
+        let eased = t < 0.5 ? 2 * t * t : 1 - pow(-2 * t + 2, 2) / 2
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        previewHeight?.constant = (resize.from + (resize.to - resize.from) * CGFloat(eased)).rounded()
+        view.layoutSubtreeIfNeeded()
+        CATransaction.commit()
+        guard t >= 1 else { return }
+        resizeTimer?.invalidate()
+        resizeTimer = nil
+        self.resize = nil
+        previewView?.reflowGlides = true
+    }
+
+    private func updateExpandButton() {
+        let expanded = session.previewExpanded
+        expandButton.image = NSImage(
+            systemSymbolName: expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
+            accessibilityDescription: nil)
+        let label = expanded ? String(localized: "Smaller preview") : String(localized: "Larger preview")
+        expandButton.toolTip = label
+        expandButton.setAccessibilityLabel(label)
+    }
+
+    /// Floats the draft as the real switcher would show it — actual size,
+    /// centered, over the real desktop — until the next click or key press.
+    @objc private func showActualSize() {
+        guard actualPanel == nil else { return }
+        let switcher = SwitcherView(frame: .zero, allowsWindowCapture: false, followsSavedTheme: false)
+        switcher.acceptsPointer = false
+        let panel = SwitcherPanel()
+        panel.contentView = switcher
+        panel.ignoresMouseEvents = true
+        actualPanel = panel
+        actualView = switcher
+        renderActualSize()
+        panel.orderFrontRegardless()
+        let dismiss: (NSEvent) -> NSEvent? = { [weak self] _ in
+            self?.hideActualSize()
+            return nil
+        }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown], handler: dismiss) {
+            actualSizeMonitors.append(local)
+        }
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown], handler: { [weak self] _ in
+            self?.hideActualSize()
+        }) {
+            actualSizeMonitors.append(global)
+        }
+    }
+
+    private func renderActualSize() {
+        guard let panel = actualPanel, let switcher = actualView else { return }
+        var override = ShortcutOverride()
+        override.panelAppearance = session.appearance
+        let effective = Preferences.shared.effectiveSettings(for: override)
+        let screen = view.window?.screen ?? SwitcherPanel.preferredScreen()
+        panel.targetScreen = screen
+        let metrics = SwitcherMetrics.forScale(
+            SwitcherMetrics.scale(forPercent: effective.panelScalePercent),
+            layoutMode: effective.layoutMode,
+            fontScale: effective.fontScale.multiplier,
+            letterHints: effective.letterHintsEnabled,
+            showAppNames: effective.showApplicationNames,
+            showWindowTitles: effective.showWindowTitleLabel,
+            hoverActionCount: 0
+        )
+        switcher.setTheme(session.draft, pictures: previewPictures)
+        switcher.configure(
+            rows: previewRows,
+            labels: RowLabels.labels(for: previewRows),
+            selectedIndex: 0,
+            metrics: metrics,
+            effective: effective,
+            persistentRowCount: previewPersistentCount
+        )
+        switcher.layoutSubtreeIfNeeded()
+        switcher.setTheme(session.draft, pictures: previewPictures)
+        let visible = screen.visibleFrame
+        let fitting = switcher.fittingSize
+        let size = NSSize(width: min(fitting.width, visible.width), height: min(fitting.height, visible.height))
+        panel.setFrame(NSRect(x: visible.midX - size.width / 2, y: visible.midY - size.height / 2,
+                              width: size.width, height: size.height).integral, display: true)
+        panel.alphaValue = CGFloat(effective.panelOpacity) / 100
+    }
+
+    private func hideActualSize() {
+        for monitor in actualSizeMonitors { NSEvent.removeMonitor(monitor) }
+        actualSizeMonitors.removeAll()
+        actualPanel?.orderOut(nil)
+        actualView?.releaseIdleResources()
+        actualPanel = nil
+        actualView = nil
+    }
+
+    /// Small icon button for the strip under the preview.
+    private static func overlayButton() -> NSButton {
+        let button = NSButton()
+        button.bezelStyle = .texturedRounded
+        button.controlSize = .small
+        button.imagePosition = .imageOnly
+        button.imageScaling = .scaleProportionallyDown
+        button.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            button.widthAnchor.constraint(equalToConstant: 28),
+            button.heightAnchor.constraint(equalToConstant: 26),
+        ])
+        return button
     }
 
     // MARK: - Control helpers
@@ -716,6 +1021,73 @@ final class ThemeSettingsViewController: SettingsTabViewController {
         button.controlSize = .small
         button.target = self
         button.action = action
+    }
+}
+
+extension ThemeSettingsViewController: NSTextFieldDelegate {
+    func controlTextDidChange(_ notification: Notification) {
+        guard (notification.object as? NSTextField) === titleField else { return }
+        let title = AreaTheme.cleanTitle(titleField.stringValue)
+        session.updateArea { $0.title = title }
+    }
+}
+
+/// "∞ 10 ⇅" under the preview: how many sample apps a section holds, so a long
+/// roster can be tried out before it exists.
+final class PreviewCountControl: NSView {
+    static let range: ClosedRange<Double> = 0...40
+    let stepper = NSStepper()
+    private let countLabel = NSTextField(labelWithString: "")
+
+    var count: Int {
+        get { stepper.integerValue }
+        set {
+            stepper.integerValue = newValue
+            countLabel.stringValue = "\(newValue)"
+        }
+    }
+
+    init(symbol: String, help: String) {
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.cornerRadius = 7
+        toolTip = help
+        let icon = NSImageView(image: NSImage(systemSymbolName: symbol, accessibilityDescription: nil) ?? NSImage())
+        icon.contentTintColor = .secondaryLabelColor
+        icon.symbolConfiguration = .init(pointSize: 10, weight: .semibold)
+        countLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
+        countLabel.textColor = .labelColor
+        countLabel.alignment = .right
+        countLabel.widthAnchor.constraint(equalToConstant: 18).isActive = true
+        stepper.controlSize = .small
+        stepper.minValue = Self.range.lowerBound
+        stepper.maxValue = Self.range.upperBound
+        stepper.increment = 1
+        stepper.valueWraps = false
+        stepper.setAccessibilityLabel(help)
+        let stack = NSStackView(views: [icon, countLabel, stepper])
+        stack.spacing = 4
+        stack.alignment = .centerY
+        stack.edgeInsets = NSEdgeInsets(top: 2, left: 8, bottom: 2, right: 4)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+        translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: topAnchor),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor),
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) not implemented") }
+
+    /// A `CGColor` doesn't follow light/dark by itself, so re-resolve it here.
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer?.backgroundColor = NSColor.quaternaryLabelColor.cgColor
+        }
     }
 }
 

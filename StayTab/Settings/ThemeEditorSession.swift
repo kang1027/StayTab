@@ -21,6 +21,10 @@ final class ThemeEditorSession {
     private(set) var sources: [ThemeArea: Source] = [:]
     private(set) var isSaving = false
     var area: ThemeArea = .panel
+    /// The Theme tab's bigger preview, remembered while the app runs.
+    var previewExpanded = false
+    /// Sample apps per section in the Theme tab's preview; nil until first shown.
+    var previewCounts: (always: Int, running: Int)?
 
     /// Called after any change, including sources finishing loading.
     var onChange: (() -> Void)?

@@ -55,6 +55,7 @@ struct AreaTheme: Equatable, Sendable {
     static let blurRange: ClosedRange<Double> = 0...8
     static let strengthRange: ClosedRange<Double> = 0.2...1
     static let scrimRange: ClosedRange<Double> = 0...0.6
+    static let titleMaxLength = 32
 
     var backdrop: ThemeBackdrop = .standard
     /// OKLCH hue in degrees, `0..<360`.
@@ -74,6 +75,10 @@ struct AreaTheme: Equatable, Sendable {
     var tone: Bool = false
     /// Extra veil behind the text, on top of the panel's standard dim.
     var scrim: Double = 0
+    /// Section header text; empty keeps the standard name. Sections only.
+    var title = ""
+    /// SF Symbol for the section header; empty keeps the standard one.
+    var symbol = ""
     var passthrough: [String: String] = [:]
 
     static func defaults(for area: ThemeArea) -> AreaTheme {
@@ -95,7 +100,7 @@ struct AreaTheme: Equatable, Sendable {
 
     static let knownKeys: Set<String> = [
         "backdrop", "hue", "tint", "border", "focusX", "focusY",
-        "zoom", "blur", "strength", "tone", "scrim",
+        "zoom", "blur", "strength", "tone", "scrim", "title", "symbol",
     ]
 
     var dictionary: [String: String] {
@@ -111,6 +116,8 @@ struct AreaTheme: Equatable, Sendable {
         d["strength"] = Self.format(strength)
         d["tone"] = tone ? "true" : "false"
         d["scrim"] = Self.format(scrim)
+        if !title.isEmpty { d["title"] = title }
+        if !symbol.isEmpty { d["symbol"] = symbol }
         return d
     }
 
@@ -131,7 +138,15 @@ struct AreaTheme: Equatable, Sendable {
         if let value = number("strength") { strength = value.clamped(to: Self.strengthRange) }
         if let value = dictionary["tone"] { tone = value == "true" }
         if let value = number("scrim") { scrim = value.clamped(to: Self.scrimRange) }
+        if let value = dictionary["title"] { title = Self.cleanTitle(value) }
+        if let value = dictionary["symbol"], !value.contains("/") { symbol = value }
         passthrough = dictionary.filter { !Self.knownKeys.contains($0.key) }
+    }
+
+    /// One line, trimmed, at most `titleMaxLength` characters.
+    static func cleanTitle(_ value: String) -> String {
+        let line = value.components(separatedBy: .newlines).joined(separator: " ")
+        return String(line.trimmingCharacters(in: .whitespaces).prefix(titleMaxLength))
     }
 
     static func normalizedHue(_ value: Double) -> Double {

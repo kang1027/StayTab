@@ -61,6 +61,7 @@ enum SettingsAnchor {
     // Theme
     static let themeStyle = "theme.style"
     static let themePicture = "theme.picture"
+    static let themeLabel = "theme.label"
     static let themeReadability = "theme.readability"
     static let themePanel = "theme.panel"
     // Privacy
@@ -176,6 +177,7 @@ enum SearchID {
     static let themeStyle = "theme.style"
     static let themePicture = "theme.picture"
     static let themeAccent = "theme.accent"
+    static let themeLabel = "theme.labelTitle"
     static let themeAppearance = "theme.appearance"
     // Privacy
     static let tabPermissions = "switcher.tabPermissions"
@@ -428,6 +430,8 @@ enum SettingsCatalog {
              String(localized: "Style"), ["theme", "color", "colour", "tint", "hue", "background", "always", "running now", "section"]),
         item(SearchID.themePicture, .theme, SettingsAnchor.themePicture, String(localized: "Theme"), String(localized: "Picture"),
              String(localized: "Picture"), ["picture", "image", "photo", "wallpaper", "background image", "crop", "blur"]),
+        item(SearchID.themeLabel, .theme, SettingsAnchor.themeLabel, String(localized: "Theme"), String(localized: "Label"),
+             String(localized: "Title"), ["section title", "rename", "always", "running now", "label", "icon", "symbol"]),
         item(SearchID.themeAccent, .theme, SettingsAnchor.themePanel, String(localized: "Theme"), String(localized: "Panel"),
              String(localized: "Accent color"), ["accent", "highlight", "selection color", "jump letters"]),
         item(SearchID.themeAppearance, .theme, SettingsAnchor.themePanel, String(localized: "Theme"), String(localized: "Panel"),
