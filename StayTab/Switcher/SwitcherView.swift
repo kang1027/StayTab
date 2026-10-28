@@ -212,6 +212,12 @@ final class SwitcherView: NSView {
     /// when the theme changes, never per reveal; a reveal only re-fits the
     /// pictures when an area changed size.
     func setTheme(_ theme: PanelTheme, pictures: [ThemeArea: ThemePicture]) {
+        // A section label shown or hidden changes its header height, so the
+        // cached layout no longer holds.
+        let labelsChanged = theme.always.showsTitle != self.theme.always.showsTitle
+            || theme.always.showsIcon != self.theme.always.showsIcon
+            || theme.running.showsTitle != self.theme.running.showsTitle
+            || theme.running.showsIcon != self.theme.running.showsIcon
         self.theme = theme
         themePictures = pictures
         themeAccent = theme.accent == .background ? ThemeColor.dynamicAccent(hue: theme.panel.hue) : nil
@@ -234,6 +240,11 @@ final class SwitcherView: NSView {
         pinnedSectionView.applyTheme(theme.always, picture: theme.always.backdrop == .image ? pictures[.always]?.image : nil)
         runningSectionView.applyTheme(theme.running, picture: theme.running.backdrop == .image ? pictures[.running]?.image : nil)
         CATransaction.commit()
+        if labelsChanged, !rows.isEmpty {
+            cachedLayout = nil
+            invalidateIntrinsicContentSize()
+            needsLayout = true
+        }
         if accent != (themeAccent ?? .controlAccentColor), !rows.isEmpty {
             accent = themeAccent ?? .controlAccentColor
             needsLayout = true
@@ -941,11 +952,12 @@ final class SwitcherView: NSView {
             case .running: sectionView = runningSectionView
             }
             sectionView.frame = section.frame
+            let label = section.kind == .pinned ? theme.always : theme.running
             sectionView.apply(
                 scale: metrics.scale,
                 accent: accent,
-                showsTitle: effective.showRosterSectionTitles,
-                showsIcon: effective.showRosterSectionIcons
+                showsTitle: effective.showRosterSectionTitles && label.showsTitle,
+                showsIcon: effective.showRosterSectionIcons && label.showsIcon
             )
             sectionView.isHidden = false
         }
@@ -1279,11 +1291,16 @@ final class SwitcherView: NSView {
         maxColumns: Int,
         packing: RosterSectionLayout.Packing
     ) -> ListLayout {
-        let headerHeight = RosterSectionLayout.headerHeight(
-            scale: metrics.scale,
-            showsTitle: effective.showRosterSectionTitles,
-            showsIcon: effective.showRosterSectionIcons
-        )
+        let scale = metrics.scale
+        let showsTitles = effective.showRosterSectionTitles
+        let showsIcons = effective.showRosterSectionIcons
+        let headerHeight = { (label: AreaTheme) in
+            RosterSectionLayout.headerHeight(
+                scale: scale,
+                showsTitle: showsTitles && label.showsTitle,
+                showsIcon: showsIcons && label.showsIcon
+            )
+        }
         let bottomPadding = round(8 * metrics.scale)
         let sectionSpacing = round(10 * metrics.scale)
         let result = RosterSectionLayout.make(
@@ -1293,7 +1310,8 @@ final class SwitcherView: NSView {
             itemGap: itemGap,
             maxWidth: maxWidth,
             maxColumns: maxColumns,
-            headerHeight: headerHeight,
+            headerHeight: headerHeight(theme.always),
+            runningHeaderHeight: headerHeight(theme.running),
             bottomPadding: bottomPadding,
             sectionSpacing: sectionSpacing,
             packing: packing
@@ -1577,8 +1595,9 @@ private final class RosterSectionBackdropView: NSView {
         self.theme = theme
         self.picture = picture
         fill.apply(theme: theme, picture: picture, veil: CGFloat(theme.scrim))
-        title.stringValue = theme.title.isEmpty ? defaultTitle : theme.title
-        icon.image = (theme.symbol.isEmpty ? nil : NSImage(systemSymbolName: theme.symbol, accessibilityDescription: nil))
+        title.stringValue = theme.title ?? defaultTitle
+        let custom = theme.symbol.isEmpty || !theme.showsIcon ? nil : theme.symbol
+        icon.image = custom.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
             ?? NSImage(systemSymbolName: defaultSymbol, accessibilityDescription: nil)
         needsLayout = true
         updateAppearance()

@@ -56,6 +56,9 @@ final class ThemeSettingsViewController: SettingsTabViewController {
     ]
     private var configuredAppearance: PanelAppearance?
     private var configuredAccent: ThemeAccent?
+    /// Which section labels the last layout had; showing or hiding one changes
+    /// the preview's size, so it needs a fresh fit.
+    private var configuredLabels: [Bool] = []
 
     // Pinned below them.
     private let saveBar = NSView()
@@ -171,15 +174,22 @@ final class ThemeSettingsViewController: SettingsTabViewController {
         labelSection = label
         titleField.controlSize = .small
         titleField.delegate = self
+        // Live edits arrive through the delegate; the action also catches a
+        // value set at once (paste, accessibility) when editing ends.
+        titleField.target = self
+        titleField.action = #selector(titleCommitted)
+        titleField.cell?.sendsActionOnEndEditing = true
         titleField.translatesAutoresizingMaskIntoConstraints = false
         titleField.widthAnchor.constraint(equalToConstant: 180).isActive = true
         titleField.setAccessibilityLabel(String(localized: "Title"))
+        titleField.placeholderString = String(localized: "No title")
         addRow(to: label, title: String(localized: "Title"),
-               subtitle: String(localized: "Leave empty for the standard name."),
+               subtitle: String(localized: "Clear it to hide the title. Reset brings back the standard name."),
                accessory: titleField, searchItemID: SearchID.themeLabel)
         symbolPopup.controlSize = .small
         symbolPopup.removeAllItems()
         symbolPopup.addItem(withTitle: String(localized: "Default"))
+        symbolPopup.addItem(withTitle: String(localized: "None"))
         for entry in Self.sectionSymbols {
             symbolPopup.addItem(withTitle: entry.name)
             symbolPopup.lastItem?.image = NSImage(systemSymbolName: entry.symbol, accessibilityDescription: nil)
@@ -317,6 +327,7 @@ final class ThemeSettingsViewController: SettingsTabViewController {
 
         previewBox.onClick = { [weak self] point in
             guard let self, let area = self.previewView?.themeArea(atWindowPoint: point) else { return }
+            self.view.window?.makeFirstResponder(nil)
             self.session.area = area
             self.refresh()
         }
@@ -404,6 +415,9 @@ final class ThemeSettingsViewController: SettingsTabViewController {
     private func buildPreview() {
         let preview = SwitcherView(frame: .zero, allowsWindowCapture: false, followsSavedTheme: false, drawsInWindow: true)
         preview.acceptsPointer = false
+        // Every change here re-fits the whole preview; gliding rows between
+        // those passes is what made it shake.
+        preview.reflowGlides = false
         previewBox.addSubview(preview, positioned: .below, relativeTo: previewBox.clickCatcher)
         previewView = preview
         rebuildPreviewRows()
@@ -498,6 +512,10 @@ final class ThemeSettingsViewController: SettingsTabViewController {
         previewView.setTheme(session.draft, pictures: previewPictures)
         // The switcher also shrinks itself to fit the screen, so the size doesn't
         // follow the requested scale linearly: step down until it fits the box.
+        // One transaction, no implicit animations: only the final pass shows.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
         for _ in 0..<8 {
             let metrics = SwitcherMetrics.forScale(
                 scale,
@@ -527,7 +545,13 @@ final class ThemeSettingsViewController: SettingsTabViewController {
         previewView.frame = NSRect(origin: Self.centeredOrigin(of: size, in: previewBox.bounds.size), size: size)
         configuredAppearance = session.appearance
         configuredAccent = session.draft.accent
+        configuredLabels = labelSignature()
         previewView.setTheme(session.draft, pictures: previewPictures)
+    }
+
+    private func labelSignature() -> [Bool] {
+        let draft = session.draft
+        return [draft.always.showsTitle, draft.always.showsIcon, draft.running.showsTitle, draft.running.showsIcon]
     }
 
     private static func centeredOrigin(of size: NSSize, in box: NSSize) -> NSPoint {
@@ -577,11 +601,12 @@ final class ThemeSettingsViewController: SettingsTabViewController {
         tintRow?.update(title: area == .panel ? String(localized: "Tint") : String(localized: "Fill"))
         pictureSection?.isHidden = theme.backdrop != .image
         labelSection?.isHidden = area == .panel
-        titleField.placeholderString = area.displayName
-        if titleField.currentEditor() == nil, titleField.stringValue != theme.title {
-            titleField.stringValue = theme.title
+        let shownTitle = theme.title ?? area.displayName
+        if titleField.currentEditor() == nil, titleField.stringValue != shownTitle {
+            titleField.stringValue = shownTitle
         }
-        let symbolIndex = Self.sectionSymbols.firstIndex { $0.symbol == theme.symbol }.map { $0 + 1 } ?? 0
+        let symbolIndex = theme.symbol == AreaTheme.noSymbol
+            ? 1 : Self.sectionSymbols.firstIndex { $0.symbol == theme.symbol }.map { $0 + 2 } ?? 0
         symbolPopup.selectItem(at: symbolIndex)
         for (index, swatch) in swatches.enumerated() {
             let preset = Self.presets[index]
@@ -611,7 +636,8 @@ final class ThemeSettingsViewController: SettingsTabViewController {
         if actualPanel != nil { renderActualSize() }
         // Light/dark and the accent reach the rows only through a configure pass;
         // everything else is a theme property on the existing preview.
-        if configuredAppearance != session.appearance || configuredAccent != session.draft.accent {
+        if configuredAppearance != session.appearance || configuredAccent != session.draft.accent
+            || configuredLabels != labelSignature() {
             layoutPreview()
         } else {
             previewView?.setTheme(session.draft, pictures: previewPictures)
@@ -717,6 +743,7 @@ final class ThemeSettingsViewController: SettingsTabViewController {
     @objc private func areaChanged() {
         let index = areaControl.selectedSegment
         guard ThemeArea.allCases.indices.contains(index) else { return }
+        view.window?.makeFirstResponder(nil)
         session.area = ThemeArea.allCases[index]
         refresh()
     }
@@ -758,6 +785,7 @@ final class ThemeSettingsViewController: SettingsTabViewController {
     }
 
     @objc private func resetArea() {
+        view.window?.makeFirstResponder(nil)
         session.resetArea()
     }
 
@@ -819,13 +847,24 @@ final class ThemeSettingsViewController: SettingsTabViewController {
         updateReadability()
     }
 
+    @objc private func titleCommitted() {
+        let title = AreaTheme.cleanTitle(titleField.stringValue)
+        session.updateArea { $0.title = title }
+    }
+
     @objc private func symbolChanged() {
         let index = symbolPopup.indexOfSelectedItem
-        let symbol = index > 0 && index <= Self.sectionSymbols.count ? Self.sectionSymbols[index - 1].symbol : ""
+        let symbol: String
+        switch index {
+        case 1: symbol = AreaTheme.noSymbol
+        case 2...(Self.sectionSymbols.count + 1): symbol = Self.sectionSymbols[index - 2].symbol
+        default: symbol = ""
+        }
         session.updateArea { $0.symbol = symbol }
     }
 
     @objc private func revert() {
+        view.window?.makeFirstResponder(nil)
         session.revert()
     }
 
@@ -861,8 +900,6 @@ final class ThemeSettingsViewController: SettingsTabViewController {
             view.layoutSubtreeIfNeeded()
             return
         }
-        // Rows re-lay out at every step; gliding them would chase each step.
-        previewView?.reflowGlides = false
         resize = (CACurrentMediaTime(), current, target, 0.25)
         resizeTimer = Timer.scheduledTimer(timeInterval: 1.0 / 60, target: self,
                                            selector: #selector(resizeStep), userInfo: nil, repeats: true)
@@ -884,7 +921,6 @@ final class ThemeSettingsViewController: SettingsTabViewController {
         resizeTimer?.invalidate()
         resizeTimer = nil
         self.resize = nil
-        previewView?.reflowGlides = true
     }
 
     private func updateExpandButton() {

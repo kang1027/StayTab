@@ -47,6 +47,19 @@ struct PanelThemeTests {
         #expect(theme.passthrough.isEmpty)
     }
 
+    @Test("a section label can keep, replace or hide its title and icon")
+    func labelVisibility() {
+        var theme = AreaTheme.defaults(for: .always)
+        #expect(theme.showsTitle && theme.showsIcon)
+        theme.title = ""
+        theme.symbol = AreaTheme.noSymbol
+        #expect(!theme.showsTitle && !theme.showsIcon)
+        let decoded = AreaTheme(dictionary: theme.dictionary, area: .always)
+        #expect(decoded.title == "")
+        #expect(!decoded.showsIcon)
+        #expect(AreaTheme(dictionary: [:], area: .always).title == nil)
+    }
+
     @Test("a section title is one trimmed line of bounded length")
     func titleCleaning() {
         #expect(AreaTheme.cleanTitle("  Work\nstuff  ") == "Work stuff")

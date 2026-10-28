@@ -56,6 +56,10 @@ struct AreaTheme: Equatable, Sendable {
     static let strengthRange: ClosedRange<Double> = 0.2...1
     static let scrimRange: ClosedRange<Double> = 0...0.6
     static let titleMaxLength = 32
+    static let noSymbol = "none"
+
+    var showsTitle: Bool { title.map { !$0.isEmpty } ?? true }
+    var showsIcon: Bool { symbol != Self.noSymbol }
 
     var backdrop: ThemeBackdrop = .standard
     /// OKLCH hue in degrees, `0..<360`.
@@ -75,9 +79,10 @@ struct AreaTheme: Equatable, Sendable {
     var tone: Bool = false
     /// Extra veil behind the text, on top of the panel's standard dim.
     var scrim: Double = 0
-    /// Section header text; empty keeps the standard name. Sections only.
-    var title = ""
-    /// SF Symbol for the section header; empty keeps the standard one.
+    /// Section header text: nil keeps the standard name, empty hides it.
+    var title: String?
+    /// SF Symbol for the section header: empty keeps the standard one,
+    /// `noSymbol` hides it.
     var symbol = ""
     var passthrough: [String: String] = [:]
 
@@ -116,7 +121,7 @@ struct AreaTheme: Equatable, Sendable {
         d["strength"] = Self.format(strength)
         d["tone"] = tone ? "true" : "false"
         d["scrim"] = Self.format(scrim)
-        if !title.isEmpty { d["title"] = title }
+        if let title { d["title"] = title }
         if !symbol.isEmpty { d["symbol"] = symbol }
         return d
     }
