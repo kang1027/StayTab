@@ -170,34 +170,6 @@ final class ThemeSettingsViewController: SettingsTabViewController {
                subtitle: String(localized: "Back to the standard look for this area. Nothing changes until you save."),
                accessory: resetButton)
 
-        let label = addSection(title: String(localized: "Label"), anchor: SettingsAnchor.themeLabel)
-        labelSection = label
-        titleField.controlSize = .small
-        titleField.delegate = self
-        // Live edits arrive through the delegate; the action also catches a
-        // value set at once (paste, accessibility) when editing ends.
-        titleField.target = self
-        titleField.action = #selector(titleCommitted)
-        titleField.cell?.sendsActionOnEndEditing = true
-        titleField.translatesAutoresizingMaskIntoConstraints = false
-        titleField.widthAnchor.constraint(equalToConstant: 180).isActive = true
-        titleField.setAccessibilityLabel(String(localized: "Title"))
-        titleField.placeholderString = String(localized: "No title")
-        addRow(to: label, title: String(localized: "Title"),
-               subtitle: String(localized: "Clear it to hide the title. Reset brings back the standard name."),
-               accessory: titleField, searchItemID: SearchID.themeLabel)
-        symbolPopup.controlSize = .small
-        symbolPopup.removeAllItems()
-        symbolPopup.addItem(withTitle: String(localized: "Default"))
-        symbolPopup.addItem(withTitle: String(localized: "None"))
-        for entry in Self.sectionSymbols {
-            symbolPopup.addItem(withTitle: entry.name)
-            symbolPopup.lastItem?.image = NSImage(systemSymbolName: entry.symbol, accessibilityDescription: nil)
-        }
-        symbolPopup.target = self
-        symbolPopup.action = #selector(symbolChanged)
-        addRow(to: label, title: String(localized: "Icon"), accessory: symbolPopup)
-
         let picture = addSection(title: String(localized: "Picture"), anchor: SettingsAnchor.themePicture)
         pictureSection = picture
         thumbnail.imageScaling = .scaleProportionallyUpOrDown
@@ -244,6 +216,34 @@ final class ThemeSettingsViewController: SettingsTabViewController {
         tintPictureRow = addRow(to: picture, title: String(localized: "Colors"),
                                 subtitle: String(localized: "Tinted turns the picture into the area's hue."),
                                 accessory: tonePopup)
+
+        let label = addSection(title: String(localized: "Label"), anchor: SettingsAnchor.themeLabel)
+        labelSection = label
+        titleField.controlSize = .small
+        titleField.delegate = self
+        // Live edits arrive through the delegate; the action also catches a
+        // value set at once (paste, accessibility) when editing ends.
+        titleField.target = self
+        titleField.action = #selector(titleCommitted)
+        titleField.cell?.sendsActionOnEndEditing = true
+        titleField.translatesAutoresizingMaskIntoConstraints = false
+        titleField.widthAnchor.constraint(equalToConstant: 180).isActive = true
+        titleField.setAccessibilityLabel(String(localized: "Title"))
+        titleField.placeholderString = String(localized: "No title")
+        addRow(to: label, title: String(localized: "Title"),
+               subtitle: String(localized: "Clear it to hide the title. Reset brings back the standard name."),
+               accessory: titleField, searchItemID: SearchID.themeLabel)
+        symbolPopup.controlSize = .small
+        symbolPopup.removeAllItems()
+        symbolPopup.addItem(withTitle: String(localized: "Default"))
+        symbolPopup.addItem(withTitle: String(localized: "None"))
+        for entry in Self.sectionSymbols {
+            symbolPopup.addItem(withTitle: entry.name)
+            symbolPopup.lastItem?.image = NSImage(systemSymbolName: entry.symbol, accessibilityDescription: nil)
+        }
+        symbolPopup.target = self
+        symbolPopup.action = #selector(symbolChanged)
+        addRow(to: label, title: String(localized: "Icon"), accessory: symbolPopup)
 
         let readability = addSection(title: String(localized: "Readability"), anchor: SettingsAnchor.themeReadability)
         addRow(to: readability, title: String(localized: "Legibility boost"),
@@ -751,7 +751,15 @@ final class ThemeSettingsViewController: SettingsTabViewController {
     @objc private func styleChanged() {
         let index = styleControl.selectedSegment
         guard ThemeBackdrop.allCases.indices.contains(index) else { return }
-        session.updateArea { $0.backdrop = ThemeBackdrop.allCases[index] }
+        let backdrop = ThemeBackdrop.allCases[index]
+        session.updateArea { $0.backdrop = backdrop }
+        guard backdrop == .image else { return }
+        // The picture rows open below the fold; bring them up, and with no
+        // picture yet go straight to choosing one.
+        refresh()
+        view.layoutSubtreeIfNeeded()
+        if let pictureSection { scrollToView(pictureSection, animated: true) }
+        if session.sources[session.area] == nil { choosePicture() }
     }
 
     @objc private func presetChosen(_ sender: ThemeSwatchButton) {

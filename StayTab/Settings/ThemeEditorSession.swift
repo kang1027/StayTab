@@ -106,6 +106,10 @@ final class ThemeEditorSession {
         theme.focusX = 0.5
         theme.focusY = 0.5
         theme.zoom = 1
+        // A boost tuned for the previous look would bury a new picture (the
+        // panel already lays 20 % over it); the suggested strength handles
+        // readability instead.
+        theme.scrim = 0
         if let strength { theme.strength = strength }
         draft[area: area] = theme
         onChange?()
