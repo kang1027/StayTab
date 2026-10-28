@@ -10,7 +10,6 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
     private let displayMonitorPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let displayModes: [SwitcherDisplayMode] = SwitcherDisplayMode.allCases
     private var layoutRadio: SettingsRadioGroupView!
-    private var appearanceRadio: SettingsRadioGroupView!
     private var titleAlignmentRadio: SettingsRadioGroupView!
     private var truncationRadio: SettingsRadioGroupView!
     private let gridPopup = NSPopUpButton(frame: .zero, pullsDown: false)
@@ -47,7 +46,6 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
     private let truncationModes: [TitleTruncationMode] = [.head, .middle, .tail]
     private let fontScales: [SwitcherFontScale] = SwitcherFontScale.allCases
     private let fontFaces: [SwitcherFontFace] = SwitcherFontFace.allCases
-    private let panelAppearances: [PanelAppearance] = PanelAppearance.allCases
     private let gridValues: [Int] = [0, 2, 3, 4, 5, 6] // 0 = automatic
 
     override func setupContent() {
@@ -169,13 +167,9 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
                subtitle: String(localized: "Mark hidden, minimized, full-screen and windowless entries with a small glyph. The audio, Launch and Reopen cues always show."),
                accessory: statusIconsSwitch, searchItemID: SearchID.windowStatusIcons)
 
-        // Panel section — the chrome: translucency, rounding. The selection
-        // accent always follows the user's macOS accent color.
+        // Panel section — the chrome: translucency, rounding. Light/dark and
+        // the accent color live in the Theme tab with the rest of the colors.
         let panel = addSection(title: String(localized: "Panel"), anchor: SettingsAnchor.appearancePanel)
-
-        appearanceRadio = makeAppearanceRadio()
-        addRow(to: panel, title: String(localized: "Appearance"),
-               accessory: appearanceRadio, searchItemID: SearchID.theme)
 
         let opacityTitle = String(localized: "Panel opacity")
         opacitySlider.minValue = Double(Preferences.panelOpacityRange.lowerBound)
@@ -275,18 +269,6 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
         return group
     }
 
-    private func makeAppearanceRadio() -> SettingsRadioGroupView {
-        let options = panelAppearances.map { appearance in
-            SettingsRadioGroupView.Option(identifier: appearance.rawValue, title: appearance.displayName)
-        }
-        let group = SettingsRadioGroupView(options: options, orientation: .horizontal)
-        group.onSelectionChange = { id in
-            guard let appearance = PanelAppearance(rawValue: id) else { return }
-            Preferences.shared.panelAppearance = appearance
-        }
-        return group
-    }
-
     private func makeTitleAlignmentRadio() -> SettingsRadioGroupView {
         let options = titleAlignments.map { alignment in
             SettingsRadioGroupView.Option(identifier: alignment.rawValue, title: alignment.displayName)
@@ -324,9 +306,13 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.applyScale($0) }
             .store(in: &cancellables)
-        prefs.$panelAppearance
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] in self?.selectAppearance($0) }
+        // The theme (and the light/dark choice that moved with it) restyles
+        // the floating preview too.
+        prefs.$panelTheme.dropFirst()
+            .sink { [weak self] _ in self?.schedulePreviewRefresh() }
+            .store(in: &cancellables)
+        prefs.$panelAppearance.dropFirst()
+            .sink { [weak self] _ in self?.schedulePreviewRefresh() }
             .store(in: &cancellables)
         prefs.$gridMaxColumns
             .receive(on: DispatchQueue.main)
@@ -414,7 +400,6 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
         }
         selectLayout(prefs.switcherLayoutMode)
         applyScale(prefs.panelScalePercent)
-        selectAppearance(prefs.panelAppearance)
         selectGrid(prefs.gridMaxColumns)
         gridSingleRowSwitch.sync()
         livePreviewSwitch.sync()
@@ -436,10 +421,6 @@ final class AppearanceSettingsViewController: SettingsTabViewController {
 
     private func selectLayout(_ mode: SwitcherLayoutMode) {
         layoutRadio.select(identifier: mode.rawValue)
-    }
-
-    private func selectAppearance(_ appearance: PanelAppearance) {
-        appearanceRadio.select(identifier: appearance.rawValue)
     }
 
     private func selectGrid(_ value: Int) {

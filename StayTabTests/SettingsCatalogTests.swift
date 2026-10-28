@@ -36,6 +36,7 @@ struct SettingsCatalogTests {
             SettingsTabID.switcher,
             SettingsTabID.apps,
             SettingsTabID.appearance,
+            SettingsTabID.theme,
             SettingsTabID.privacy,
             SettingsTabID.about,
         ])

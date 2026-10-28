@@ -1,0 +1,764 @@
+import AppKit
+import BetterSettings
+import UniformTypeIdentifiers
+
+/// Theme pane — colors and pictures for the panel and its two section plates.
+/// Unlike the other panes it edits a draft (`ThemeEditorSession`): pictures are
+/// baked when you save, so changes show in the pinned preview first and reach
+/// the switcher on Save.
+@MainActor
+final class ThemeSettingsViewController: SettingsTabViewController {
+    private let session = ThemeEditorSession.shared
+
+    // Pinned above the scrolling rows.
+    private let header = NSView()
+    private let previewBox = ThemePreviewBox()
+    private let areaControl = NSSegmentedControl()
+    private var previewView: SwitcherView?
+    private var previewRows: [SwitcherRow] = []
+    private var configuredAppearance: PanelAppearance?
+    private var configuredAccent: ThemeAccent?
+
+    // Pinned below them.
+    private let saveBar = NSView()
+    private let saveLabel = NSTextField(labelWithString: String(localized: "Unsaved theme changes"))
+    private let revertButton = NSButton(title: String(localized: "Revert"), target: nil, action: nil)
+    private let saveButton = NSButton(title: String(localized: "Save"), target: nil, action: nil)
+    private var saveBarHeight: NSLayoutConstraint?
+
+    // Style
+    private let styleControl = NSSegmentedControl()
+    private var swatches: [ThemeSwatchButton] = []
+    private let hueSlider = NSSlider(), hueValue = ThemeSettingsViewController.valueLabel()
+    private let tintSlider = NSSlider(), tintValue = ThemeSettingsViewController.valueLabel()
+    private let borderSlider = NSSlider(), borderValue = ThemeSettingsViewController.valueLabel()
+    private let resetButton = NSButton(title: String(localized: "Reset"), target: nil, action: nil)
+    private var presetRow: SettingsRowView?
+    private var hueRow: SettingsRowView?
+    private var tintRow: SettingsRowView?
+    private var borderRow: SettingsRowView?
+
+    // Picture
+    private var pictureSection: SettingsSectionView?
+    private let thumbnail = NSImageView()
+    private let pictureName = NSTextField(labelWithString: "")
+    private let chooseButton = NSButton(title: String(localized: "Choose…"), target: nil, action: nil)
+    private let cropView = ThemeCropView()
+    private let zoomSlider = NSSlider(), zoomValue = ThemeSettingsViewController.valueLabel()
+    private let blurSlider = NSSlider(), blurValue = ThemeSettingsViewController.valueLabel()
+    private let strengthSlider = NSSlider(), strengthValue = ThemeSettingsViewController.valueLabel()
+    private let tonePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private var tintPictureRow: SettingsRowView?
+
+    // Readability and panel
+    private let scrimSlider = NSSlider(), scrimValue = ThemeSettingsViewController.valueLabel()
+    private let contrastLabel = NSTextField(labelWithString: "")
+    private let fixButton = NSButton(title: String(localized: "Fix"), target: nil, action: nil)
+    private let accentPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let appearancePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+
+    private let accents = ThemeAccent.allCases
+    private let appearances = PanelAppearance.allCases
+
+    private var previewPictures: [ThemeArea: ThemePicture] = [:]
+    private var bakedKeys: [ThemeArea: BakeKey] = [:]
+    private static let bakeQueue = DispatchQueue(label: "StayTab.themePreviewBake", qos: .userInitiated)
+    private var desktopColor = ThemeRGB(r: 0.33, g: 0.35, b: 0.42)
+    private var refreshScheduled = false
+    private var suggestedScrim: Double?
+
+    /// What a baked preview depends on; a slider that changes none of it (focus,
+    /// zoom, strength, tint) costs a layer property, not a bake.
+    private struct BakeKey: Equatable {
+        let source: ObjectIdentifier
+        let blur: Double
+        let tone: Bool
+        let toneHue: Double
+    }
+
+    private static let presets: [(name: String, hue: Double, tint: Double)] = [
+        (String(localized: "Neutral"), 240, 0),
+        (String(localized: "Mint"), 175, 0.22),
+        (String(localized: "Dawn"), 268, 0.26),
+        (String(localized: "Dusk"), 38, 0.24),
+        (String(localized: "Moss"), 135, 0.2),
+        (String(localized: "Ink"), 250, 0.07),
+    ]
+
+    // MARK: - Building the pane
+
+    override func setupContent() {
+        let style = addSection(title: String(localized: "Style"), anchor: SettingsAnchor.themeStyle)
+        styleControl.segmentCount = ThemeBackdrop.allCases.count
+        for (index, backdrop) in ThemeBackdrop.allCases.enumerated() {
+            styleControl.setLabel(backdrop.displayName, forSegment: index)
+        }
+        styleControl.trackingMode = .selectOne
+        styleControl.controlSize = .small
+        styleControl.target = self
+        styleControl.action = #selector(styleChanged)
+        addRow(to: style, title: String(localized: "Style"),
+               subtitle: String(localized: "Default keeps the standard glass."),
+               accessory: styleControl, searchItemID: SearchID.themeStyle)
+
+        swatches = Self.presets.enumerated().map { index, preset in
+            let color = preset.tint == 0
+                ? NSColor.systemGray
+                : ThemeColor.oklch(0.66, 0.12, preset.hue).nsColor()
+            let button = ThemeSwatchButton(color: color, name: preset.name)
+            button.tag = index
+            button.target = self
+            button.action = #selector(presetChosen(_:))
+            return button
+        }
+        let swatchStack = NSStackView(views: swatches)
+        swatchStack.spacing = 6
+        presetRow = addRow(to: style, title: String(localized: "Preset"),
+                           subtitle: String(localized: "Sets the hue and its strength together."),
+                           accessory: swatchStack)
+        hueRow = addRow(to: style, title: String(localized: "Hue"),
+                        accessory: slider(hueSlider, value: hueValue, range: 0...360, label: String(localized: "Hue")))
+        tintRow = addRow(to: style, title: String(localized: "Tint"),
+                         subtitle: String(localized: "How strongly the color shows."),
+                         accessory: slider(tintSlider, value: tintValue, range: 0...60, label: String(localized: "Tint")))
+        borderRow = addRow(to: style, title: String(localized: "Border"),
+                           subtitle: String(localized: "Outline around the section."),
+                           accessory: slider(borderSlider, value: borderValue, range: 0...100, label: String(localized: "Border")))
+        configureButton(resetButton, action: #selector(resetArea))
+        addRow(to: style, title: String(localized: "Reset"),
+               subtitle: String(localized: "Back to the standard look for this area. Nothing changes until you save."),
+               accessory: resetButton)
+
+        let picture = addSection(title: String(localized: "Picture"), anchor: SettingsAnchor.themePicture)
+        pictureSection = picture
+        thumbnail.imageScaling = .scaleProportionallyUpOrDown
+        thumbnail.wantsLayer = true
+        thumbnail.layer?.cornerRadius = 4
+        thumbnail.layer?.masksToBounds = true
+        thumbnail.translatesAutoresizingMaskIntoConstraints = false
+        pictureName.textColor = .secondaryLabelColor
+        pictureName.font = .systemFont(ofSize: 11)
+        pictureName.lineBreakMode = .byTruncatingMiddle
+        pictureName.translatesAutoresizingMaskIntoConstraints = false
+        configureButton(chooseButton, action: #selector(choosePicture))
+        let pictureStack = NSStackView(views: [thumbnail, pictureName, chooseButton])
+        pictureStack.spacing = 8
+        pictureStack.alignment = .centerY
+        NSLayoutConstraint.activate([
+            thumbnail.widthAnchor.constraint(equalToConstant: 48),
+            thumbnail.heightAnchor.constraint(equalToConstant: 30),
+            pictureName.widthAnchor.constraint(lessThanOrEqualToConstant: 150),
+        ])
+        addRow(to: picture, title: String(localized: "Picture"),
+               subtitle: String(localized: "PNG, JPEG or HEIC. Kept on this Mac only."),
+               accessory: pictureStack, searchItemID: SearchID.themePicture)
+
+        cropView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            cropView.widthAnchor.constraint(equalToConstant: 240),
+            cropView.heightAnchor.constraint(equalToConstant: 150),
+        ])
+        cropView.onFocusChange = { [weak self] focus in
+            self?.session.updateArea { $0.focusX = focus.x; $0.focusY = focus.y }
+        }
+        cropView.onDropFile = { [weak self] url in self?.loadPicture(from: url) }
+        addRow(to: picture, title: String(localized: "Visible area"),
+               subtitle: String(localized: "Drag the frame, or drop a picture on it. The frame keeps the area's shape as apps come and go."),
+               accessory: cropView)
+        addRow(to: picture, title: String(localized: "Zoom"),
+               accessory: slider(zoomSlider, value: zoomValue, range: 100...300, label: String(localized: "Zoom")))
+        addRow(to: picture, title: String(localized: "Blur"),
+               subtitle: String(localized: "Baked into the picture when you save."),
+               accessory: slider(blurSlider, value: blurValue, range: 0...8, label: String(localized: "Blur")))
+        addRow(to: picture, title: String(localized: "Strength"),
+               subtitle: String(localized: "How much of the picture shows through."),
+               accessory: slider(strengthSlider, value: strengthValue, range: 20...100, label: String(localized: "Strength")))
+        configurePopup(tonePopup, titles: [String(localized: "Original"), String(localized: "Tinted")], action: #selector(toneChanged))
+        tintPictureRow = addRow(to: picture, title: String(localized: "Colors"),
+                                subtitle: String(localized: "Tinted turns the picture into the area's hue."),
+                                accessory: tonePopup)
+
+        let readability = addSection(title: String(localized: "Readability"), anchor: SettingsAnchor.themeReadability)
+        addRow(to: readability, title: String(localized: "Legibility boost"),
+               subtitle: String(localized: "Darkens or lightens the area behind the text."),
+               accessory: slider(scrimSlider, value: scrimValue, range: 0...60, label: String(localized: "Legibility boost")))
+        contrastLabel.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+        configureButton(fixButton, action: #selector(applyFix))
+        let contrastStack = NSStackView(views: [contrastLabel, fixButton])
+        contrastStack.spacing = 8
+        contrastStack.alignment = .centerY
+        addRow(to: readability, title: String(localized: "Text contrast"),
+               subtitle: String(localized: "The worst tenth of this area. 4.5:1 or higher reads well."),
+               accessory: contrastStack)
+
+        let panel = addSection(title: String(localized: "Panel"), anchor: SettingsAnchor.themePanel)
+        configurePopup(accentPopup, titles: accents.map(\.displayName), action: #selector(accentChanged))
+        addRow(to: panel, title: String(localized: "Accent color"),
+               subtitle: String(localized: "Jump letters, list selection and the default Always section."),
+               accessory: accentPopup, searchItemID: SearchID.themeAccent)
+        configurePopup(appearancePopup, titles: appearances.map(\.displayName), action: #selector(appearanceChanged))
+        addRow(to: panel, title: String(localized: "Appearance"),
+               subtitle: String(localized: "Match Picture picks light or dark text from the background picture."),
+               accessory: appearancePopup, searchItemID: SearchID.themeAppearance)
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        installHeaderAndSaveBar()
+    }
+
+    override func viewWillAppear() {
+        super.viewWillAppear()
+        session.onChange = { [weak self] in self?.scheduleRefresh() }
+        session.begin()
+        if previewView == nil { buildPreview() }
+        loadDesktopPicture()
+        refresh()
+    }
+
+    override func viewWillDisappear() {
+        super.viewWillDisappear()
+        // The draft stays in the session; only this pane stops listening.
+        session.onChange = nil
+    }
+
+    override func prepareForMemoryRelease() {
+        super.prepareForMemoryRelease()
+        session.onChange = nil
+        session.releaseIfClean()
+        previewView?.releaseIdleResources()
+        previewView?.removeFromSuperview()
+        previewView = nil
+        previewRows = []
+        previewPictures = [:]
+        bakedKeys = [:]
+    }
+
+    /// Pins the preview above the scrolling rows and the save bar below them by
+    /// re-anchoring the base class's scroll view.
+    private func installHeaderAndSaveBar() {
+        guard let scroll = view.subviews.first(where: { $0 is NSScrollView }) else { return }
+        for constraint in view.constraints where (constraint.firstItem as? NSView) === scroll
+            && (constraint.firstAttribute == .top || constraint.firstAttribute == .bottom) {
+            constraint.isActive = false
+        }
+
+        areaControl.segmentCount = ThemeArea.allCases.count
+        for (index, area) in ThemeArea.allCases.enumerated() {
+            areaControl.setLabel(area.displayName, forSegment: index)
+            areaControl.setImageScaling(.scaleProportionallyDown, forSegment: index)
+        }
+        areaControl.trackingMode = .selectOne
+        areaControl.segmentDistribution = .fillEqually
+        areaControl.target = self
+        areaControl.action = #selector(areaChanged)
+        areaControl.setAccessibilityLabel(String(localized: "Area"))
+
+        previewBox.onClick = { [weak self] point in
+            guard let self, let area = self.previewView?.themeArea(atWindowPoint: point) else { return }
+            self.session.area = area
+            self.refresh()
+        }
+        previewBox.onLayout = { [weak self] in self?.layoutPreview() }
+
+        for subview in [previewBox, areaControl] as [NSView] {
+            subview.translatesAutoresizingMaskIntoConstraints = false
+            header.addSubview(subview)
+        }
+        header.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(header)
+
+        saveLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        configureButton(revertButton, action: #selector(revert))
+        configureButton(saveButton, action: #selector(save))
+        saveButton.keyEquivalent = "\r"
+        let saveStack = NSStackView(views: [saveLabel, NSView(), revertButton, saveButton])
+        saveStack.spacing = 8
+        saveStack.alignment = .centerY
+        saveStack.translatesAutoresizingMaskIntoConstraints = false
+        let divider = NSBox()
+        divider.boxType = .separator
+        divider.translatesAutoresizingMaskIntoConstraints = false
+        saveBar.addSubview(divider)
+        saveBar.addSubview(saveStack)
+        saveBar.translatesAutoresizingMaskIntoConstraints = false
+        saveBar.wantsLayer = true
+        saveBar.layer?.masksToBounds = true
+        view.addSubview(saveBar)
+
+        let saveBarHeight = saveBar.heightAnchor.constraint(equalToConstant: 0)
+        self.saveBarHeight = saveBarHeight
+        NSLayoutConstraint.activate([
+            header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 4),
+            header.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            header.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            previewBox.topAnchor.constraint(equalTo: header.topAnchor),
+            previewBox.leadingAnchor.constraint(equalTo: header.leadingAnchor),
+            previewBox.trailingAnchor.constraint(equalTo: header.trailingAnchor),
+            previewBox.heightAnchor.constraint(equalToConstant: 210),
+            areaControl.topAnchor.constraint(equalTo: previewBox.bottomAnchor, constant: 10),
+            areaControl.leadingAnchor.constraint(equalTo: header.leadingAnchor),
+            areaControl.trailingAnchor.constraint(equalTo: header.trailingAnchor),
+            areaControl.bottomAnchor.constraint(equalTo: header.bottomAnchor),
+            scroll.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 6),
+            scroll.bottomAnchor.constraint(equalTo: saveBar.topAnchor),
+            saveBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            saveBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            saveBar.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            saveBarHeight,
+            divider.topAnchor.constraint(equalTo: saveBar.topAnchor),
+            divider.leadingAnchor.constraint(equalTo: saveBar.leadingAnchor),
+            divider.trailingAnchor.constraint(equalTo: saveBar.trailingAnchor),
+            saveStack.leadingAnchor.constraint(equalTo: saveBar.leadingAnchor, constant: 20),
+            saveStack.trailingAnchor.constraint(equalTo: saveBar.trailingAnchor, constant: -20),
+            saveStack.centerYAnchor.constraint(equalTo: saveBar.centerYAnchor),
+        ])
+    }
+
+    private func buildPreview() {
+        let preview = SwitcherView(frame: .zero, allowsWindowCapture: false, followsSavedTheme: false, drawsInWindow: true)
+        preview.acceptsPointer = false
+        previewBox.addSubview(preview, positioned: .below, relativeTo: previewBox.clickCatcher)
+        previewView = preview
+        previewRows = Self.makePreviewRows()
+        configuredAppearance = nil
+    }
+
+    /// Up to six running apps, split between the two sections so both show.
+    private static func makePreviewRows() -> [SwitcherRow] {
+        var seen = Set<String>()
+        var apps: [NSRunningApplication] = []
+        for app in NSWorkspace.shared.runningApplications
+        where !app.isTerminated && app.activationPolicy == .regular {
+            let identity = app.bundleIdentifier ?? "pid.\(app.processIdentifier)"
+            guard seen.insert(identity).inserted, app.localizedName?.isEmpty == false else { continue }
+            apps.append(app)
+            if apps.count == 6 { break }
+        }
+        if apps.isEmpty { apps = [.current] }
+        return apps.map {
+            SwitcherRow(app: $0, window: nil, windowTitle: "", isMinimized: false, isPlaceholder: true)
+        }
+    }
+
+    /// Configures the preview at a scale that fits the box and centers it.
+    private func layoutPreview() {
+        guard let previewView, previewBox.bounds.width > 40 else { return }
+        let prefs = Preferences.shared
+        var override = ShortcutOverride()
+        override.panelAppearance = session.appearance
+        let effective = prefs.effectiveSettings(for: override)
+        let available = NSSize(width: previewBox.bounds.width - 28, height: previewBox.bounds.height - 24)
+        var scale = SwitcherMetrics.scale(forPercent: effective.panelScalePercent)
+        var fitting = NSSize.zero
+        // Before configuring, so the rows pick up the draft's accent.
+        previewView.setTheme(session.draft, pictures: previewPictures)
+        for _ in 0..<2 {
+            let metrics = SwitcherMetrics.forScale(
+                scale,
+                layoutMode: effective.layoutMode,
+                fontScale: effective.fontScale.multiplier,
+                letterHints: effective.letterHintsEnabled,
+                showAppNames: effective.showApplicationNames,
+                showWindowTitles: effective.showWindowTitleLabel,
+                hoverActionCount: 0
+            )
+            previewView.configure(
+                rows: previewRows,
+                labels: RowLabels.labels(for: previewRows),
+                selectedIndex: 0,
+                metrics: metrics,
+                effective: effective,
+                persistentRowCount: previewRows.count > 1 ? (previewRows.count + 1) / 2 : previewRows.count
+            )
+            previewView.layoutSubtreeIfNeeded()
+            fitting = previewView.fittingSize
+            let shrink = min(1, available.width / max(fitting.width, 1), available.height / max(fitting.height, 1))
+            if shrink >= 0.98 { break }
+            scale *= shrink
+        }
+        let size = NSSize(width: min(fitting.width, available.width), height: min(fitting.height, available.height))
+        previewView.frame = NSRect(x: (previewBox.bounds.width - size.width) / 2,
+                                   y: (previewBox.bounds.height - size.height) / 2,
+                                   width: size.width, height: size.height).integral
+        configuredAppearance = session.appearance
+        configuredAccent = session.draft.accent
+        previewView.setTheme(session.draft, pictures: previewPictures)
+    }
+
+    private func loadDesktopPicture() {
+        guard let screen = view.window?.screen ?? NSScreen.main,
+              let url = NSWorkspace.shared.desktopImageURL(for: screen) else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard let image = ThemeImageFiles.loadSource(from: url) else { return }
+            let samples = ThemeImageSamples(image: image, maxEdge: 24)
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.previewBox.desktopImage = image
+                if let samples { self.desktopColor = ThemeLegibility.average(samples.pixels) }
+                self.scheduleRefresh()
+            }
+        }
+    }
+
+    // MARK: - Refresh
+
+    private func scheduleRefresh() {
+        guard !refreshScheduled else { return }
+        refreshScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.refreshScheduled = false
+            self.refresh()
+        }
+    }
+
+    private func refresh() {
+        guard isViewLoaded else { return }
+        let area = session.area
+        let theme = session.draft[area: area]
+        let source = session.sources[area]
+
+        areaControl.selectedSegment = ThemeArea.allCases.firstIndex(of: area) ?? 0
+        styleControl.selectedSegment = ThemeBackdrop.allCases.firstIndex(of: theme.backdrop) ?? 0
+        let colored = theme.backdrop != .standard
+        presetRow?.isHidden = !colored
+        hueRow?.isHidden = !colored
+        tintRow?.isHidden = !colored || (theme.backdrop == .image && theme.tone && source != nil)
+        borderRow?.isHidden = !colored || area == .panel
+        tintRow?.update(title: area == .panel ? String(localized: "Tint") : String(localized: "Fill"))
+        pictureSection?.isHidden = theme.backdrop != .image
+        for (index, swatch) in swatches.enumerated() {
+            let preset = Self.presets[index]
+            swatch.isChosen = colored && preset.hue == theme.hue && preset.tint == theme.tint
+        }
+        set(hueSlider, hueValue, theme.hue, text: "\(Int(theme.hue.rounded()))°")
+        set(tintSlider, tintValue, theme.tint * 100, text: "\(Int((theme.tint * 100).rounded())) %")
+        set(borderSlider, borderValue, theme.border * 100, text: "\(Int((theme.border * 100).rounded())) %")
+        set(zoomSlider, zoomValue, theme.zoom * 100, text: "\(Int((theme.zoom * 100).rounded())) %")
+        set(blurSlider, blurValue, theme.blur, text: AreaTheme.format(theme.blur) + " pt")
+        set(strengthSlider, strengthValue, theme.strength * 100, text: "\(Int((theme.strength * 100).rounded())) %")
+        set(scrimSlider, scrimValue, theme.scrim * 100, text: "+\(Int((theme.scrim * 100).rounded())) %")
+        tonePopup.selectItem(at: theme.tone ? 1 : 0)
+        accentPopup.selectItem(at: accents.firstIndex(of: session.draft.accent) ?? 0)
+        appearancePopup.selectItem(at: appearances.firstIndex(of: session.appearance) ?? 0)
+
+        thumbnail.image = source.map { NSImage(cgImage: $0.image, size: .zero) }
+        pictureName.stringValue = source?.name ?? ""
+        cropView.image = source?.image
+        cropView.focus = CGPoint(x: theme.focusX, y: theme.focusY)
+        cropView.zoom = CGFloat(theme.zoom)
+        if let size = previewView?.themeAreaSize(area), size.height > 0 {
+            cropView.areaAspect = size.width / size.height
+        }
+
+        updatePreviewPictures()
+        // Light/dark and the accent reach the rows only through a configure pass;
+        // everything else is a theme property on the existing preview.
+        if configuredAppearance != session.appearance || configuredAccent != session.draft.accent {
+            layoutPreview()
+        } else {
+            previewView?.setTheme(session.draft, pictures: previewPictures)
+        }
+        updateReadability()
+
+        let dirty = session.isDirty
+        saveBarHeight?.constant = dirty ? 48 : 0
+        saveBar.isHidden = !dirty
+        saveButton.isEnabled = !session.isSaving
+        revertButton.isEnabled = !session.isSaving
+    }
+
+    private func updatePreviewPictures() {
+        for area in ThemeArea.allCases {
+            let theme = session.draft[area: area]
+            guard theme.backdrop == .image, let source = session.sources[area] else {
+                previewPictures[area] = nil
+                bakedKeys[area] = nil
+                continue
+            }
+            let key = BakeKey(source: ObjectIdentifier(source.image), blur: theme.blur, tone: theme.tone,
+                              toneHue: theme.tone ? theme.hue : 0)
+            guard bakedKeys[area] != key else { continue }
+            bakedKeys[area] = key
+            let image = source.image
+            let edge = min(800, ThemeImageFiles.bakedMaxEdge(for: area, blur: theme.blur))
+            Self.bakeQueue.async {
+                let baked = ThemeImageFiles.bake(image, area: area, theme: theme, maxEdge: edge)
+                let picture = baked.map(ThemePicture.init(image:))
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, self.bakedKeys[area] == key else { return }
+                    self.previewPictures[area] = picture
+                    self.previewView?.setTheme(self.session.draft, pictures: self.previewPictures)
+                    self.updateReadability()
+                }
+            }
+        }
+    }
+
+    /// Contrast of every area, as warning marks on the area tabs, and the
+    /// current area's number with a one-click fix.
+    private func updateReadability() {
+        guard let previewView else { return }
+        let dark = previewView.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        var sizes: [ThemeArea: CGSize] = [:]
+        var samples: [ThemeArea: ThemeImageSamples] = [:]
+        for area in ThemeArea.allCases {
+            sizes[area] = previewView.themeAreaSize(area)
+            samples[area] = previewPictures[area]?.samples
+        }
+        let accent = NSColor.controlAccentColor.usingColorSpace(.sRGB)
+        let check = ThemeLegibility(
+            theme: session.draft, desktop: desktopColor, dark: dark, samples: samples, sizes: sizes,
+            accent: accent.map { ThemeRGB(r: $0.redComponent, g: $0.greenComponent, b: $0.blueComponent) }
+                ?? ThemeRGB(r: 0.04, g: 0.52, b: 1)
+        )
+        for (index, area) in ThemeArea.allCases.enumerated() {
+            let ratio = check.worstContrast(area)
+            let low = ratio < ThemeLegibility.target
+            areaControl.setImage(low ? NSImage(systemSymbolName: "exclamationmark.triangle.fill",
+                                              accessibilityDescription: String(localized: "Low")) : nil,
+                                 forSegment: index)
+            areaControl.setToolTip(String(format: "%.1f:1", ratio), forSegment: index)
+        }
+        let ratio = check.worstContrast(session.area)
+        let status: String
+        if ratio >= ThemeLegibility.target {
+            status = String(localized: "Pass")
+        } else if ratio >= 3 {
+            status = String(localized: "Low")
+        } else {
+            status = String(localized: "Hard to read")
+        }
+        contrastLabel.stringValue = String(format: "%.1f:1", ratio) + " · " + status
+        contrastLabel.textColor = ratio >= ThemeLegibility.target ? .labelColor : .systemOrange
+        suggestedScrim = ratio >= ThemeLegibility.target ? nil : check.suggestedScrim(session.area)
+        fixButton.isHidden = suggestedScrim.map { $0 <= session.draft[area: session.area].scrim } ?? true
+    }
+
+    /// ttheme's rule for a new picture: the highest strength whose text still
+    /// passes, so the picture starts as present as it can be while readable.
+    private func suggestedStrength(for samples: ThemeImageSamples?) -> Double? {
+        guard let samples, let previewView else { return nil }
+        let area = session.area
+        let dark = previewView.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        var theme = session.draft
+        theme[area: area].backdrop = .image
+        var check = ThemeLegibility(theme: theme, desktop: desktopColor, dark: dark,
+                                    samples: [area: samples],
+                                    sizes: [area: previewView.themeAreaSize(area) ?? CGSize(width: 2, height: 1)])
+        var strength = AreaTheme.strengthRange.upperBound
+        while strength >= AreaTheme.strengthRange.lowerBound {
+            check.theme[area: area].strength = strength
+            if check.worstContrast(area) >= ThemeLegibility.target { return strength }
+            strength -= 0.05
+        }
+        return 0.6
+    }
+
+    // MARK: - Actions
+
+    @objc private func areaChanged() {
+        let index = areaControl.selectedSegment
+        guard ThemeArea.allCases.indices.contains(index) else { return }
+        session.area = ThemeArea.allCases[index]
+        refresh()
+    }
+
+    @objc private func styleChanged() {
+        let index = styleControl.selectedSegment
+        guard ThemeBackdrop.allCases.indices.contains(index) else { return }
+        session.updateArea { $0.backdrop = ThemeBackdrop.allCases[index] }
+    }
+
+    @objc private func presetChosen(_ sender: ThemeSwatchButton) {
+        let preset = Self.presets[sender.tag]
+        session.updateArea {
+            $0.hue = preset.hue
+            $0.tint = preset.tint
+            if $0.backdrop == .standard { $0.backdrop = .color }
+        }
+    }
+
+    @objc private func sliderMoved(_ sender: NSSlider) {
+        let value = sender.doubleValue
+        session.updateArea { theme in
+            switch sender {
+            case hueSlider: theme.hue = AreaTheme.normalizedHue(value.rounded())
+            case tintSlider: theme.tint = (value.rounded() / 100).clamped(to: AreaTheme.tintRange)
+            case borderSlider: theme.border = (value.rounded() / 100).clamped(to: AreaTheme.borderRange)
+            case zoomSlider: theme.zoom = (value.rounded() / 100).clamped(to: AreaTheme.zoomRange)
+            case blurSlider: theme.blur = ((value * 2).rounded() / 2).clamped(to: AreaTheme.blurRange)
+            case strengthSlider: theme.strength = (value.rounded() / 100).clamped(to: AreaTheme.strengthRange)
+            case scrimSlider: theme.scrim = (value.rounded() / 100).clamped(to: AreaTheme.scrimRange)
+            default: break
+            }
+        }
+    }
+
+    @objc private func toneChanged() {
+        let tone = tonePopup.indexOfSelectedItem == 1
+        session.updateArea { $0.tone = tone }
+    }
+
+    @objc private func resetArea() {
+        session.resetArea()
+    }
+
+    @objc private func applyFix() {
+        guard let suggestedScrim else { return }
+        session.updateArea { $0.scrim = suggestedScrim }
+    }
+
+    @objc private func accentChanged() {
+        let index = accentPopup.indexOfSelectedItem
+        guard accents.indices.contains(index) else { return }
+        session.setAccent(accents[index])
+    }
+
+    @objc private func appearanceChanged() {
+        let index = appearancePopup.indexOfSelectedItem
+        guard appearances.indices.contains(index) else { return }
+        session.setAppearance(appearances[index])
+    }
+
+    @objc private func choosePicture() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        let handle: (NSApplication.ModalResponse) -> Void = { [weak self, weak panel] response in
+            guard response == .OK, let url = panel?.url else { return }
+            self?.loadPicture(from: url)
+        }
+        if let window = view.window {
+            panel.beginSheetModal(for: window, completionHandler: handle)
+        } else {
+            handle(panel.runModal())
+        }
+    }
+
+    private func loadPicture(from url: URL) {
+        let area = session.area
+        DispatchQueue.global(qos: .userInitiated).async {
+            let image = ThemeImageFiles.loadSource(from: url)
+            let samples = image.flatMap { ThemeImageSamples(image: $0) }
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                guard let image else {
+                    self.showError(String(localized: "StayTab couldn't open that picture. Choose a PNG, JPEG or HEIC file."))
+                    return
+                }
+                self.session.area = area
+                self.session.setPicture(image, name: url.lastPathComponent, strength: self.suggestedStrength(for: samples))
+            }
+        }
+    }
+
+    @objc private func revert() {
+        session.revert()
+    }
+
+    @objc private func save() {
+        session.save { [weak self] succeeded in
+            guard !succeeded else { return }
+            self?.showError(String(localized: "StayTab couldn't save the theme pictures. The other theme changes were saved."))
+        }
+        refresh()
+    }
+
+    private func showError(_ message: String) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = message
+        if let window = view.window {
+            alert.beginSheetModal(for: window)
+        } else {
+            alert.runModal()
+        }
+    }
+
+    // MARK: - Control helpers
+
+    private static func valueLabel() -> NSTextField {
+        let label = NSTextField(labelWithString: "")
+        label.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        label.textColor = .secondaryLabelColor
+        label.alignment = .right
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.widthAnchor.constraint(equalToConstant: 46).isActive = true
+        return label
+    }
+
+    private func slider(_ slider: NSSlider, value: NSTextField, range: ClosedRange<Double>, label: String) -> NSStackView {
+        slider.minValue = range.lowerBound
+        slider.maxValue = range.upperBound
+        slider.isContinuous = true
+        slider.controlSize = .small
+        slider.target = self
+        slider.action = #selector(sliderMoved(_:))
+        slider.setAccessibilityLabel(label)
+        slider.translatesAutoresizingMaskIntoConstraints = false
+        slider.widthAnchor.constraint(equalToConstant: 140).isActive = true
+        let stack = NSStackView(views: [slider, value])
+        stack.spacing = 8
+        stack.alignment = .centerY
+        return stack
+    }
+
+    private func set(_ slider: NSSlider, _ label: NSTextField, _ value: Double, text: String) {
+        if slider.doubleValue != value { slider.doubleValue = value }
+        label.stringValue = text
+    }
+
+    private func configureButton(_ button: NSButton, action: Selector) {
+        button.bezelStyle = .rounded
+        button.controlSize = .small
+        button.target = self
+        button.action = action
+    }
+}
+
+/// The preview's stage: the user's desktop picture with the switcher on top,
+/// and a transparent layer above both that turns clicks into area picks.
+final class ThemePreviewBox: NSView {
+    let clickCatcher = ClickCatcher()
+    var onClick: ((NSPoint) -> Void)? {
+        get { clickCatcher.onClick }
+        set { clickCatcher.onClick = newValue }
+    }
+    var onLayout: (() -> Void)?
+    private var lastLaidOutSize = NSSize.zero
+
+    var desktopImage: CGImage? {
+        didSet { layer?.contents = desktopImage }
+    }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.cornerRadius = 10
+        layer?.cornerCurve = .continuous
+        layer?.masksToBounds = true
+        layer?.contentsGravity = .resizeAspectFill
+        layer?.backgroundColor = NSColor(srgbRed: 0.2, green: 0.22, blue: 0.3, alpha: 1).cgColor
+        clickCatcher.autoresizingMask = [.width, .height]
+        addSubview(clickCatcher)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) not implemented") }
+
+    override func layout() {
+        super.layout()
+        clickCatcher.frame = bounds
+        guard bounds.size != lastLaidOutSize else { return }
+        lastLaidOutSize = bounds.size
+        onLayout?()
+    }
+
+    final class ClickCatcher: NSView {
+        var onClick: ((NSPoint) -> Void)?
+        override func mouseDown(with event: NSEvent) { onClick?(event.locationInWindow) }
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    }
+}

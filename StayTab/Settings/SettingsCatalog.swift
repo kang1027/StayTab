@@ -18,6 +18,7 @@ enum SettingsTabID {
     static let tabs = "tabs"
     static let apps = "apps"
     static let appearance = "appearance"
+    static let theme = "theme"
     static let privacy = "privacy"
     static let about = "about"
 }
@@ -57,6 +58,11 @@ enum SettingsAnchor {
     static let appearanceLayout = "appearance.layoutSection"
     static let appearanceLabels = "appearance.labels"
     static let appearancePanel = "appearance.panel"
+    // Theme
+    static let themeStyle = "theme.style"
+    static let themePicture = "theme.picture"
+    static let themeReadability = "theme.readability"
+    static let themePanel = "theme.panel"
     // Privacy
     static let permissions = "privacy.permissions"
     static let screenSharing = "privacy.screenSharing"
@@ -161,12 +167,16 @@ enum SearchID {
     static let rosterSectionTitles = "appearance.rosterSectionTitles"
     static let rosterSectionIcons = "appearance.rosterSectionIcons"
     static let windowStatusIcons = "switcher.windowStatusIcons"
-    static let theme = "appearance.theme"
     static let opacity = "appearance.opacity"
     static let cornerRadius = "appearance.cornerRadius"
     static let animations = "appearance.animations"
     static let livePreviews = "appearance.livePreviews"
     static let preview = "appearance.preview"
+    // Theme
+    static let themeStyle = "theme.style"
+    static let themePicture = "theme.picture"
+    static let themeAccent = "theme.accent"
+    static let themeAppearance = "theme.appearance"
     // Privacy
     static let tabPermissions = "switcher.tabPermissions"
 }
@@ -208,6 +218,7 @@ enum SettingsCatalog {
                 case SettingsTabID.tabs:       return SwitcherPanesViewController(pane: .tabs)
                 case SettingsTabID.apps:       return AppsSettingsViewController()
                 case SettingsTabID.appearance: return AppearanceSettingsViewController()
+                case SettingsTabID.theme:      return ThemeSettingsViewController()
                 case SettingsTabID.privacy:    return PrivacySettingsViewController()
                 default:                       return AboutSettingsViewController()
                 }
@@ -254,6 +265,11 @@ enum SettingsCatalog {
         SettingsTab(
             id: SettingsTabID.appearance, title: String(localized: "Appearance"), icon: "paintbrush.fill",
             iconStyle: style(0xFF6991, 0xD41E5A, scale: 0.9)
+        ),
+        // Colors and pictures for the panel and its sections, edited as a draft.
+        SettingsTab(
+            id: SettingsTabID.theme, title: String(localized: "Theme"), icon: "paintpalette.fill",
+            iconStyle: style(0xFFB340, 0xFF7A00, scale: 0.9)
         ),
         SettingsTab(
             id: SettingsTabID.privacy, title: String(localized: "Privacy"), icon: "lock.fill",
@@ -397,8 +413,6 @@ enum SettingsCatalog {
              String(localized: "Show status icons"),
              ["status icons", "status", "icons", "glyph", "minimized", "hidden", "full-screen", "no window", "dashed square"]),
         // Appearance · Panel
-        item(SearchID.theme, .appearance, SettingsAnchor.appearancePanel, String(localized: "Appearance"), String(localized: "Panel"),
-             String(localized: "Appearance"), ["theme", "appearance", "light", "dark", "system", "color scheme"]),
         item(SearchID.opacity, .appearance, SettingsAnchor.appearancePanel, String(localized: "Appearance"), String(localized: "Panel"),
              String(localized: "Panel opacity"), ["opacity", "transparency", "alpha", "translucent"]),
         item(SearchID.cornerRadius, .appearance, SettingsAnchor.appearancePanel, String(localized: "Appearance"), String(localized: "Panel"),
@@ -409,6 +423,15 @@ enum SettingsCatalog {
              String(localized: "Live window previews"), ["live", "preview", "previews", "thumbnail", "thumbnails", "refresh", "video"]),
         item(SearchID.preview, .appearance, SettingsAnchor.appearancePanel, String(localized: "Appearance"), String(localized: "Panel"),
              String(localized: "Preview"), ["preview", "sample", "test", "live"]),
+        // Theme
+        item(SearchID.themeStyle, .theme, SettingsAnchor.themeStyle, String(localized: "Theme"), String(localized: "Style"),
+             String(localized: "Style"), ["theme", "color", "colour", "tint", "hue", "background", "always", "running now", "section"]),
+        item(SearchID.themePicture, .theme, SettingsAnchor.themePicture, String(localized: "Theme"), String(localized: "Picture"),
+             String(localized: "Picture"), ["picture", "image", "photo", "wallpaper", "background image", "crop", "blur"]),
+        item(SearchID.themeAccent, .theme, SettingsAnchor.themePanel, String(localized: "Theme"), String(localized: "Panel"),
+             String(localized: "Accent color"), ["accent", "highlight", "selection color", "jump letters"]),
+        item(SearchID.themeAppearance, .theme, SettingsAnchor.themePanel, String(localized: "Theme"), String(localized: "Panel"),
+             String(localized: "Appearance"), ["appearance", "light", "dark", "system", "color scheme", "match picture"]),
 
         // Privacy · Permissions
         item(SearchID.accessibility, .privacy, SettingsAnchor.permissions, String(localized: "Privacy"), String(localized: "Permissions"),
@@ -439,7 +462,7 @@ enum SettingsCatalog {
     }
 
     private enum TabRef {
-        case general, profiles, switcher, apps, appearance, privacy
+        case general, profiles, switcher, apps, appearance, theme, privacy
 
         var id: String {
             switch self {
@@ -448,6 +471,7 @@ enum SettingsCatalog {
             case .switcher: return SettingsTabID.switcher
             case .apps: return SettingsTabID.apps
             case .appearance: return SettingsTabID.appearance
+            case .theme: return SettingsTabID.theme
             case .privacy: return SettingsTabID.privacy
             }
         }
