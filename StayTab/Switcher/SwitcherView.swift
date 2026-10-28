@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import os
 
 /// A window/app action invoked from a row's hover buttons. Raw values double as
@@ -43,6 +44,14 @@ final class SwitcherView: NSView {
     /// Backdrop pair layered under the content on Liquid Glass: a light frost, then a dim.
     private let haze = NSVisualEffectView()
     private let dim = BackdropDimView()
+    /// Theme picture and tint for the panel, between the haze and the dim.
+    private let panelFill = ThemeFillView()
+    private var theme = PanelTheme.standard
+    private var themePictures: [ThemeArea: ThemePicture] = [:]
+    /// Accent for the jump letters and selection when the theme picks one; nil
+    /// follows the macOS accent. Built when the theme changes, not per reveal.
+    private var themeAccent: NSColor?
+    private var themeCancellable: AnyCancellable?
     private let listContainer = NSView()
     private let pinnedSectionView = RosterSectionBackdropView(
         title: String(localized: "Always"),
@@ -90,7 +99,13 @@ final class SwitcherView: NSView {
         self.init(frame: frameRect, allowsWindowCapture: true)
     }
 
-    init(frame frameRect: NSRect, allowsWindowCapture: Bool) {
+    /// - Parameters:
+    ///   - followsSavedTheme: track the saved theme. The Theme editor's preview
+    ///     passes `false` and feeds its draft through `setTheme(_:pictures:)`.
+    ///   - drawsInWindow: blur what is behind the view inside its own window
+    ///     instead of what is behind the window — for a preview embedded in
+    ///     Settings over a picture of the desktop.
+    init(frame frameRect: NSRect, allowsWindowCapture: Bool, followsSavedTheme: Bool = true, drawsInWindow: Bool = false) {
         self.allowsWindowCapture = allowsWindowCapture
         if #available(macOS 26.0, *) {
             let glass = NSGlassEffectView()
@@ -107,7 +122,7 @@ final class SwitcherView: NSView {
         } else {
             let fallback = NSVisualEffectView()
             fallback.material = .hudWindow
-            fallback.blendingMode = .behindWindow
+            fallback.blendingMode = drawsInWindow ? .withinWindow : .behindWindow
             fallback.state = .active
             fallback.wantsLayer = true
             fallback.layer?.cornerRadius = SwitcherMetrics.baseCornerRadius
@@ -140,7 +155,7 @@ final class SwitcherView: NSView {
             // itself ~3 points cheaper than the frosted style it replaced (27 %), so the
             // pair lands ~2 points above what shipped — for as long as the panel shows.
             haze.material = .hudWindow
-            haze.blendingMode = .behindWindow
+            haze.blendingMode = drawsInWindow ? .withinWindow : .behindWindow
             haze.state = .active   // the panel never becomes key, so don't dim with focus
             haze.alphaValue = 0.85
             for backdrop in [haze, dim] {
@@ -152,8 +167,14 @@ final class SwitcherView: NSView {
                 backdrop.layer?.masksToBounds = true
                 contentContainer.addSubview(backdrop)
             }
+            panelFill.frame = contentContainer.bounds
+            panelFill.autoresizingMask = [.width, .height]
+            contentContainer.addSubview(panelFill, positioned: .below, relativeTo: dim)
         } else {
             glassBackdrop.addSubview(contentContainer)
+            panelFill.frame = contentContainer.bounds
+            panelFill.autoresizingMask = [.width, .height]
+            contentContainer.addSubview(panelFill)
         }
         // The row block is slid by its layer on every reflow, so it owns one
         // outright instead of relying on the glass backdrop above it to make
@@ -179,6 +200,44 @@ final class SwitcherView: NSView {
         rim.frame = contentContainer.bounds
         rim.autoresizingMask = [.width, .height]
         contentContainer.addSubview(rim)
+
+        if followsSavedTheme {
+            themeCancellable = Preferences.shared.$panelTheme
+                .combineLatest(ThemeImageStore.shared.$pictures)
+                .sink { [weak self] theme, pictures in self?.setTheme(theme, pictures: pictures) }
+        }
+    }
+
+    /// Applies a theme to the backdrop, the section plates and the accent. Runs
+    /// when the theme changes, never per reveal; a reveal only re-fits the
+    /// pictures when an area changed size.
+    func setTheme(_ theme: PanelTheme, pictures: [ThemeArea: ThemePicture]) {
+        self.theme = theme
+        themePictures = pictures
+        themeAccent = theme.accent == .background ? ThemeColor.dynamicAccent(hue: theme.panel.hue) : nil
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        // matchPicture resolves against this theme's picture, so re-run it first:
+        // the fills below read the panel's effective appearance.
+        applyPanelAppearance(appliedPanelAppearance, force: true)
+        let panel = theme.panel
+        let panelPicture = panel.backdrop == .image ? pictures[.panel]?.image : nil
+        if #available(macOS 26.0, *), glassBackdrop is NSGlassEffectView {
+            panelFill.apply(theme: panel, picture: panelPicture, veil: 0)
+            dim.level = 0.2 + CGFloat(panel.scrim)
+            // An opaque picture hides the haze completely; skip its second
+            // behind-window sampler instead of compositing it for nothing.
+            haze.isHidden = panelPicture != nil && panel.strength >= 0.99
+        } else {
+            panelFill.apply(theme: panel, picture: panelPicture, veil: CGFloat(panel.scrim))
+        }
+        pinnedSectionView.applyTheme(theme.always, picture: theme.always.backdrop == .image ? pictures[.always]?.image : nil)
+        runningSectionView.applyTheme(theme.running, picture: theme.running.backdrop == .image ? pictures[.running]?.image : nil)
+        CATransaction.commit()
+        if accent != (themeAccent ?? .controlAccentColor), !rows.isEmpty {
+            accent = themeAccent ?? .controlAccentColor
+            needsLayout = true
+        }
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) not implemented") }
@@ -244,9 +303,10 @@ final class SwitcherView: NSView {
         self.persistentRowCount = persistentRowCount
         self.highlightPrefix = highlightPrefix
         self.searchActive = searchActive
-        // The selection highlight / jump-letter color always follows the
-        // user's macOS accent (re-read per reveal so it stays reactive).
-        self.accent = .controlAccentColor
+        // The selection highlight / jump-letter color follows the user's macOS
+        // accent unless the theme picks one (both are dynamic colors, so they
+        // stay reactive to appearance changes).
+        self.accent = themeAccent ?? .controlAccentColor
         self.selectedIndex = selectedIndex
         // Only when it's on screen: this runs on every reveal, and the common
         // ⌘Tab has no search bar to configure.
@@ -451,14 +511,23 @@ final class SwitcherView: NSView {
 
     /// Set a forced Aqua/Dark Aqua only when the preference changes. Leaving the
     /// override nil preserves AppKit's live system-appearance inheritance.
-    private func applyPanelAppearance(_ value: PanelAppearance) {
-        guard value != appliedPanelAppearance || (value == .system && appearance != nil) else { return }
+    private func applyPanelAppearance(_ value: PanelAppearance, force: Bool = false) {
+        guard force || value == .matchPicture || value != appliedPanelAppearance || (value == .system && appearance != nil) else { return }
         appliedPanelAppearance = value
+        let target: NSAppearance?
         switch value {
-        case .system: appearance = nil
-        case .light: appearance = NSAppearance(named: .aqua)
-        case .dark: appearance = NSAppearance(named: .darkAqua)
+        case .system: target = nil
+        case .light: target = NSAppearance(named: .aqua)
+        case .dark: target = NSAppearance(named: .darkAqua)
+        case .matchPicture:
+            if theme.panel.backdrop == .image, let samples = themePictures[.panel]?.samples {
+                let dark = PanelAppearance.picturePrefersDark(meanLightness: samples.meanLightness)
+                target = NSAppearance(named: dark ? .darkAqua : .aqua)
+            } else {
+                target = nil
+            }
         }
+        if appearance?.name != target?.name { appearance = target }
     }
 
     /// User-pinned corner radius when set (`-1` = square, `> 0` = explicit
@@ -542,9 +611,36 @@ final class SwitcherView: NSView {
         return frame.contains(point) ? self : nil
     }
 
+    /// Pointer hover and clicks. The Theme editor's preview turns them off so
+    /// the mouse picks an area to edit instead of a row.
+    var acceptsPointer = true {
+        didSet { if acceptsPointer != oldValue { updateTrackingAreas() } }
+    }
+
+    /// Current size of a themed area; nil for a section that isn't showing.
+    func themeAreaSize(_ area: ThemeArea) -> CGSize? {
+        switch area {
+        case .panel: return contentContainer.bounds.size
+        case .always: return pinnedSectionView.isHidden ? nil : pinnedSectionView.bounds.size
+        case .running: return runningSectionView.isHidden ? nil : runningSectionView.bounds.size
+        }
+    }
+
+    /// The themed area under a window point: a section plate, else the panel.
+    func themeArea(atWindowPoint point: NSPoint) -> ThemeArea? {
+        guard bounds.contains(convert(point, from: nil)) else { return nil }
+        for (section, area) in [(pinnedSectionView, ThemeArea.always), (runningSectionView, .running)]
+        where !section.isHidden && section.bounds.contains(section.convert(point, from: nil)) {
+            return area
+        }
+        return .panel
+    }
+
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let trackingArea { removeTrackingArea(trackingArea) }
+        trackingArea = nil
+        guard acceptsPointer else { return }
         let area = NSTrackingArea(
             rect: bounds,
             options: [.mouseMoved, .activeAlways, .inVisibleRect, .mouseEnteredAndExited],
@@ -595,6 +691,7 @@ final class SwitcherView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        guard acceptsPointer else { return }
         handleClick(atWindowPoint: event.locationInWindow)
     }
 
@@ -1422,12 +1519,17 @@ private final class RosterSectionBackdropView: NSView {
     private var scale: CGFloat = 0
     private var showsTitle = true
     private var showsIcon = true
+    private let fill = ThemeFillView()
+    private var theme = AreaTheme()
+    private var picture: CGImage?
 
     init(title: String, symbolName: String, style: Style) {
         self.style = style
         super.init(frame: .zero)
         wantsLayer = true
         layer?.cornerCurve = .continuous
+        layer?.masksToBounds = true
+        addSubview(fill)
 
         icon.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)
         icon.imageScaling = .scaleProportionallyUpOrDown
@@ -1460,8 +1562,18 @@ private final class RosterSectionBackdropView: NSView {
         updateAppearance()
     }
 
+    /// The section's theme. Called when the theme changes, not per reveal.
+    func applyTheme(_ theme: AreaTheme, picture: CGImage?) {
+        guard theme != self.theme || picture !== self.picture else { return }
+        self.theme = theme
+        self.picture = picture
+        fill.apply(theme: theme, picture: picture, veil: CGFloat(theme.scrim))
+        updateAppearance()
+    }
+
     override func layout() {
         super.layout()
+        fill.frame = bounds
         let activeScale = max(scale, 0.01)
         let inset = round(10 * activeScale)
         let iconSize = round(12 * activeScale)
@@ -1502,6 +1614,16 @@ private final class RosterSectionBackdropView: NSView {
 
     private func updateAppearance() {
         guard layer != nil else { return }
+        layer?.borderWidth = 1
+        if theme.backdrop != .standard {
+            let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            let titleColor = ThemeColor.title(hue: theme.hue, dark: dark).nsColor()
+            layer?.backgroundColor = NSColor.clear.cgColor
+            layer?.borderColor = ThemeColor.tint(hue: theme.hue).nsColor(alpha: theme.border).cgColor
+            icon.contentTintColor = titleColor
+            title.textColor = titleColor
+            return
+        }
         switch style {
         case .persistent:
             layer?.backgroundColor = accent.withAlphaComponent(0.12).cgColor
@@ -1515,7 +1637,6 @@ private final class RosterSectionBackdropView: NSView {
             icon.contentTintColor = runningGreen
             title.textColor = runningGreen
         }
-        layer?.borderWidth = 1
     }
 }
 
@@ -1524,6 +1645,11 @@ private final class RosterSectionBackdropView: NSView {
 /// contrast it is there to buy — and a `CGColor` set once never re-resolves when the
 /// system theme (or the panel-appearance preference) flips under a live view.
 private final class BackdropDimView: NSView {
+    /// Veil strength: the standard 20 % plus the theme's legibility boost.
+    var level: CGFloat = 0.2 {
+        didSet { if level != oldValue { updateAppearance() } }
+    }
+
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         updateAppearance()
@@ -1536,7 +1662,80 @@ private final class BackdropDimView: NSView {
 
     private func updateAppearance() {
         let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        layer?.backgroundColor = (dark ? NSColor.black : NSColor.white).withAlphaComponent(0.2).cgColor
+        layer?.backgroundColor = (dark ? NSColor.black : NSColor.white).withAlphaComponent(min(0.95, level)).cgColor
+    }
+}
+
+/// Picture, tint and veil of one themed area, drawn under the area's content.
+/// Everything is set when the theme changes; layout only re-picks the visible
+/// part of the picture, which is four numbers on a layer.
+final class ThemeFillView: NSView {
+    private let pictureLayer = CALayer()
+    private let tintLayer = CALayer()
+    private let veilLayer = CALayer()
+    private var theme = AreaTheme()
+    private var picture: CGImage?
+    private var veil: CGFloat = 0
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        for sublayer in [pictureLayer, tintLayer, veilLayer] {
+            sublayer.actions = ["contents": NSNull(), "contentsRect": NSNull(), "bounds": NSNull(),
+                                "position": NSNull(), "opacity": NSNull(), "backgroundColor": NSNull(), "hidden": NSNull()]
+            sublayer.isHidden = true
+            layer?.addSublayer(sublayer)
+        }
+        pictureLayer.contentsGravity = .resize
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) not implemented") }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    func apply(theme: AreaTheme, picture: CGImage?, veil: CGFloat) {
+        self.theme = theme
+        self.picture = theme.backdrop == .image ? picture : nil
+        self.veil = veil
+        update()
+    }
+
+    override func layout() {
+        super.layout()
+        for sublayer in [pictureLayer, tintLayer, veilLayer] { sublayer.frame = bounds }
+        updatePictureRect()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        update()
+    }
+
+    private func update() {
+        let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        pictureLayer.isHidden = picture == nil
+        pictureLayer.contents = picture
+        pictureLayer.opacity = Float(theme.strength)
+        // A picture area without its file (another Mac's import) draws as color.
+        let tinted = theme.backdrop == .color || (theme.backdrop == .image && (!theme.tone || picture == nil))
+        tintLayer.isHidden = !tinted || theme.tint <= 0
+        tintLayer.backgroundColor = ThemeColor.tint(hue: theme.hue).nsColor().cgColor
+        tintLayer.opacity = Float(theme.tint)
+        veilLayer.isHidden = veil <= 0
+        veilLayer.backgroundColor = (dark ? NSColor.black : NSColor.white).cgColor
+        veilLayer.opacity = Float(min(0.95, veil))
+        updatePictureRect()
+    }
+
+    private func updatePictureRect() {
+        guard let picture, bounds.width > 0, bounds.height > 0 else { return }
+        let rect = ThemeCrop.visibleRect(
+            imageSize: CGSize(width: picture.width, height: picture.height),
+            viewSize: bounds.size,
+            focus: CGPoint(x: theme.focusX, y: theme.focusY),
+            zoom: CGFloat(theme.zoom)
+        )
+        pictureLayer.contentsRect = ThemeCrop.layerContentsRect(rect)
     }
 }
 
