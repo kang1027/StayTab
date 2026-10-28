@@ -42,6 +42,9 @@ extension Preferences {
         "Switcher.accentChoice",
         "Switcher.customAccentHex",
         "Switcher.customCommitSoundFilename",
+        // Theme pictures live only in this Mac's Application Support; another
+        // Mac draws a picture area as its color until a picture is chosen there.
+        "Switcher.themeImageFiles",
         // Migration bookkeeping for THIS Mac's stored percentages, not a setting
         // — see `Preferences.preRebasePanelScales`.
         "Switcher.panelScaleRebased",
