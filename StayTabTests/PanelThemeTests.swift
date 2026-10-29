@@ -119,6 +119,19 @@ struct PanelThemeTests {
         #expect(abs(rect.minY) < 0.0001)
     }
 
+    @Test("an area shaped like its picture never inverts the crop's clamp")
+    func cropSurvivesRounding() {
+        // 1×49 in a 0.5×24.5 area once rounded to a crop taller than the picture.
+        for width in 1...60 {
+            for height in 1...60 {
+                let rect = ThemeCrop.visibleRect(imageSize: CGSize(width: width, height: height),
+                                                 viewSize: CGSize(width: Double(width) * 0.5, height: Double(height) * 0.5),
+                                                 focus: CGPoint(x: 0.5, y: 0.5), zoom: 1)
+                #expect(rect.minX >= 0 && rect.minY >= 0 && rect.maxX <= 1.000001 && rect.maxY <= 1.000001)
+            }
+        }
+    }
+
     @Test("the layer rect flips to a bottom-left origin")
     func layerRectFlips() {
         let rect = ThemeCrop.layerContentsRect(CGRect(x: 0.1, y: 0.2, width: 0.5, height: 0.3))

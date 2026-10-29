@@ -91,8 +91,14 @@ enum ThemeCrop {
             return CGRect(x: 0, y: 0, width: 1, height: 1)
         }
         let aspect = viewSize.width / viewSize.height
+        // `min` keeps a rounding error from making the crop a hair larger than
+        // the picture, which would invert the clamp ranges below.
         var w = imageSize.width, h = imageSize.height
-        if imageSize.width / imageSize.height > aspect { w = imageSize.height * aspect } else { h = imageSize.width / aspect }
+        if imageSize.width / imageSize.height > aspect {
+            w = min(imageSize.width, imageSize.height * aspect)
+        } else {
+            h = min(imageSize.height, imageSize.width / aspect)
+        }
         let z = max(1, zoom)
         w /= z
         h /= z
