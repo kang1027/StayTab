@@ -202,9 +202,8 @@ final class SwitcherView: NSView {
         contentContainer.addSubview(rim)
 
         if followsSavedTheme {
-            themeCancellable = Preferences.shared.$panelTheme
-                .combineLatest(ThemeImageStore.shared.$pictures)
-                .sink { [weak self] theme, pictures in self?.setTheme(theme, pictures: pictures) }
+            themeCancellable = ThemeImageStore.shared.$snapshot
+                .sink { [weak self] snapshot in self?.setTheme(snapshot.theme, pictures: snapshot.pictures) }
         }
     }
 

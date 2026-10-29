@@ -150,21 +150,31 @@ enum ThemeImageFiles {
     }
 }
 
-/// The saved theme's pictures, decoded once and held for the live switcher.
-/// Reloads off the main thread when the stored files or the areas using a
-/// picture change; the switcher only ever reads `pictures`.
+/// The saved theme with its pictures, decoded once and held for the live
+/// switcher. Decoding runs off the main thread, and a theme is published only
+/// once every picture it names is ready, so the switcher never pairs a new
+/// theme with the previous pictures.
 @MainActor
 final class ThemeImageStore: ObservableObject {
     static let shared = ThemeImageStore()
 
-    @Published private(set) var pictures: [ThemeArea: ThemePicture] = [:]
+    struct Snapshot {
+        let theme: PanelTheme
+        let pictures: [ThemeArea: ThemePicture]
+    }
 
-    private var loaded: [ThemeArea: String] = [:]
-    private var generation = 0
+    @Published private(set) var snapshot: Snapshot
+
+    /// Base name → decoded picture; nil marks a file that failed to decode.
+    private var decoded: [String: ThemePicture?] = [:]
+    private var decoding: Set<String> = []
+    private var latest: (theme: PanelTheme, wanted: [ThemeArea: String])
     private var cancellable: AnyCancellable?
 
     private init() {
         let prefs = Preferences.shared
+        latest = (prefs.panelTheme, [:])
+        snapshot = Snapshot(theme: prefs.panelTheme, pictures: [:])
         cancellable = prefs.$panelTheme.combineLatest(prefs.$themeImageFiles)
             .sink { [weak self] theme, files in self?.reload(theme: theme, files: files) }
     }
@@ -174,25 +184,38 @@ final class ThemeImageStore: ObservableObject {
         for area in ThemeArea.allCases where theme[area: area].backdrop == .image {
             if let base = files[area.rawValue] { wanted[area] = base }
         }
-        guard wanted != loaded else { return }
-        loaded = wanted
-        generation += 1
-        let token = generation
-        if wanted.isEmpty {
-            pictures = [:]
-            return
-        }
+        latest = (theme, wanted)
+        let missing = Set(wanted.values).subtracting(decoded.keys).subtracting(decoding)
+        if !missing.isEmpty { decode(missing) }
+        publishIfReady()
+    }
+
+    private func decode(_ bases: Set<String>) {
+        decoding.formUnion(bases)
         DispatchQueue.global(qos: .utility).async { [weak self] in
-            var decoded: [ThemeArea: ThemePicture] = [:]
-            for (area, base) in wanted {
-                guard let url = ThemeImageFiles.bakedURL(base: base),
-                      let image = ThemeImageFiles.loadImage(at: url) else { continue }
-                decoded[area] = ThemePicture(image: image)
+            var pictures: [String: ThemePicture?] = [:]
+            for base in bases {
+                pictures[base] = ThemeImageFiles.bakedURL(base: base)
+                    .flatMap(ThemeImageFiles.loadImage(at:))
+                    .map(ThemePicture.init(image:))
             }
             DispatchQueue.main.async {
-                guard let self, self.generation == token else { return }
-                self.pictures = decoded
+                guard let self else { return }
+                self.decoding.subtract(bases)
+                let wanted = Set(self.latest.wanted.values)
+                for (base, picture) in pictures where wanted.contains(base) {
+                    self.decoded[base] = picture
+                }
+                self.publishIfReady()
             }
         }
+    }
+
+    private func publishIfReady() {
+        let wanted = latest.wanted
+        guard wanted.values.allSatisfy({ decoded.keys.contains($0) }) else { return }
+        let used = Set(wanted.values)
+        decoded = decoded.filter { used.contains($0.key) }
+        snapshot = Snapshot(theme: latest.theme, pictures: wanted.compactMapValues { decoded[$0] ?? nil })
     }
 }
