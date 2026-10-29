@@ -56,27 +56,27 @@ StayTab keeps BetterCmdTab's inherited preference formats readable for upgrades,
 
 ## Install
 
-### Download the DMG — recommended
-
-Install the latest signed and notarized release as follows:
-
-1. Download `StayTab-*.dmg` from [GitHub Releases](https://github.com/kang1027/StayTab/releases/latest).
-2. Open the DMG and drag **StayTab** to Applications.
-3. Launch StayTab and grant Accessibility access when macOS asks.
-
-The DMG is only required for the first installation. StayTab can check its signed GitHub release feed afterward; choose a cadence under **Settings → General → Check for updates**. Enable **Include beta releases** only if you want prerelease builds.
-
-Official binaries are signed with a Developer ID, notarized by Apple, and accompanied by their GPL-3.0 source. Do not redistribute local test builds.
-
-### Install with npm
+### Install with npm — recommended
 
 ```sh
 npx staytab
 ```
 
-The installer downloads the same signed release from GitHub, checks its Developer ID signature and notarization, installs it into `/Applications`, and opens it. Pass `--dir ~/Applications` to install elsewhere.
+The installer downloads the latest signed release from GitHub, checks its Developer ID signature and notarization, installs it into `/Applications`, and opens it. Pass `--dir ~/Applications` to install elsewhere. It needs Node.js 18.3 or later.
 
-Homebrew is intentionally not advertised for the initial release. The DMG, `npx staytab`, and in-app updates are the supported distribution paths while the first releases stabilize.
+### Download the DMG
+
+Without Node.js, install the latest signed and notarized release as follows:
+
+1. Download `StayTab-*.dmg` from [GitHub Releases](https://github.com/kang1027/StayTab/releases/latest).
+2. Open the DMG and drag **StayTab** to Applications.
+3. Launch StayTab and grant Accessibility access when macOS asks.
+
+Either way, you only install once. StayTab can check its signed GitHub release feed afterward; choose a cadence under **Settings → General → Check for updates**. Enable **Include beta releases** only if you want prerelease builds.
+
+Official binaries are signed with a Developer ID, notarized by Apple, and accompanied by their GPL-3.0 source. Do not redistribute local test builds.
+
+Homebrew is intentionally not advertised for the initial release. `npx staytab`, the DMG, and in-app updates are the supported distribution paths while the first releases stabilize.
 
 ### Build from source
 
