@@ -7,6 +7,8 @@ import BetterSettings
 /// while this window is open.
 @MainActor
 final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
+    /// Lets Settings see an open onboarding window when it closes.
+    static let windowIdentifier = NSUserInterfaceItemIdentifier("StayTabOnboarding")
 
     /// Marks the walkthrough as seen, so it never reopens.
     static func markCompleted() {
@@ -48,6 +50,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
             defer: false
         )
         window.title = String(localized: "Welcome to StayTab")
+        window.identifier = Self.windowIdentifier
         window.isReleasedWhenClosed = false
         super.init(window: window)
         window.delegate = self

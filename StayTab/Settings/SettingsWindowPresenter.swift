@@ -99,7 +99,12 @@ final class SettingsWindowPresenter {
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                NSApp.setActivationPolicy(.accessory)
+                // Onboarding reverts the policy itself when it closes; don't
+                // demote the app underneath it.
+                let onboardingOpen = NSApp.windows.contains {
+                    $0.identifier == OnboardingWindowController.windowIdentifier && $0.isVisible
+                }
+                if !onboardingOpen { NSApp.setActivationPolicy(.accessory) }
                 if let token = self?.closeObserver {
                     NotificationCenter.default.removeObserver(token)
                     self?.closeObserver = nil
