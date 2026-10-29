@@ -105,6 +105,21 @@ struct PanelThemeTests {
         #expect(Preferences.loadPanelTheme(defaults) == theme)
     }
 
+    @Test("a hand-written config may give theme values as JSON numbers and booleans")
+    @MainActor
+    func loadsNumbersAndBooleans() throws {
+        let suite = "PanelThemeTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        defaults.set(["backdrop": "color", "hue": 42, "tint": 0.3, "tone": true], forKey: Preferences.Keys.themeAlways)
+        let always = Preferences.loadPanelTheme(defaults).always
+        #expect(always.backdrop == .color)
+        #expect(always.hue == 42)
+        #expect(always.tint == 0.3)
+        #expect(always.tone)
+    }
+
     // MARK: - Picture placement
 
     @Test("a wide picture in a wide area keeps its full height at zoom 1")

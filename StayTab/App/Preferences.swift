@@ -1735,12 +1735,21 @@ final class Preferences: ObservableObject {
     static func loadPanelTheme(_ defaults: UserDefaults) -> PanelTheme {
         var theme = PanelTheme()
         for (area, key) in themeAreaKeys {
-            if let raw = defaults.dictionary(forKey: key) as? [String: String] {
-                theme[area: area] = AreaTheme(dictionary: raw, area: area)
+            if let raw = defaults.dictionary(forKey: key) {
+                theme[area: area] = AreaTheme(dictionary: raw.compactMapValues(themeString), area: area)
             }
         }
         theme.accent = defaults.string(forKey: Keys.themeAccent).flatMap(ThemeAccent.init(rawValue:)) ?? .system
         return theme
+    }
+
+    /// A hand-written config.json may give a theme value as a JSON number or
+    /// boolean; read it as the string the theme stores.
+    private static func themeString(_ value: Any) -> String? {
+        if let string = value as? String { return string }
+        guard let number = value as? NSNumber else { return nil }
+        if CFGetTypeID(number) == CFBooleanGetTypeID() { return number.boolValue ? "true" : "false" }
+        return number.stringValue
     }
 
     static func storePanelTheme(_ theme: PanelTheme, in defaults: UserDefaults) {
