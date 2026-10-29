@@ -15,9 +15,9 @@
 
 <br>
 
-<img src="assets/switcher-hero.png" width="980" alt="StayTab switcher with separate Always and Running now sections">
+<img src="assets/switcher-hero.png" width="980" alt="StayTab switcher with an image panel theme and separate Always and Running now sections">
 
-<sub>Pinned apps keep a permanent lane. Docker is closed but ready to launch; temporary apps stay in Running now.</sub>
+<sub>Pinned apps keep a permanent lane. ChatGPT and Calculator are closed but ready to launch; temporary apps stay in Running now. Shown with a custom image panel theme.</sub>
 
 </div>
 
