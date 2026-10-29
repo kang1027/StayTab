@@ -522,7 +522,9 @@ final class SwitcherView: NSView {
     /// Set a forced Aqua/Dark Aqua only when the preference changes. Leaving the
     /// override nil preserves AppKit's live system-appearance inheritance.
     private func applyPanelAppearance(_ value: PanelAppearance, force: Bool = false) {
-        guard force || value == .matchPicture || value != appliedPanelAppearance || (value == .system && appearance != nil) else { return }
+        // matchPicture needs no per-reveal pass: `setTheme` forces one whenever
+        // the picture it reads changes.
+        guard force || value != appliedPanelAppearance || (value == .system && appearance != nil) else { return }
         appliedPanelAppearance = value
         let target: NSAppearance?
         switch value {
@@ -530,8 +532,8 @@ final class SwitcherView: NSView {
         case .light: target = NSAppearance(named: .aqua)
         case .dark: target = NSAppearance(named: .darkAqua)
         case .matchPicture:
-            if theme.panel.backdrop == .image, let samples = themePictures[.panel]?.samples {
-                let dark = PanelAppearance.picturePrefersDark(meanLightness: samples.meanLightness)
+            if theme.panel.backdrop == .image, let lightness = themePictures[.panel]?.meanLightness {
+                let dark = PanelAppearance.picturePrefersDark(meanLightness: lightness)
                 target = NSAppearance(named: dark ? .darkAqua : .aqua)
             } else {
                 target = nil

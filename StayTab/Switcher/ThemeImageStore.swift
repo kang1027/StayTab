@@ -8,10 +8,13 @@ import UniformTypeIdentifiers
 struct ThemePicture: @unchecked Sendable {
     let image: CGImage
     let samples: ThemeImageSamples?
+    /// Read by Match Picture, so it's measured here, off the main thread.
+    let meanLightness: Double?
 
     init(image: CGImage) {
         self.image = image
         self.samples = ThemeImageSamples(image: image)
+        self.meanLightness = samples?.meanLightness
     }
 }
 
