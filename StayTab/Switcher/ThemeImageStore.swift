@@ -104,16 +104,29 @@ enum ThemeImageFiles {
         return ciContext.createCGImage(image, from: extent)
     }
 
+    /// Whether two looks of an area bake to the same picture. Focus and zoom
+    /// aren't baked in; the layer crops at draw time.
+    static func bakesAlike(_ a: AreaTheme, _ b: AreaTheme) -> Bool {
+        a.blur == b.blur && a.tone == b.tone && (!a.tone || a.hue == b.hue)
+    }
+
     /// Writes the baked picture and its source under a fresh base name. A new
     /// name per save means a running switcher never reads a half-written file.
-    static func write(baked: CGImage, source: CGImage, area: ThemeArea) throws -> String {
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    /// A source already saved under `sourceBase` is copied, not re-encoded, so
+    /// saving again never costs it quality.
+    static func write(baked: CGImage, source: CGImage, sourceBase: String?, area: ThemeArea) throws -> String {
+        let manager = FileManager.default
+        try manager.createDirectory(at: directory, withIntermediateDirectories: true)
         let base = area.rawValue + "-" + UUID().uuidString.prefix(8).lowercased()
         guard let bakedURL = bakedURL(base: base), let sourceURL = sourceURL(base: base) else {
             throw CocoaError(.fileWriteInvalidFileName)
         }
         try writeJPEG(baked, to: bakedURL)
-        try writeJPEG(source, to: sourceURL)
+        if let saved = sourceBase.flatMap(Self.sourceURL(base:)), manager.fileExists(atPath: saved.path) {
+            try manager.copyItem(at: saved, to: sourceURL)
+        } else {
+            try writeJPEG(source, to: sourceURL)
+        }
         return base
     }
 

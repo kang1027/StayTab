@@ -20,6 +20,9 @@ final class ThemeEditorSession {
     private(set) var appearance = PanelAppearance.system
     private(set) var sources: [ThemeArea: Source] = [:]
     private(set) var isSaving = false
+    /// Saved pictures still decoding. Saving waits: an area whose picture
+    /// hasn't arrived can't be re-baked.
+    private(set) var isLoading = false
     var area: ThemeArea = .panel
     /// The Theme tab's bigger preview, remembered while the app runs.
     var previewExpanded = false
@@ -56,6 +59,7 @@ final class ThemeEditorSession {
     func releaseIfClean() {
         guard !isDirty, !isSaving else { return }
         loadGeneration += 1
+        isLoading = false
         sources = [:]
         started = false
     }
@@ -115,28 +119,40 @@ final class ThemeEditorSession {
         onChange?()
     }
 
-    /// Bakes every picture area, writes the files, then publishes the theme in
-    /// one step so the switcher never pairs a new theme with old pictures.
+    /// Bakes the picture areas that changed, writes their files, then publishes
+    /// the theme. An area whose picture and bake settings are unchanged keeps
+    /// its files, and one that fails keeps its previous files, so a save never
+    /// deletes a picture it didn't replace.
     func save(completion: @escaping (Bool) -> Void) {
-        guard !isSaving else { return }
+        guard !isSaving, !isLoading else { return }
         isSaving = true
         let draft = draft
         let appearance = appearance
         let sources = sources
+        let saved = baseTheme
+        let savedFiles = Preferences.shared.themeImageFiles
         DispatchQueue.global(qos: .userInitiated).async {
             var files: [String: String] = [:]
-            var written: [ThemeArea: String] = [:]
             var failed = false
             for area in ThemeArea.allCases where draft[area: area].backdrop == .image {
-                guard let source = sources[area] else { continue }
-                guard let baked = ThemeImageFiles.bake(source.image, area: area, theme: draft[area: area]),
-                      let base = try? ThemeImageFiles.write(baked: baked, source: source.image, area: area)
+                let theme = draft[area: area]
+                let previous = savedFiles[area.rawValue]
+                guard let source = sources[area],
+                      source.base == nil || source.base != previous
+                        || !ThemeImageFiles.bakesAlike(theme, saved[area: area])
+                else {
+                    if let previous { files[area.rawValue] = previous }
+                    continue
+                }
+                guard let baked = ThemeImageFiles.bake(source.image, area: area, theme: theme),
+                      let base = try? ThemeImageFiles.write(baked: baked, source: source.image,
+                                                            sourceBase: source.base, area: area)
                 else {
                     failed = true
+                    if let previous { files[area.rawValue] = previous }
                     continue
                 }
                 files[area.rawValue] = base
-                written[area] = base
             }
             ThemeImageFiles.removeFiles(except: Set(files.values))
             DispatchQueue.main.async {
@@ -146,10 +162,12 @@ final class ThemeEditorSession {
                 prefs.panelAppearance = appearance
                 self.baseTheme = draft
                 self.baseAppearance = appearance
-                for (area, base) in written {
-                    if let source = self.sources[area] {
-                        self.sources[area] = Source(image: source.image, name: source.name, base: base)
-                    }
+                // Only the picture that was saved is marked saved: one dropped
+                // in while the save ran stays unsaved.
+                for area in ThemeArea.allCases {
+                    guard let base = files[area.rawValue], let current = self.sources[area],
+                          current.image === sources[area]?.image else { continue }
+                    self.sources[area] = Source(image: current.image, name: current.name, base: base)
                 }
                 self.isSaving = false
                 self.onChange?()
@@ -162,6 +180,7 @@ final class ThemeEditorSession {
         loadGeneration += 1
         let token = loadGeneration
         let wanted = ThemeArea.allCases.compactMap { area in files[area.rawValue].map { (area, $0) } }
+        isLoading = !wanted.isEmpty
         guard !wanted.isEmpty else { return }
         DispatchQueue.global(qos: .userInitiated).async {
             var loaded: [ThemeArea: Source] = [:]
@@ -173,6 +192,7 @@ final class ThemeEditorSession {
             }
             DispatchQueue.main.async {
                 guard self.loadGeneration == token else { return }
+                self.isLoading = false
                 for (area, source) in loaded where self.sources[area] == nil {
                     self.sources[area] = source
                 }

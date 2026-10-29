@@ -132,6 +132,25 @@ struct PanelThemeTests {
         }
     }
 
+    @Test("only blur and tone decide whether a picture needs baking again")
+    func bakesAlike() {
+        let base = AreaTheme.defaults(for: .panel)
+        var moved = base
+        moved.focusX = 0.1
+        moved.zoom = 2
+        moved.hue = 10
+        #expect(ThemeImageFiles.bakesAlike(base, moved))
+        var blurred = base
+        blurred.blur = base.blur + 1
+        #expect(!ThemeImageFiles.bakesAlike(base, blurred))
+        var toned = base
+        toned.tone = true
+        #expect(!ThemeImageFiles.bakesAlike(base, toned))
+        var retoned = toned
+        retoned.hue = toned.hue + 30
+        #expect(!ThemeImageFiles.bakesAlike(toned, retoned))
+    }
+
     @Test("the layer rect flips to a bottom-left origin")
     func layerRectFlips() {
         let rect = ThemeCrop.layerContentsRect(CGRect(x: 0.1, y: 0.2, width: 0.5, height: 0.3))

@@ -647,7 +647,7 @@ final class ThemeSettingsViewController: SettingsTabViewController {
         let dirty = session.isDirty
         saveBarHeight?.constant = dirty ? 48 : 0
         saveBar.isHidden = !dirty
-        saveButton.isEnabled = !session.isSaving
+        saveButton.isEnabled = !session.isSaving && !session.isLoading
         revertButton.isEnabled = !session.isSaving
     }
 
