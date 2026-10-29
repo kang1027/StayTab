@@ -68,7 +68,15 @@ The DMG is only required for the first installation. StayTab can check its signe
 
 Official binaries are signed with a Developer ID, notarized by Apple, and accompanied by their GPL-3.0 source. Do not redistribute local test builds.
 
-Homebrew is intentionally not advertised for the initial release. Direct DMG installation and in-app updates are the supported distribution path while the first releases stabilize.
+### Install with npm
+
+```sh
+npx staytab
+```
+
+The installer downloads the same signed release from GitHub, checks its Developer ID signature and notarization, installs it into `/Applications`, and opens it. Pass `--dir ~/Applications` to install elsewhere.
+
+Homebrew is intentionally not advertised for the initial release. The DMG, `npx staytab`, and in-app updates are the supported distribution paths while the first releases stabilize.
 
 ### Build from source
 

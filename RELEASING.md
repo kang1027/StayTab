@@ -42,6 +42,23 @@ scripts/configure_release_secrets.sh kang1027/StayTab
 이 키를 잃으면 이미 배포된 앱의 업데이트 신뢰 체인을 이어갈 수 없습니다. 최초 릴리스
 전에 별도 암호 관리자에 안전하게 백업해야 합니다.
 
+### 4. npm 설치 패키지
+
+`npx staytab`은 `npm/`의 설치 스크립트입니다. 자기 버전과 같은 GitHub Release의 ZIP을
+받아 Developer ID 서명과 공증을 확인한 뒤 `/Applications`에 설치합니다.
+
+npm trusted publishing은 이미 있는 패키지에만 연결되므로 첫 버전은 직접 올립니다.
+GitHub Release가 공개된 뒤 다음을 실행합니다.
+
+```bash
+npm login
+scripts/publish_npm.sh v<version>
+```
+
+그다음 npmjs.com의 `staytab` 패키지 설정에서 Trusted Publisher로 GitHub Actions
+`kang1027/StayTab`의 `publish-npm.yml`을 추가합니다. 이후 릴리스는 워크플로가
+토큰 없이 올립니다.
+
 ## 버전 준비
 
 StayTab은 `v0.1.0` 형식의 태그를 사용합니다.
@@ -97,6 +114,8 @@ scripts/build_release.sh \
 - `sign-release.yml`: DMG/ZIP 해시와 저장소·번들·팀 정보를 서명한 BetterUpdater
   매니페스트를 첨부합니다.
 - `update-homebrew-cask.yml`: DMG의 SHA-256으로 `Casks/staytab.rb`를 갱신합니다.
+- `publish-npm.yml`: 같은 버전의 `staytab` npm 설치 패키지를 올립니다. 베타는 `beta`
+  태그로 올라갑니다. 패키지가 npm에 아직 없으면 건너뜁니다.
 
 초기 공개 설치 경로는 GitHub Releases의 공증된 DMG입니다. Homebrew Cask 자동화는 이후
 배포 경로를 열 때 사용할 기반으로만 유지하며 README에서는 아직 안내하지 않습니다.

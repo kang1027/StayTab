@@ -1,0 +1,31 @@
+{
+  "name": "staytab",
+  "version": "0.0.0",
+  "description": "Install StayTab, the macOS ⌘Tab switcher that keeps your apps in place",
+  "bin": {
+    "staytab": "bin/staytab.js"
+  },
+  "files": [
+    "bin/"
+  ],
+  "os": [
+    "darwin"
+  ],
+  "engines": {
+    "node": ">=18.3"
+  },
+  "keywords": [
+    "macos",
+    "cmd-tab",
+    "app-switcher",
+    "launcher"
+  ],
+  "homepage": "https://github.com/kang1027/StayTab",
+  "bugs": "https://github.com/kang1027/StayTab/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kang1027/StayTab.git",
+    "directory": "npm"
+  },
+  "license": "GPL-3.0-only"
+}
