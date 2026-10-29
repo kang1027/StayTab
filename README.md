@@ -37,9 +37,19 @@ Quick-tapping `⌘Tab` still returns to the previously focused app. Holding it o
 
 <div align="center">
 
-<img src="assets/settings-pinned-apps.png" width="878" alt="StayTab pinned-app settings">
+<img src="assets/settings-pinned-apps.png" width="870" alt="StayTab Apps settings with the pinned-app list and jump keys">
 
 <sub>Choose the order once, then use automatic or custom one-to-three-character jump keys.</sub>
+
+</div>
+
+## Make the panel yours
+
+<div align="center">
+
+<img src="assets/settings-theme.png" width="870" alt="StayTab Theme settings with a live panel preview and picture background controls">
+
+<sub>Give the panel, Always, and Running now their own color or picture, and check the live preview before you save.</sub>
 
 </div>
 
@@ -48,6 +58,7 @@ Quick-tapping `⌘Tab` still returns to the previously focused app. Holding it o
 - **Persistent pinned apps.** Keep Mail, your browser, terminal, notes, music, and other daily tools in a predictable order.
 - **Closed-app launch.** A pinned app remains selectable after quitting and launches from the same slot.
 - **Clear visual grouping.** Pinned apps and temporary running apps occupy separate sections.
+- **Panel themes.** Use a color or your own picture for the panel and each section, with crop, blur, and tint controls, custom section titles and icons, and a readability check that suggests a fix when labels get hard to read.
 - **Fast jump keys.** Automatic labels use the shortest available app-name prefix, up to three letters or digits. Custom combinations are supported too.
 - **Native switching semantics.** Quick `⌘Tab`, reverse switching, window focus, Spaces, minimized windows, and keyboard input behave like a Mac switcher should.
 - **Local by design.** No account, telemetry, analytics, or remote app-usage history.
