@@ -38,6 +38,8 @@ final class AppsSettingsViewController: SettingsTabViewController {
     /// A free key offered next to `jumpKeyValidationMessage` when the rejected
     /// edit was a conflict or a reserved key; one click assigns it.
     private var jumpKeySuggestion: (bundleID: String, key: String)?
+    /// Bumped on every edit, so a slow suggestion for an earlier one is dropped.
+    private var jumpKeySuggestionRequest = 0
     private var appsSheet: AppsPickerSheetWindowController?
     private var addSheet: AppsPickerSheetWindowController?
 
@@ -374,6 +376,7 @@ final class AppsSettingsViewController: SettingsTabViewController {
     private func clearJumpKeyRejection() {
         jumpKeyValidationMessage = nil
         jumpKeySuggestion = nil
+        jumpKeySuggestionRequest += 1
     }
 
     /// Resolve the app's display name off the main actor (a cold LaunchServices
@@ -382,6 +385,7 @@ final class AppsSettingsViewController: SettingsTabViewController {
     private func suggestJumpKey(for bundleID: String) {
         let assignments = jumpLetters
         let reserved = RowLabels.reserved
+        let request = jumpKeySuggestionRequest
         DispatchQueue.global(qos: .userInitiated).async {
             let name = Self.appName(for: bundleID)
             let key = JumpKeySuggestion.suggest(
@@ -391,8 +395,9 @@ final class AppsSettingsViewController: SettingsTabViewController {
                 reservedLetters: reserved
             )
             DispatchQueue.main.async { [weak self] in
-                guard let self, self.jumpKeyValidationMessage != nil,
-                      self.jumpKeySuggestion == nil, let key else { return }
+                guard let self, self.jumpKeySuggestionRequest == request,
+                      self.jumpKeyValidationMessage != nil, self.jumpKeySuggestion == nil, let key
+                else { return }
                 self.jumpKeySuggestion = (bundleID, key)
                 self.rebuildPinnedCard()
             }
