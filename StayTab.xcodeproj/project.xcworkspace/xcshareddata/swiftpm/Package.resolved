@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/rokartur/BetterPermissions.git",
       "state" : {
-        "revision" : "0679549a2bb9b5989a2f9975aed222a93af35616",
-        "version" : "1.0.1"
+        "revision" : "9acc215f6c41624b2fc836dad2dd02972e3377bd",
+        "version" : "1.0.2"
       }
     },
     {
