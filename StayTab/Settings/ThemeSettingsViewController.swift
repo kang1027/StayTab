@@ -561,10 +561,10 @@ final class ThemeSettingsViewController: SettingsTabViewController {
     private func loadDesktopPicture() {
         guard let screen = view.window?.screen ?? NSScreen.main,
               let url = NSWorkspace.shared.desktopImageURL(for: screen) else { return }
-        DispatchQueue.global(qos: .userInitiated).async {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let image = ThemeImageFiles.loadSource(from: url) else { return }
             let samples = ThemeImageSamples(image: image, maxEdge: 24)
-            DispatchQueue.main.async { [weak self] in
+            DispatchQueue.main.async {
                 guard let self else { return }
                 self.previewBox.desktopImage = image
                 if let samples { self.desktopColor = ThemeLegibility.average(samples.pixels) }
@@ -665,10 +665,10 @@ final class ThemeSettingsViewController: SettingsTabViewController {
             bakedKeys[area] = key
             let image = source.image
             let edge = min(800, ThemeImageFiles.bakedMaxEdge(for: area, blur: theme.blur))
-            Self.bakeQueue.async {
+            Self.bakeQueue.async { [weak self] in
                 let baked = ThemeImageFiles.bake(image, area: area, theme: theme, maxEdge: edge)
                 let picture = baked.map(ThemePicture.init(image:))
-                DispatchQueue.main.async { [weak self] in
+                DispatchQueue.main.async {
                     guard let self, self.bakedKeys[area] == key else { return }
                     self.previewPictures[area] = picture
                     self.previewView?.setTheme(self.session.draft, pictures: self.previewPictures)
@@ -832,10 +832,10 @@ final class ThemeSettingsViewController: SettingsTabViewController {
 
     private func loadPicture(from url: URL) {
         let area = session.area
-        DispatchQueue.global(qos: .userInitiated).async {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let image = ThemeImageFiles.loadSource(from: url)
             let samples = image.flatMap { ThemeImageSamples(image: $0) }
-            DispatchQueue.main.async { [weak self] in
+            DispatchQueue.main.async {
                 guard let self else { return }
                 guard let image else {
                     self.showError(String(localized: "StayTab couldn't open that picture. Choose a PNG, JPEG or HEIC file."))
