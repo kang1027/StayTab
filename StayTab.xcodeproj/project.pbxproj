@@ -593,7 +593,7 @@
 			repositoryURL = "https://github.com/rokartur/BetterUpdater.git";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 0.1.0;
+				minimumVersion = 0.2.8;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
