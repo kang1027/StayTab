@@ -856,7 +856,7 @@ final class ThemeSettingsViewController: SettingsTabViewController {
     }
 
     @objc private func titleCommitted() {
-        let title = AreaTheme.cleanTitle(titleField.stringValue)
+        let title = AreaTheme.storedTitle(titleField.stringValue, defaultName: session.area.displayName)
         session.updateArea { $0.title = title }
     }
 
@@ -1071,8 +1071,7 @@ final class ThemeSettingsViewController: SettingsTabViewController {
 extension ThemeSettingsViewController: NSTextFieldDelegate {
     func controlTextDidChange(_ notification: Notification) {
         guard (notification.object as? NSTextField) === titleField else { return }
-        let title = AreaTheme.cleanTitle(titleField.stringValue)
-        session.updateArea { $0.title = title }
+        titleCommitted()
     }
 }
 

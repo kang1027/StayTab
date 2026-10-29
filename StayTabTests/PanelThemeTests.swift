@@ -69,6 +69,14 @@ struct PanelThemeTests {
         #expect(theme.symbol.isEmpty)
     }
 
+    @Test("the default name typed back stays the localizable default")
+    func storedTitle() {
+        #expect(AreaTheme.storedTitle("Always", defaultName: "Always") == nil)
+        #expect(AreaTheme.storedTitle(" Always ", defaultName: "Always") == nil)
+        #expect(AreaTheme.storedTitle(" Work ", defaultName: "Always") == "Work")
+        #expect(AreaTheme.storedTitle("", defaultName: "Always") == "")
+    }
+
     @Test("stored numbers don't depend on the locale and drop trailing zeros")
     func numberFormat() {
         #expect(AreaTheme.format(200) == "200")

@@ -154,6 +154,13 @@ struct AreaTheme: Equatable, Sendable {
         return String(line.trimmingCharacters(in: .whitespaces).prefix(titleMaxLength))
     }
 
+    /// The title a typed value stores. The default name, typed back or left
+    /// untouched, stays nil so it keeps following the system language.
+    static func storedTitle(_ typed: String, defaultName: String) -> String? {
+        let title = cleanTitle(typed)
+        return title == defaultName ? nil : title
+    }
+
     static func normalizedHue(_ value: Double) -> Double {
         let wrapped = value.truncatingRemainder(dividingBy: 360)
         return wrapped < 0 ? wrapped + 360 : wrapped
