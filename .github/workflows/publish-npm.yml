@@ -1,0 +1,46 @@
+# Publish the `staytab` npm installer (`npx staytab`) for each release.
+#
+# Setup: npm trusted publishing only attaches to a package that exists, so the
+# first version is published by hand (`npm login`, then
+# `scripts/publish_npm.sh <tag>`). Then add this workflow as the package's
+# trusted publisher on npmjs.com (kang1027/StayTab, publish-npm.yml). Until
+# then this job skips instead of failing.
+
+name: Publish npm installer
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published release tag, e.g. v0.2.0
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          if ! npm view staytab name >/dev/null 2>&1; then
+            echo "::notice::staytab isn't on npm yet. Publish it once by hand, then add this workflow as its trusted publisher."
+            exit 0
+          fi
+          # Trusted publishing needs npm 11.5.1 or later.
+          npm install --global npm@11
+          scripts/publish_npm.sh "$TAG"

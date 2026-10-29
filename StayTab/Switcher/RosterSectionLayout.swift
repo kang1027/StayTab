@@ -42,6 +42,7 @@ enum RosterSectionLayout {
         maxWidth: CGFloat,
         maxColumns: Int,
         headerHeight: CGFloat,
+        runningHeaderHeight: CGFloat? = nil,
         bottomPadding: CGFloat,
         sectionSpacing: CGFloat,
         packing: Packing
@@ -65,11 +66,15 @@ enum RosterSectionLayout {
             (.running, pinned..<total),
         ].filter { !$0.range.isEmpty }
 
+        // A section whose title and icon are both off keeps only a thin header.
+        let header = { (kind: RosterSectionKind) in
+            kind == .running ? (runningHeaderHeight ?? headerHeight) : headerHeight
+        }
         let sectionHeights = definitions.map { definition -> CGFloat in
             let rowCount = Int(ceil(Double(definition.range.count) / Double(columns)))
             let itemsHeight = CGFloat(rowCount) * itemSize.height
                 + CGFloat(max(0, rowCount - 1)) * itemGap
-            return headerHeight + itemsHeight + bottomPadding
+            return header(definition.kind) + itemsHeight + bottomPadding
         }
         let totalHeight = sectionHeights.reduce(0, +)
             + CGFloat(max(0, definitions.count - 1)) * sectionSpacing
@@ -81,6 +86,7 @@ enum RosterSectionLayout {
 
         for (sectionIndex, definition) in definitions.enumerated() {
             let sectionHeight = sectionHeights[sectionIndex]
+            let headerHeight = header(definition.kind)
             let sectionFrame = NSRect(
                 x: 0,
                 y: top - sectionHeight,

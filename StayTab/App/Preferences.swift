@@ -506,12 +506,16 @@ enum PanelAppearance: String, CaseIterable, Sendable {
     case system
     case light
     case dark
+    /// Light or dark by the brightness of the theme's background picture;
+    /// `.system` when the panel has none.
+    case matchPicture
 
     var displayName: String {
         switch self {
         case .system: return String(localized: "System")
         case .light: return String(localized: "Light")
         case .dark: return String(localized: "Dark")
+        case .matchPicture: return String(localized: "Match Picture")
         }
     }
 }
@@ -851,6 +855,15 @@ final class Preferences: ObservableObject {
         static let panelCornerRadius = "Switcher.panelCornerRadius"
         static let listWidthPercent = "Switcher.listWidthPercent"
         static let backdropMaterial = "Switcher.backdropMaterial"
+        /// Panel theme (Theme tab), one `[String: String]` per area plus the
+        /// accent source. See `AreaTheme.dictionary`.
+        static let themePanel = "Switcher.themePanel"
+        static let themeAlways = "Switcher.themeAlways"
+        static let themeRunning = "Switcher.themeRunning"
+        static let themeAccent = "Switcher.themeAccent"
+        /// Area → base name of the baked picture in Application Support. Local to
+        /// THIS Mac, never exported (like the custom commit sound).
+        static let themeImageFiles = "Switcher.themeImageFiles"
         /// Legacy pre-#57 bool ("only current Space"). Still written (in sync
         /// with `spaceScope`) so older builds and old exports stay coherent;
         /// read only as the fallback when `spaceScope` is absent.
@@ -1694,6 +1707,67 @@ final class Preferences: ObservableObject {
         }
     }
 
+    /// Colors and pictures of the panel and its sections (Theme tab). An area
+    /// left at its defaults is not stored, so untouched installs export nothing.
+    @Published var panelTheme: PanelTheme {
+        didSet {
+            guard oldValue != panelTheme else { return }
+            Self.storePanelTheme(panelTheme, in: .standard)
+        }
+    }
+
+    /// Area → base name of its baked picture (`ThemeImageStore`). Machine-local.
+    @Published var themeImageFiles: [String: String] {
+        didSet {
+            guard oldValue != themeImageFiles else { return }
+            if themeImageFiles.isEmpty {
+                UserDefaults.standard.removeObject(forKey: Keys.themeImageFiles)
+            } else {
+                UserDefaults.standard.set(themeImageFiles, forKey: Keys.themeImageFiles)
+            }
+        }
+    }
+
+    private static let themeAreaKeys: [(ThemeArea, String)] = [
+        (.panel, Keys.themePanel), (.always, Keys.themeAlways), (.running, Keys.themeRunning),
+    ]
+
+    static func loadPanelTheme(_ defaults: UserDefaults) -> PanelTheme {
+        var theme = PanelTheme()
+        for (area, key) in themeAreaKeys {
+            if let raw = defaults.dictionary(forKey: key) {
+                theme[area: area] = AreaTheme(dictionary: raw.compactMapValues(themeString), area: area)
+            }
+        }
+        theme.accent = defaults.string(forKey: Keys.themeAccent).flatMap(ThemeAccent.init(rawValue:)) ?? .system
+        return theme
+    }
+
+    /// A hand-written config.json may give a theme value as a JSON number or
+    /// boolean; read it as the string the theme stores.
+    private static func themeString(_ value: Any) -> String? {
+        if let string = value as? String { return string }
+        guard let number = value as? NSNumber else { return nil }
+        if CFGetTypeID(number) == CFBooleanGetTypeID() { return number.boolValue ? "true" : "false" }
+        return number.stringValue
+    }
+
+    static func storePanelTheme(_ theme: PanelTheme, in defaults: UserDefaults) {
+        for (area, key) in themeAreaKeys {
+            let value = theme[area: area]
+            if value == AreaTheme.defaults(for: area) {
+                defaults.removeObject(forKey: key)
+            } else {
+                defaults.set(value.dictionary, forKey: key)
+            }
+        }
+        if theme.accent == .system {
+            defaults.removeObject(forKey: Keys.themeAccent)
+        } else {
+            defaults.set(theme.accent.rawValue, forKey: Keys.themeAccent)
+        }
+    }
+
     /// Which Spaces the switcher shows windows from (#57). Default all Spaces.
     /// Reads window Space membership via the same private APIs as instant Space
     /// switching; degrades to showing everything when those are unavailable.
@@ -2328,6 +2402,8 @@ final class Preferences: ObservableObject {
         self.listWidthPercent = Self.clampListWidthPercent(listWidth)
         let materialRaw = defaults.string(forKey: Keys.backdropMaterial)
         self.backdropMaterial = materialRaw.flatMap(BackdropMaterial.init(rawValue:)) ?? .hud
+        self.panelTheme = Self.loadPanelTheme(defaults)
+        self.themeImageFiles = defaults.dictionary(forKey: Keys.themeImageFiles) as? [String: String] ?? [:]
         self.spaceScope = Self.storedSpaceScope(defaults)
         self.directActivationBindings = Self.normalizeBindings(defaults.stringArray(forKey: Keys.directActivationBindings) ?? [])
         let legacyScopes = Self.loadScopes(defaults.stringArray(forKey: Keys.scopedShortcutScopes))
@@ -2469,6 +2545,8 @@ final class Preferences: ObservableObject {
         panelCornerRadius = Self.clampCornerRadius(defaults.object(forKey: Keys.panelCornerRadius) as? Int ?? 0)
         listWidthPercent = Self.clampListWidthPercent(defaults.object(forKey: Keys.listWidthPercent) as? Int ?? 100)
         backdropMaterial = defaults.string(forKey: Keys.backdropMaterial).flatMap(BackdropMaterial.init(rawValue:)) ?? .hud
+        panelTheme = Self.loadPanelTheme(defaults)
+        themeImageFiles = defaults.dictionary(forKey: Keys.themeImageFiles) as? [String: String] ?? [:]
         spaceScope = Self.storedSpaceScope(defaults)
         directActivationBindings = Self.normalizeBindings(defaults.stringArray(forKey: Keys.directActivationBindings) ?? [])
         let reloadedScopes = Self.loadScopes(defaults.stringArray(forKey: Keys.scopedShortcutScopes))

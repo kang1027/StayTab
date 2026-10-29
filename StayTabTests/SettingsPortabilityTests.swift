@@ -973,4 +973,34 @@ struct SettingsPortabilityTests {
         ]))
         #expect(UserDefaults.standard.object(forKey: "Foreign.someKey") == nil)
     }
+    @Test("the panel theme exports and imports; its picture files stay on this Mac")
+    func panelThemeRoundTrip() throws {
+        let prefs = Preferences.shared
+        let savedTheme = prefs.panelTheme
+        let savedFiles = prefs.themeImageFiles
+        defer {
+            prefs.panelTheme = savedTheme
+            prefs.themeImageFiles = savedFiles
+        }
+
+        var theme = PanelTheme.standard
+        theme.always.backdrop = .color
+        theme.always.hue = 42
+        theme.panel.backdrop = .image
+        theme.accent = .background
+        prefs.panelTheme = theme
+        prefs.themeImageFiles = ["panel": "panel-test"]
+
+        let data = try Preferences.exportedJSONData()
+        let root = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(root["themeAlways"] is [String: String])
+        #expect(root["themeAccent"] as? String == "background")
+        #expect(root["themeImageFiles"] == nil)
+
+        prefs.panelTheme = .standard
+        try prefs.importSettings(from: data)
+        #expect(prefs.panelTheme == theme)
+        #expect(prefs.themeImageFiles == ["panel": "panel-test"])
+    }
 }
+
