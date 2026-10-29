@@ -15,9 +15,9 @@
 
 <br>
 
-<img src="assets/switcher-hero.png" width="980" alt="Always와 Running now 영역이 분리된 StayTab 앱 전환기">
+<img src="assets/switcher-hero.png" width="980" alt="이미지 패널 테마를 적용했고 Always와 Running now 영역이 분리된 StayTab 앱 전환기">
 
-<sub>고정 앱은 Always 영역을 유지해요. 종료된 Docker는 바로 실행할 수 있고, 임시 앱은 Running now에만 표시돼요.</sub>
+<sub>고정 앱은 Always 영역을 유지해요. 종료된 ChatGPT와 계산기도 바로 실행할 수 있고, 임시 앱은 Running now에만 표시돼요. 패널에는 사용자 지정 이미지 테마를 적용했어요.</sub>
 
 </div>
 
