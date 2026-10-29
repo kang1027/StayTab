@@ -36,6 +36,37 @@ enum JumpKeyAssignmentValidation: Equatable {
     }
 }
 
+/// Picks a free single-key jump for an app whose requested key was rejected.
+/// Tries the letters of the app's own name first so the suggestion stays
+/// mnemonic, then the remaining A–Z, then digits.
+enum JumpKeySuggestion {
+    static func suggest(
+        appName: String,
+        bundleID: String,
+        assignments: [String: String],
+        reservedLetters: Set<Character>
+    ) -> String? {
+        var seen = Set<Character>()
+        var candidates: [Character] = []
+        let fallback = Array("abcdefghijklmnopqrstuvwxyz0123456789")
+        for character in appName.lowercased() + String(fallback) where RowLabels.isDirectJumpCharacter(character) {
+            if seen.insert(character).inserted { candidates.append(character) }
+        }
+        for character in candidates {
+            let key = String(character)
+            if case .valid = JumpKeyAssignmentValidation.evaluate(
+                rawValue: key,
+                bundleID: bundleID,
+                assignments: assignments,
+                reservedLetters: reservedLetters
+            ) {
+                return key
+            }
+        }
+        return nil
+    }
+}
+
 /// Pure array-move for the pinned-apps drag reorder. Extracted from the view so
 /// the drop-index math is unit-testable without a live `NSTableView`.
 enum PinnedReorder {

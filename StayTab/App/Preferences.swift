@@ -735,6 +735,9 @@ final class Preferences: ObservableObject {
         /// Local bookkeeping, never exported: see `preRebasePanelScales` for
         /// how an imported payload is dated instead.
         static let panelScaleRebased = "Switcher.panelScaleRebased"
+        /// Set once the first-run walkthrough has been shown or dismissed.
+        /// Local bookkeeping for THIS Mac, never exported.
+        static let onboardingCompleted = "Switcher.onboardingCompleted"
         static let panelAppearance = "Switcher.panelAppearance"
         static let fontScale = "Switcher.fontScale"
         static let fontFace = "Switcher.fontFace"

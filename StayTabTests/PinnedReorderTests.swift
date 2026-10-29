@@ -158,3 +158,56 @@ struct JumpKeyAssignmentValidationTests {
         ) == .valid("c"))
     }
 }
+
+@Suite("Pinned jump-key suggestion")
+struct JumpKeySuggestionTests {
+
+    @Test("prefers the first letter of the app name that is free")
+    func prefersAppNameLetters() {
+        // Slack's "s" is taken by Safari, so the next name letter wins.
+        #expect(JumpKeySuggestion.suggest(
+            appName: "Slack", bundleID: "slack",
+            assignments: ["safari": "s"], reservedLetters: []
+        ) == "l")
+    }
+
+    @Test("skips reserved switcher keys and other apps' keys")
+    func skipsReservedAndTaken() {
+        #expect(JumpKeySuggestion.suggest(
+            appName: "Mail", bundleID: "mail",
+            assignments: ["music": "a"], reservedLetters: ["m"]
+        ) == "i")
+    }
+
+    @Test("falls back to the alphabet, then digits, when the name is exhausted")
+    func fallsBackBeyondTheName() {
+        let taken: [String: String] = ["x": "a", "y": "b"]
+        #expect(JumpKeySuggestion.suggest(
+            appName: "AB", bundleID: "ab", assignments: taken, reservedLetters: []
+        ) == "c")
+    }
+
+    @Test("an app's own current key does not block itself")
+    func ignoresOwnAssignment() {
+        #expect(JumpKeySuggestion.suggest(
+            appName: "Notion", bundleID: "notion",
+            assignments: ["notion": "n"], reservedLetters: []
+        ) == "n")
+    }
+
+    @Test("returns nil when every key is unavailable")
+    func exhausted() {
+        let all = Array("abcdefghijklmnopqrstuvwxyz0123456789").map(String.init)
+        let taken = Dictionary(uniqueKeysWithValues: all.enumerated().map { ("app\($0.offset)", $0.element) })
+        #expect(JumpKeySuggestion.suggest(
+            appName: "Notion", bundleID: "notion", assignments: taken, reservedLetters: []
+        ) == nil)
+    }
+
+    @Test("non-ASCII name characters are ignored")
+    func nonASCIIName() {
+        #expect(JumpKeySuggestion.suggest(
+            appName: "메모 Notes", bundleID: "notes", assignments: [:], reservedLetters: []
+        ) == "n")
+    }
+}

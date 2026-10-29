@@ -71,9 +71,14 @@ enum KeyboardLayout {
         return result
     }
 
-    /// Re-read the current keyboard layout. Safe to call from any thread.
+    /// Re-read the current keyboard layout. Safe to call from any thread: the
+    /// Text Input Source calls must run on the main thread (HIToolbox asserts
+    /// it), so an off-main caller waits for main, as `Activator` does.
     static func reload() {
-        guard let data = currentOrFallbackLayoutData() else { return }
+        let data = Thread.isMainThread
+            ? currentOrFallbackLayoutData()
+            : DispatchQueue.main.sync { currentOrFallbackLayoutData() }
+        guard let data else { return }
         layoutData.withLock { $0 = data }
     }
 

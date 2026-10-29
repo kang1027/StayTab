@@ -31,11 +31,13 @@ final class AccessibilityWaiter {
 
     private var timer: Timer?
 
-    func start() {
+    /// `prompt: false` waits without raising the system dialog — the first-run
+    /// walkthrough asks for the permission itself, on its own screen.
+    func start(prompt: Bool = true) {
         if AccessibilityCheck.isTrusted {
             onTrusted()
         } else {
-            AccessibilityCheck.promptIfNeeded()
+            if prompt { AccessibilityCheck.promptIfNeeded() }
             waitForTrust()
         }
     }

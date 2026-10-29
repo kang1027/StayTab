@@ -44,6 +44,16 @@ enum IconCache {
         return c
     }()
 
+    /// Dashed "not running" variants of launchable rows. Separate from
+    /// `bundleCache` because recently-closed rows share a bundle ID with the
+    /// same app yet keep the plain icon.
+    private static let ghostCache: NSCache<NSString, NSImage> = {
+        let c = NSCache<NSString, NSImage>()
+        c.countLimit = capacity
+        c.totalCostLimit = capacity * bytesPerImage
+        return c
+    }()
+
     static func icon(for row: SwitcherRow) -> NSImage? {
         if let tab = row.browserTab,
            let key = BrowserFaviconCache.key(bundleID: row.bundleIdentifier, url: tab.url),
@@ -84,6 +94,13 @@ enum IconCache {
         // from memory instead of round-tripping `NSWorkspace`.
         guard let bundleID = row.bundleIdentifier, !bundleID.isEmpty else { return row.icon }
         let key = bundleID as NSString
+        if row.isLaunchable {
+            if let cached = ghostCache.object(forKey: key) { return cached }
+            guard let source = row.icon else { return nil }
+            let ghost = renderBitmap(edge: renderEdge) { GhostIcon.draw(source, in: $0) } ?? source
+            ghostCache.setObject(ghost, forKey: key, cost: bytesPerImage)
+            return ghost
+        }
         if let cached = bundleCache.object(forKey: key) { return cached }
         guard let source = row.icon else { return nil }
         let flat = flattened(source) ?? source
@@ -98,6 +115,7 @@ enum IconCache {
     static func clear() {
         cache.removeAllObjects()
         bundleCache.removeAllObjects()
+        ghostCache.removeAllObjects()
         badgedCache.removeAllObjects()
     }
 
